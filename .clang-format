@@ -1,0 +1,84 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Layout & Line Width
+ColumnLimit: 107
+IndentWidth: 4
+TabWidth: 4
+ContinuationIndentWidth: 8
+ConstructorInitializerIndentWidth: 4
+
+# Indentation
+IndentCaseLabels: true
+NamespaceIndentation: All
+AccessModifierOffset: -4
+
+# Braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterControlStatement: true
+  AfterEnum: true
+  AfterExternBlock: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  BeforeLambdaBody: true
+  BeforeWhile: true
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyNamespace: false
+  SplitEmptyRecord: false
+
+# Spaces
+SpaceAfterCStyleCast: true
+SpaceAfterTemplateKeyword: false
+SpaceBeforeRangeBasedForLoopColon: true
+SpacesInAngles: false
+SpacesInConditionalStatement: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpaceInEmptyParentheses: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignOperands: true
+AlignTrailingComments: true
+PointerAlignment: Right
+
+# Includes
+IncludeCategories:
+  - Regex: '^<.*'
+    Priority: 1
+  - Regex: '^".*'
+    Priority: 2
+  - Regex: '.*'
+    Priority: 3
+IncludeIsMainRegex: '([-_](test|unittest))?$'
+IncludeBlocks: Preserve
+SortIncludes: Never
+
+# Statement formatting
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortBlocksOnASingleLine: Never
+AllowAllConstructorInitializersOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
+AlwaysBreakTemplateDeclarations: Yes
+BinPackParameters: OnePerLine
+BinPackArguments: false
+PenaltyBreakBeforeFirstCallParameter: 1
+
+# Other
+InsertNewlineAtEOF: true
+MaxEmptyLinesToKeep: 2
