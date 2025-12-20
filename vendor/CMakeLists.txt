@@ -1,1 +1,5 @@
+set(NVRHI_WITH_VULKAN ON CACHE BOOL "Enable Vulkan Backend" FORCE)
+set(NVRHI_WITH_DX11 OFF CACHE BOOL "Enable DX11 Backend" FORCE)
+set(NVRHI_WITH_DX12 OFF CACHE BOOL "Enable DX12 Backend" FORCE)
+
 add_subdirectory(NVRHI)

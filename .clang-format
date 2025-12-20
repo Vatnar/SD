@@ -3,19 +3,33 @@ Language: Cpp
 BasedOnStyle: LLVM
 
 # Layout & Line Width
-ColumnLimit: 107
-IndentWidth: 4
-TabWidth: 4
-ContinuationIndentWidth: 8
-ConstructorInitializerIndentWidth: 4
-
-# Indentation
-IndentCaseLabels: true
-NamespaceIndentation: All
 AccessModifierOffset: -4
-
-# Braces
-BreakBeforeBraces: Custom
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: Right
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveBitFields: None
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveMacros: None
+AlignEscapedNewlines: Left
+AlignOperands: Align
+AlignTrailingComments: true
+AllowAllArgumentsOnNextLine: false
+AllowAllConstructorInitializersOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLambdasOnASingleLine: Inline
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: false
+BinPackParameters: OnePerLine
+BitFieldColonSpacing: Both
 BraceWrapping:
   AfterCaseLabel: true
   AfterClass: true
@@ -24,6 +38,7 @@ BraceWrapping:
   AfterExternBlock: true
   AfterFunction: true
   AfterNamespace: true
+  AfterObjCDeclaration: false
   AfterStruct: true
   AfterUnion: true
   BeforeCatch: true
@@ -34,51 +49,147 @@ BraceWrapping:
   SplitEmptyFunction: false
   SplitEmptyNamespace: false
   SplitEmptyRecord: false
-
-# Spaces
-SpaceAfterCStyleCast: true
-SpaceAfterTemplateKeyword: false
-SpaceBeforeRangeBasedForLoopColon: true
-SpacesInAngles: false
-SpacesInConditionalStatement: false
-SpacesInCStyleCastParentheses: false
-SpacesInParentheses: false
-SpaceInEmptyParentheses: false
-
-# Alignment
-AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: true
-AlignConsecutiveDeclarations: true
-AlignOperands: true
-AlignTrailingComments: true
-PointerAlignment: Right
-
-# Includes
+BreakAfterAttributes: Never
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BreakBeforeConceptDeclarations: Allowed
+BreakBeforeInheritanceComma: false
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeColon
+BreakStringLiterals: true
+ColumnLimit: 107
+CommentPragmas: '^ IWYU pragma:'
+CompactNamespaces: false
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 8
+Cpp11BracedListStyle: true
+DeriveLineEnding: true
+DerivePointerAlignment: false
+DisableFormat: false
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: LogicalBlock
+ExperimentalAutoDetectBinPacking: false
+FixNamespaceComments: true
+ForEachMacros:
+  - foreach
+  - Q_FOREACH
+  - BOOST_FOREACH
+IfMacros:
+  - KJ_IF_MAYBE
+IncludeBlocks: Preserve
 IncludeCategories:
   - Regex: '^<.*'
     Priority: 1
+    SortPriority: 0
   - Regex: '^".*'
     Priority: 2
+    SortPriority: 0
   - Regex: '.*'
     Priority: 3
+    SortPriority: 0
 IncludeIsMainRegex: '([-_](test|unittest))?$'
-IncludeBlocks: Preserve
-SortIncludes: Never
-
-# Statement formatting
-AllowShortIfStatementsOnASingleLine: false
-AllowShortLoopsOnASingleLine: false
-AllowShortCaseLabelsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: InlineOnly
-AllowShortBlocksOnASingleLine: Never
-AllowAllConstructorInitializersOnNextLine: false
-AllowAllParametersOfDeclarationOnNextLine: false
-AllowAllArgumentsOnNextLine: false
-AlwaysBreakTemplateDeclarations: Yes
-BinPackParameters: OnePerLine
-BinPackArguments: false
-PenaltyBreakBeforeFirstCallParameter: 1
-
-# Other
+IncludeIsMainSourceRegex: ''
+IndentAccessModifiers: false
+IndentCaseBlocks: false
+IndentCaseLabels: true
+IndentExternBlock: AfterExternBlock
+IndentGotoLabels: true
+IndentPPDirectives: None
+IndentRequiresClause: true
+IndentWidth: 4
+IndentWrappedFunctionNames: false
+InsertBraces: false
 InsertNewlineAtEOF: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+LambdaBodyIndentation: Signature
+LineEnding: DeriveLF
 MaxEmptyLinesToKeep: 2
+NamespaceIndentation: All
+NamespaceMacros:
+  - TEST_SUITE
+  - TEST_CASE
+  - TEST_CASE_METHOD
+  - TEST_CASE_TEMPLATE
+  - TEST_CASE_TEMPLATE_DEFINE
+  - TEST_CASE_METHOD_DEFINE
+  - TEMPLATE_TEST_CASE
+  - TEMPLATE_TEST_CASE_SIG
+  - TEMPLATE_TEST_CASE_METHOD
+  - TEMPLATE_TEST_CASE_METHOD_SIG
+  - CATCH_TEST_CASE
+  - CATCH_TEST_CASE_METHOD
+  - CATCH_SECTION
+  - CATCH_SCENARIO
+  - CATCH_DESCRIBE
+  - CATCH_CONTEXT
+PenaltyBreakAssignment: 2
+PenaltyBreakBeforeFirstCallParameter: 1
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyBreakTemplateDeclaration: 10
+PenaltyExcessCharacter: 1000000
+PenaltyIndentedWhitespace: 0
+PenaltyReturnTypeOnItsOwnLine: 60
+PointerAlignment: Right
+QualifierAlignment: Left
+RawStringFormats:
+  - Language: Cpp
+    Delimiters:
+      - 'R'
+    CanonicalDelimiter: ''
+    BasedOnStyle: 'LLVM'
+ReferenceAlignment: Left
+ReflowComments: Always
+RemoveBracesLLVM: false
+SeparateDefinitionBlocks: Leave
+ShortNamespaceLines: 1
+SortIncludes: Never
+SortJavaStaticImport: Before
+SortUsingDeclarations: true
+SpaceAfterCStyleCast: true
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: false
+SpaceAroundPointerQualifiers: Default
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+Standard: Latest
+StatementAttributeLikeMacros:
+  - Q_EMIT
+StatementMacros:
+  - Q_UNUSED
+  - QT_REQUIRE_VERSION
+TabWidth: 4
+UseCRLF: false
+UseTab: Never
+
+# ObjC / Other language specific (harmless for pure C++, but present in full dump)
+ObjCBinPackProtocolList: Auto
+ObjCBlockIndentWidth: 2
+ObjCBreakBeforeNestedBlockParam: true
+ObjCSpaceAfterProperty: false
+ObjCSpaceBeforeProtocolList: true
+
+# Misc toggles that appear in newer versions
+PackConstructorInitializers: BinPack
+AllowShortCaseExpressionOnASingleLine: false
+AllowShortCompoundRequirementOnASingleLine: false
+RequiresClausePosition: OwnLine
+RequiresExpressionIndentation: OuterScope
