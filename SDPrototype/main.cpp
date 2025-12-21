@@ -1,13 +1,16 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #define VULKAN_HPP_ENABLE_DYNAMIC_LOADER_TOOL 1
+#include <bits/this_thread_sleep.h>
 #include <vulkan/vulkan.hpp>
 #include <nvrhi/vulkan.h>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 
-#include "nvrhi/utils.h"
-#include "nvrhi/validation.h"
+#include <nvrhi/utils.h>
+#include <nvrhi/validation.h>
+
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <print>
@@ -26,6 +29,23 @@ struct Vertex
     float position[3];
     float texCoord[2];
 };
+
+nvrhi::Format toNvrhiFormat(vk::Format fmt)
+{
+    switch (fmt)
+    {
+        case vk::Format::eB8G8R8A8Srgb:
+        case vk::Format::eR8G8B8A8Srgb:
+            return nvrhi::Format::SRGBA8_UNORM;
+
+        case vk::Format::eB8G8R8A8Unorm:
+        case vk::Format::eR8G8B8A8Unorm:
+            return nvrhi::Format::RGBA8_UNORM;
+
+        default:
+            throw std::runtime_error("Unsupported VkFormat for swapchain in NVRHI");
+    }
+}
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -60,8 +80,13 @@ VkPhysicalDevice vulkanPhysicalDevice = nullptr;
 
 int main()
 {
-    // NOTE: INIT VULKAN
+    // TODO: Create window and such
+    glfwInit();
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    GLFWwindow *windowHandle = glfwCreateWindow(800, 600, "SDPrototype", nullptr, nullptr);
 
+
+    // NOTE: vulkan instance
     static vk::detail::DynamicLoader dl;
     PFN_vkGetInstanceProcAddr        vkGetInstanceProcAddr =
             dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
@@ -71,9 +96,12 @@ int main()
     // Create instance
     vk::ApplicationInfo appInfo("MyEngine", 1, "NoEngine", 1, VK_API_VERSION_1_3);
 
-    std::vector<const char *> instanceExts = {VK_KHR_SURFACE_EXTENSION_NAME,
-                                              VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-                                              VK_EXT_DEBUG_REPORT_EXTENSION_NAME};
+    uint32_t extCount = 0;
+
+    const char **glfwExts = glfwGetRequiredInstanceExtensions(&extCount);
+
+    std::vector<const char *> instanceExts(glfwExts, glfwExts + extCount);
+
 
     vk::InstanceCreateInfo instInfo({}, &appInfo, {}, instanceExts);
     vk::UniqueInstance     instance = vk::createInstanceUnique(instInfo);
@@ -91,15 +119,75 @@ int main()
     vk::PhysicalDeviceFeatures2 features2;
     features2.setPNext(&features13);
 
-    std::vector<const char *> deviceExts = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                                            VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-                                            VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-                                            VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME};
+    // TODO: actually query for extensions, and not just assume they exist
+    auto available = physDev.enumerateDeviceExtensionProperties();
+
+    auto supports = [&](const char *name)
+    {
+        return std::ranges::any_of(available,
+                                   [&](const vk::ExtensionProperties& e)
+                                   { return std::strcmp(e.extensionName, name) == 0; });
+    };
+
+    std::vector<const char *> deviceExts;
+
+    auto requireExt = [&](const char *name)
+    {
+        if (!supports(name))
+            throw std::runtime_error(std::string("Required device extension missing ") + name);
+        deviceExts.push_back(name);
+    };
+
+    requireExt(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    auto raytracing = false;
+    if (raytracing)
+    {
+        requireExt(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+        requireExt(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+        requireExt(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    }
+
+    // NOTE: Create surface
+
+    VkSurfaceKHR rawSurface;
+    if (auto res = glfwCreateWindowSurface(*instance, windowHandle, nullptr, &rawSurface); res != VK_SUCCESS)
+    {
+        std::cerr << "glfwCreateWindowSurface failed with VKResult = " << res << "\n";
+        throw std::runtime_error("Failed to create window surface");
+    }
+    vk::SurfaceKHR surface = rawSurface;
+
 
     // NOTE: setup queues
     // todo: find graphics family index
-    uint32_t graphicsFamilyIndex = 0;
 
+    auto     queueFamilies       = physDev.getQueueFamilyProperties();
+    uint32_t graphicsFamilyIndex = UINT32_MAX;
+
+    for (uint32_t i = 0; i < queueFamilies.size(); ++i)
+    {
+        bool supportsGraphics =
+                (queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) == vk::QueueFlagBits::eGraphics;
+
+        vk::Bool32 supportsPresent = vk::False;
+        physDev.getSurfaceSupportKHR(i, surface, &supportsPresent);
+
+        if (supportsGraphics && supportsPresent)
+        {
+            graphicsFamilyIndex = i;
+            break;
+        }
+    }
+
+    if (graphicsFamilyIndex == UINT32_MAX)
+    {
+        // TODO: figure out if i want exceptions, how it should be handled, where etc
+        throw std::runtime_error("No queue family supports both graphics and present");
+    }
+
+
+    // NOTE: Create device
 
     float                     priority = 1.0f;
     vk::DeviceQueueCreateInfo queueInfo({}, graphicsFamilyIndex, 1, &priority);
@@ -108,21 +196,21 @@ int main()
     devInfo.setPNext(&features2);
 
 
-    vk::UniqueDevice device = physDev.createDeviceUnique(devInfo);
+    vk::UniqueDevice vulkanDevice = physDev.createDeviceUnique(devInfo);
 
     // init dispatcher for device
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(*device);
-
-
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*vulkanDevice);
+    // endregion
+    // region NVRHIDevice and validation
     // NOTE: Creating NVRHI device
     nvrhi::vulkan::DeviceDesc nvrhiDesc;
     nvrhiDesc.errorCB        = &g_MessageCallback;
     nvrhiDesc.instance       = *instance;
     nvrhiDesc.physicalDevice = physDev;
-    nvrhiDesc.device         = *device;
+    nvrhiDesc.device         = *vulkanDevice;
 
     // queue
-    nvrhiDesc.graphicsQueue      = device->getQueue(graphicsFamilyIndex, 0);
+    nvrhiDesc.graphicsQueue      = vulkanDevice->getQueue(graphicsFamilyIndex, 0);
     nvrhiDesc.graphicsQueueIndex = graphicsFamilyIndex;
 
     // exts
@@ -139,25 +227,145 @@ int main()
         nvrhi::DeviceHandle nvrhiValidationLayer = nvrhi::validation::createValidationLayer(nvrhiDevice);
         nvrhiDevice                              = nvrhiValidationLayer;
     }
+
+    // endregion
+
+
+    // Find swapchain width and height
+
+    vk::SurfaceCapabilitiesKHR caps = physDev.getSurfaceCapabilitiesKHR(surface);
+    vk::Extent2D               swapchainExtent;
+
+    if (caps.currentExtent.width != UINT32_MAX)
+        swapchainExtent = caps.currentExtent;
+    else
+    {
+        uint32_t windowWidth  = 800; // TODO: get from window system
+        uint32_t windowHeight = 600;
+        // TODO: Change to the actual window width and such, this just for testing
+        swapchainExtent.width  = std::clamp(windowWidth, caps.minImageExtent.width, caps.maxImageExtent.width);
+        swapchainExtent.height = std::clamp(windowHeight, caps.minImageExtent.height, caps.maxImageExtent.height);
+    }
+
+    // image count
+    uint32_t desiredImageCount = caps.minImageCount + 1; // try triple buffering
+
+    if (caps.maxImageCount > 0 && desiredImageCount > caps.maxImageCount)
+        desiredImageCount = caps.maxImageCount;
+
+
+    // NOTE: create swapchain
+    auto surfaceFormats = physDev.getSurfaceFormatsKHR(surface);
+
+    // get surface formats
+    vk::SurfaceFormatKHR surfaceFormat;
+    if (surfaceFormats.size() == 1 && surfaceFormats[0].format == vk::Format::eUndefined)
+    {
+        // no preference;
+        // todo: study which are best
+        surfaceFormat.format     = vk::Format::eB8G8R8A8Srgb;
+        surfaceFormat.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+    }
+    else
+    {
+        // prefer SRGB 8bit BGRA if avilable, else fallback
+        surfaceFormat = surfaceFormats[0];
+        for (auto& f : surfaceFormats)
+        {
+            if (f.format == vk::Format::eB8G8R8A8Srgb && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+            {
+                surfaceFormat = f;
+                break;
+            }
+        }
+    }
+    // get present mode
+    auto               presentModes = physDev.getSurfacePresentModesKHR(surface);
+    vk::PresentModeKHR presentMode  = vk::PresentModeKHR::eFifo; // always supported
+    for (auto m : presentModes)
+    {
+        if (m == vk::PresentModeKHR::eMailbox)
+        {
+            presentMode = m; // low-latency vsync
+            break;
+        }
+    }
+
+    // find image usage
+    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment;
+    usage |= vk::ImageUsageFlagBits::eTransferDst; // for offscreen hdr buffer blitting
+
+    // find pretransform
+    // for rotated displays to work properly
+    vk::SurfaceTransformFlagBitsKHR preTransform = caps.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity
+                                                           ? vk::SurfaceTransformFlagBitsKHR::eIdentity
+                                                           : caps.currentTransform;
+
+    vk::SwapchainCreateInfoKHR swapchainCreateInfo;
+    swapchainCreateInfo.setSurface(surface)
+            .setMinImageCount(desiredImageCount)
+            .setImageFormat(surfaceFormat.format)
+            .setImageColorSpace(surfaceFormat.colorSpace)
+            .setImageExtent(swapchainExtent)
+            .setImageArrayLayers(1)
+            .setImageUsage(usage)
+            .setPreTransform(preTransform)
+            .setPresentMode(presentMode)
+            .setClipped(true)
+            .setImageSharingMode(vk::SharingMode::eExclusive); // for graphics queue == present queue
+
+    vk::SwapchainKHR swapchain = vulkanDevice->createSwapchainKHR(swapchainCreateInfo);
+
+    // Get all swapchain images
+    uint32_t imageCount = 0;
+
+    // TODO: Check if we might aswell just put it into the vector right away, if that is better or not
+    // TODO: Get/create swap chain
+    vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, nullptr);
+    std::vector<vk::Image> swapchainImages(imageCount);
+    vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, swapchainImages.data());
+
+    nvrhi::TextureDesc swapchainTexDesc;
+
+    uint32_t swapchainWidth  = swapchainExtent.width;
+    uint32_t swapchainHeight = swapchainExtent.height;
+
+    // TODO: this must match surface specs
+    auto swapchainTexImageFormat = toNvrhiFormat(surfaceFormat.format);
+
+    swapchainTexDesc.setDimension(nvrhi::TextureDimension::Texture2D)
+            .setFormat(swapchainTexImageFormat)
+            .setWidth(swapchainWidth)
+            .setHeight(swapchainHeight)
+            .setIsRenderTarget(true)
+            .setDebugName("Swapchain Image");
+
+    std::vector<nvrhi::TextureHandle> swapchainTextures;
+    swapchainTextures.reserve(imageCount);
+
+
+    // create handles for all native vk textures
+    for (uint32_t i = 0; i < imageCount; ++i)
+    {
+        VkImage nativeImage = static_cast<VkImage>(swapchainImages[i]);
+
+        nvrhi::TextureHandle tex = nvrhiDevice->createHandleForNativeTexture(nvrhi::ObjectTypes::VK_Image,
+                                                                             nvrhi::Object(nativeImage),
+                                                                             swapchainTexDesc);
+        swapchainTextures.push_back(tex);
+    }
+
+
+    // create framebuffer for each nvrhi texture
+    std::vector<nvrhi::FramebufferHandle> framebuffers;
+    framebuffers.reserve(imageCount);
+    for (uint32_t i = 0; i < imageCount; ++i)
+    {
+        auto fbDesc = nvrhi::FramebufferDesc().addColorAttachment(swapchainTextures[i]);
+        framebuffers.push_back(nvrhiDevice->createFramebuffer(fbDesc));
+    }
+
     /*
-        // NOTE: Create swap chain textures
-        auto textureDesc = nvrhi::TextureDesc()
-                                   .setDimension(nvrhi::TextureDimension::Texture2D)
-                                   .setFormat(nvrhi::Format::RGBA8_UNORM)
-                                   .setWidth(swapChainWidth)
-                                   .setHeight(swapChainHeight)
-                                   .setIsRenderTarget(true)
-                                   .setDebugName("Swap Chain Image");
-
-        nvrhi::TextureHandle swapChainTexture =
-                nvrhiDevice->createHandleForNativeTexture(nvrhi::ObjectTypes::VK_Image,
-                                                          nativeTextureOrImage,
-                                                          textureDesc);
-
-        auto framebufferDesc                 =
-       nvrhi::FramebufferDesc().addColorAttachment(swapChainTexture); nvrhi::FramebufferHandle framebuffer
-       = nvrhiDevice->createFramebuffer(framebufferDesc);
-
 
         // NOTE: Graphics Pipeline
         nvrhi::ShaderHandle vertexShader =
@@ -310,9 +518,25 @@ int main()
        https://github.com/NVIDIA-RTX/Donut-Samples/blob/main/examples/vertex_buffer/vertex_buffer.cpp
     */
 
-    device->waitIdle();
+
+    // NOTE: Window loop
+    static bool isRunning = true;
+    while (isRunning)
+    {
+        isRunning = !glfwWindowShouldClose(windowHandle);
+        glfwPollEvents();
+        // get image, record/submit commands, present
+        // simulate rendering
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::cout << "Rendered" << "\n";
+        isRunning = false;
+    }
+
+    vulkanDevice->waitIdle();
     // TODO: Global nvrhi stuff needs to be cleaned up before main exits
     nvrhiDevice = nullptr;
+    glfwDestroyWindow(windowHandle);
+    glfwTerminate();
 
     return 0;
 }
