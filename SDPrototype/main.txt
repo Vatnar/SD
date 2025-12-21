@@ -116,17 +116,11 @@ int main()
 
     // Create device
 
-    vk::PhysicalDeviceVulkan12Features features12{};
-    features12.timelineSemaphore   = VK_TRUE;
-    features12.bufferDeviceAddress = VK_TRUE;
-
     vk::PhysicalDeviceVulkan13Features features13;
     features13.setDynamicRendering(true).setSynchronization2(true);
 
-    features12.pNext = &features13;
-
     vk::PhysicalDeviceFeatures2 features2;
-    features2.setPNext(&features12);
+    features2.setPNext(&features13);
 
     // TODO: actually query for extensions, and not just assume they exist
     auto available = physDev.enumerateDeviceExtensionProperties();
@@ -425,20 +419,8 @@ int main()
 
     nvrhi::InputLayoutHandle inputLayout = nvrhiDevice->createInputLayout(nullptr, 0, vertexShader);
 
-    auto fbInfo = framebuffers[0]->getFramebufferInfo();
-    printf("colorFormats[0]=%d\n", (int) fbInfo.colorFormats[0]); // Only this prints
 
-    // CORRECT pipeline creation:
-    auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-                                .setInputLayout(inputLayout)
-                                .setVertexShader(vertexShader)
-                                .setPixelShader(pixelShader);
-
-    pipelineDesc.renderState.rasterState.setCullMode(nvrhi::RasterCullMode::None);
-
-    // NO targetCount loop - your version INFERS from fbInfo in createGraphicsPipeline
-    nvrhi::GraphicsPipelineHandle graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, fbInfo);
-
+    auto framebufferInfo = framebuffers[0]->getFramebufferInfo();
 
     // NOTE: Binding layout
     // auto layoutDesc = nvrhi::BindingLayoutDesc()
@@ -448,7 +430,16 @@ int main()
 
     // nvrhi::BindingLayoutHandle bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
 
-    //
+    // NOTE: Pipeline creation
+    auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
+                                .setInputLayout(inputLayout)
+                                .setVertexShader(vertexShader)
+                                .setPixelShader(pixelShader);
+
+    // .addBindingLayout(bindingLayout);
+
+    nvrhi::GraphicsPipelineHandle graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, framebufferInfo);
+
     //
     // // NOTE: Creating the resources
     //
@@ -533,64 +524,72 @@ https://github.com/NVIDIA-RTX/Donut-Samples/blob/main/examples/vertex_buffer/ver
     vk::UniqueSemaphore renderFinished = vulkanDevice->createSemaphoreUnique(semaphoreInfo);
 
     vk::UniqueFence inFlight = vulkanDevice->createFenceUnique(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
-    vulkanDevice->resetFences(*inFlight);
+
     nvrhi::CommandListHandle cmdList = nvrhiDevice->createCommandList();
 
+    // NOTE: Window loop
     bool     isRunning  = true;
     uint32_t frameCount = 0;
-
     while (isRunning)
     {
         isRunning = !glfwWindowShouldClose(windowHandle);
         glfwPollEvents();
 
-        // 1. Acquire image
-        uint32_t imageIndex = 0;
-        auto     res = vulkanDevice->acquireNextImageKHR(swapchain, UINT64_MAX, VK_NULL_HANDLE, *inFlight, &imageIndex);
-        if (res == vk::Result::eErrorOutOfDateKHR)
-            continue;
-        if (res != vk::Result::eSuccess)
-            continue;
-
-        // 2. CRITICAL: Wait for ACQUIRE fence IMMEDIATELY (fixes validation)
+        // wait for gpu
         vulkanDevice->waitForFences(*inFlight, VK_TRUE, UINT64_MAX);
         vulkanDevice->resetFences(*inFlight);
 
-        // 3. Render (unchanged)
+        // acquire next image
+        uint32_t   imageIndex = 0;
+        vk::Result res =
+                vulkanDevice->acquireNextImageKHR(swapchain, UINT64_MAX, *imageAvailable, nullptr, &imageIndex);
+
+        if (res == vk::Result::eErrorOutOfDateKHR)
+        {
+            // TODO: resizing, swapchain recreation
+            continue;
+        }
+
+        // record nvrhi clear into command list
         cmdList->open();
+
         auto fb = framebuffers[imageIndex];
+
         nvrhi::utils::ClearColorAttachment(cmdList, fb, 0, nvrhi::Color(0.f));
+
+        // set pipeline and viewport
+
+        auto extent = swapchainExtent;
+
+        int winW, winH;
+        glfwGetWindowSize(windowHandle, &winW, &winH);
+        printf("Window: %dx%d, Swapchain: %ux%u\n", winW, winH, extent.width, extent.height);
+        printf("Frame %u: imageIndex=%u\n", frameCount++, imageIndex);
+
         auto graphicsState = nvrhi::GraphicsState()
                                      .setPipeline(graphicsPipeline)
                                      .setFramebuffer(fb)
                                      .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(
-                                             nvrhi::Viewport(static_cast<float>(swapchainExtent.width),
-                                                             static_cast<float>(swapchainExtent.height))));
+                                             nvrhi::Viewport(extent.width, extent.height)));
 
         cmdList->setGraphicsState(graphicsState);
+
+
+        // draw fullscreen triangle
         cmdList->draw(nvrhi::DrawArguments().setVertexCount(3));
+
+
         cmdList->close();
         nvrhiDevice->executeCommandList(cmdList);
 
-        // 4. Present (your existing code)
+        // present
         vk::PresentInfoKHR presentInfo{};
         presentInfo.setSwapchainCount(1).setSwapchains(swapchain).setImageIndices(imageIndex);
+
         vulkanDevice->getQueue(graphicsFamilyIndex, 0).presentKHR(presentInfo);
     }
 
-
-    nvrhiDevice->waitForIdle();
     vulkanDevice->waitIdle();
-
-    framebuffers.clear();
-    swapchainTextures.clear();
-
-    graphicsPipeline = nullptr;
-    cmdList          = nullptr;
-
-    vulkanDevice->destroySwapchainKHR(swapchain);
-    instance->destroySurfaceKHR(surface);
-
     // TODO: Global nvrhi stuff needs to be cleaned up before main exits
     nvrhiDevice = nullptr;
     glfwDestroyWindow(windowHandle);
