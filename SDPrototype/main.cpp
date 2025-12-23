@@ -1,26 +1,30 @@
+#include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
+
+
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #define VULKAN_HPP_ENABLE_DYNAMIC_LOADER_TOOL 1
-#include <bits/this_thread_sleep.h>
 #include <vulkan/vulkan.hpp>
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include <nvrhi/vulkan.h>
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-
+#include <GLFW/glfw3.h>
 
 #include <nvrhi/utils.h>
 #include <nvrhi/validation.h>
-
-#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <print>
 #include <queue>
 
+
 #include "assets/shaders/vertex_shader.h"
 #include "assets/shaders/pixel_shader.h"
 
 
-const bool enableValidation = true;
+constexpr bool enableValidation = true;
 
 
 extern unsigned char vertex_spv[], pixel_spv[];
@@ -81,9 +85,92 @@ void MessageCallback::message(nvrhi::MessageSeverity severity, const char *messa
 MessageCallback  g_MessageCallback;
 VkPhysicalDevice vulkanPhysicalDevice = nullptr;
 
+
+#define ENGINE_LOG_LEVEL_TRACE 0
+#define ENGINE_LOG_LEVEL_DEBUG 1
+#define ENGINE_LOG_LEVEL_INFO 2
+#define ENGINE_LOG_LEVEL_WARN 3
+#define ENGINE_LOG_LEVEL_ERROR 4
+#define ENGINE_LOG_LEVEL_CRITICAL 5
+#define ENGINE_LOG_LEVEL_OFF 6
+
+enum class LogLevel
+{
+    Trace    = ENGINE_LOG_LEVEL_TRACE,
+    Debug    = ENGINE_LOG_LEVEL_DEBUG,
+    Info     = ENGINE_LOG_LEVEL_INFO,
+    Warn     = ENGINE_LOG_LEVEL_WARN,
+    Error    = ENGINE_LOG_LEVEL_ERROR,
+    Critical = ENGINE_LOG_LEVEL_CRITICAL,
+    Off      = ENGINE_LOG_LEVEL_OFF
+};
+
+#ifndef ENGINE_LOG_LEVEL
+#define ENGINE_LOG_LEVEL ENGINE_LOG_LEVEL_INFO
+#endif
+constexpr auto cLOG_LEVEL = static_cast<LogLevel>(ENGINE_LOG_LEVEL);
+
+bool constexpr should_log(LogLevel level)
+{
+    return static_cast<int>(level) >= static_cast<int>(cLOG_LEVEL);
+}
+
+// TODO: Custom logging macros that respect log levels and remove calls
+void init_logging()
+{
+    spdlog::init_thread_pool(8192, 1);
+
+    std::vector<spdlog::sink_ptr> sinks;
+    sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+    sinks.push_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>("engine.log", true));
+
+    auto logger = std::make_shared<spdlog::async_logger>("engine",
+                                                         sinks.begin(),
+                                                         sinks.end(),
+                                                         spdlog::thread_pool(),
+                                                         spdlog::async_overflow_policy::block);
+
+    switch (cLOG_LEVEL)
+    {
+        case LogLevel::Trace:
+            logger->set_level(spdlog::level::trace);
+            break;
+        case LogLevel::Debug:
+            logger->set_level(spdlog::level::debug);
+            break;
+        case LogLevel::Info:
+            logger->set_level(spdlog::level::info);
+            break;
+        case LogLevel::Warn:
+            logger->set_level(spdlog::level::warn);
+            break;
+        case LogLevel::Error:
+            logger->set_level(spdlog::level::err);
+            break;
+        case LogLevel::Critical:
+            logger->set_level(spdlog::level::critical);
+            break;
+        case LogLevel::Off:
+            logger->set_level(spdlog::level::off);
+            break;
+        default:
+            logger->set_level(spdlog::level::info);
+    }
+    logger->flush_on(spdlog::level::warn);
+
+    spdlog::register_logger(logger);
+}
+
 int main()
 {
+    // NOTE: Init logging
+
+    init_logging();
+    auto logger = spdlog::get("engine");
+
     // TODO: Create window and such
+
+
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow *windowHandle = glfwCreateWindow(800, 600, "SDPrototype", nullptr, nullptr);
@@ -180,7 +267,11 @@ int main()
                 (queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) == vk::QueueFlagBits::eGraphics;
 
         vk::Bool32 supportsPresent = vk::False;
-        physDev.getSurfaceSupportKHR(i, surface, &supportsPresent);
+
+        if (auto res = physDev.getSurfaceSupportKHR(i, surface, &supportsPresent); res != vk::Result::eSuccess)
+        {
+            logger->warn("getSurfaceSupportKHR returned vk::Result::{}", static_cast<uint64_t>(res));
+        }
 
         if (supportsGraphics && supportsPresent)
         {
@@ -337,9 +428,18 @@ int main()
 
     // TODO: Check if we might aswell just put it into the vector right away, if that is better or not
     // TODO: Get/create swap chain
-    vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, nullptr);
+
+    if (auto res = vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, nullptr); res != vk::Result::eSuccess)
+    {
+        logger->warn("getSwapChainImagesKHR returned vk::Result::{}", static_cast<uint64_t>(res));
+    }
     std::vector<vk::Image> swapchainImages(imageCount);
-    vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, swapchainImages.data());
+
+    if (auto res = vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, swapchainImages.data());
+        res != vk::Result::eSuccess)
+    {
+        logger->warn("getSwapChainImagesKHR returned vk::Result::{}", static_cast<uint64_t>(res));
+    }
 
     nvrhi::TextureDesc swapchainTexDesc;
 
@@ -426,7 +526,7 @@ int main()
     nvrhi::InputLayoutHandle inputLayout = nvrhiDevice->createInputLayout(nullptr, 0, vertexShader);
 
     auto fbInfo = framebuffers[0]->getFramebufferInfo();
-    printf("colorFormats[0]=%d\n", (int) fbInfo.colorFormats[0]); // Only this prints
+    logger->debug("colorFormats[0]={}", static_cast<uint32_t>(fbInfo.colorFormats[0]));
 
     // CORRECT pipeline creation:
     auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
@@ -541,10 +641,11 @@ https://github.com/NVIDIA-RTX/Donut-Samples/blob/main/examples/vertex_buffer/ver
 
     while (isRunning)
     {
+        // TODO: Begin pass somehow?
         isRunning = !glfwWindowShouldClose(windowHandle);
         glfwPollEvents();
 
-        // 1. Acquire image
+        // Acquire image
         uint32_t imageIndex = 0;
         auto     res = vulkanDevice->acquireNextImageKHR(swapchain, UINT64_MAX, VK_NULL_HANDLE, *inFlight, &imageIndex);
         if (res == vk::Result::eErrorOutOfDateKHR)
@@ -552,11 +653,14 @@ https://github.com/NVIDIA-RTX/Donut-Samples/blob/main/examples/vertex_buffer/ver
         if (res != vk::Result::eSuccess)
             continue;
 
-        // 2. CRITICAL: Wait for ACQUIRE fence IMMEDIATELY (fixes validation)
-        vulkanDevice->waitForFences(*inFlight, VK_TRUE, UINT64_MAX);
+        // Wait for ACQUIRE fence IMMEDIATELY
+        if (auto res = vulkanDevice->waitForFences(*inFlight, VK_TRUE, UINT64_MAX); res != vk::Result::eSuccess)
+        {
+            logger->warn("waitForFences returned vk::Result::{}", static_cast<uint64_t>(res));
+        }
         vulkanDevice->resetFences(*inFlight);
 
-        // 3. Render (unchanged)
+        // Render
         cmdList->open();
         auto fb = framebuffers[imageIndex];
         nvrhi::utils::ClearColorAttachment(cmdList, fb, 0, nvrhi::Color(0.f));
@@ -570,12 +674,18 @@ https://github.com/NVIDIA-RTX/Donut-Samples/blob/main/examples/vertex_buffer/ver
         cmdList->setGraphicsState(graphicsState);
         cmdList->draw(nvrhi::DrawArguments().setVertexCount(3));
         cmdList->close();
+
         nvrhiDevice->executeCommandList(cmdList);
 
-        // 4. Present (your existing code)
+        //  Present
         vk::PresentInfoKHR presentInfo{};
         presentInfo.setSwapchainCount(1).setSwapchains(swapchain).setImageIndices(imageIndex);
-        vulkanDevice->getQueue(graphicsFamilyIndex, 0).presentKHR(presentInfo);
+        auto presentResult = vulkanDevice->getQueue(graphicsFamilyIndex, 0).presentKHR(presentInfo);
+        if (presentResult != vk::Result::eSuccess)
+        {
+            // TODO: make custom loggin stuff
+            std::println("PresentKHR error: vk::result::{}", static_cast<uint64_t>(presentResult));
+        }
     }
 
 
