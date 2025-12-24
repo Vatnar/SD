@@ -1,9 +1,17 @@
-float4 main(uint vid : SV_VertexID) : SV_POSITION
+// vertex.hlsl
+struct VSOutput
 {
-    float2 pos[3] = {
-        float2(-1.0, -1.0),
-        float2( 3.0, -1.0),
-        float2(-1.0,  3.0)
-    };
-    return float4(pos[vid], 0.0, 1.0);
+    float4 Pos : SV_POSITION;
+};
+
+VSOutput main(uint VertexID : SV_VertexID)
+{
+    VSOutput output;
+
+    // Grid generation logic
+    float2 grid = float2((VertexID << 1) & 2, VertexID & 2);
+    float2 xy = grid * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f);
+
+    output.Pos = float4(xy, 0.0f, 1.0f);
+    return output;
 }
