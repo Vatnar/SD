@@ -1,3 +1,8 @@
 cmake-build-*/
-.idea**
 *.log
+
+
+.idea**
+!.idea/cmake.xml
+!.idea/codeStyles/
+

@@ -21,23 +21,30 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 // GLFW
 #include <GLFW/glfw3.h>
 
+// STB
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 // STD
 #include <iostream>
-#include <print>
 #include <queue>
 #include <chrono>
 #include <x86intrin.h>
+#include <filesystem>
+#include <fstream>
 
 // SD
-#include "assets/shaders/vertex_shader.h"
-#include "assets/shaders/pixel_shader.h"
+// #include "assets/shaders/vertex_shader.h"
+// #include "assets/shaders/pixel_shader.h"
 
 
 constexpr bool enableValidation = true;
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 
-extern unsigned char vertex_spv[], pixel_spv[];
-extern unsigned int  vertex_spv_len, pixel_spv_len;
+#include <dxc/dxcapi.h>
+// extern unsigned char vertex_spv[], pixel_spv[];
+// extern unsigned int  vertex_spv_len, pixel_spv_len;
 
 struct Vertex
 {
@@ -170,6 +177,124 @@ void init_logging()
     spdlog::register_logger(logger);
 }
 
+bool g_ResizeRequested = false;
+
+void framebufferResizeCallback(GLFWwindow *window, int width, int height)
+{
+    g_ResizeRequested = true;
+}
+
+std::vector<char> readFile(const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open())
+    {
+        throw std::runtime_error("failed to open file: " + filename);
+    }
+
+    size_t            fileSize = (size_t) file.tellg();
+    std::vector<char> buffer(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+    file.close();
+
+    return buffer;
+}
+
+CComPtr<IDxcUtils> g_dxcUtils;
+CComPtr<IDxcCompiler3> g_dxcCompiler;
+
+bool initShaderCompiler()
+{
+    if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&g_dxcUtils))))
+    {
+        std::cerr << "Failed to create DXC Utils" << std::endl;
+        return false;
+    }
+    if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&g_dxcCompiler))))
+    {
+        std::cerr << "Failed to create DXC Compiler" << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool compileShader(const std::string& source, std::vector<char>& output, const std::string& profile)
+{
+    if (!g_dxcUtils || !g_dxcCompiler)
+    {
+        std::cerr << "Shader compiler not initialized" << std::endl;
+        return false;
+    }
+
+    CComPtr<IDxcBlobEncoding> pSource;
+    if (FAILED(g_dxcUtils->LoadFile(CA2W(source.c_str()), nullptr, &pSource)))
+    {
+        std::cerr << "Failed to load shader source: " << source << std::endl;
+        return false;
+    }
+
+    DxcBuffer Source;
+    Source.Ptr = pSource->GetBufferPointer();
+    Source.Size = pSource->GetBufferSize();
+    BOOL known = FALSE;
+    UINT32 codePage = 0;
+    if (SUCCEEDED(pSource->GetEncoding(&known, &codePage)))
+    {
+        Source.Encoding = known ? codePage : DXC_CP_ACP;
+    }
+    else
+    {
+        Source.Encoding = DXC_CP_ACP;
+    }
+
+    std::vector<std::wstring> args;
+    args.push_back(L"-E");
+    args.push_back(L"main");
+    args.push_back(L"-T");
+    args.push_back(std::wstring(CA2W(profile.c_str())));
+    args.push_back(L"-spirv");
+
+    std::vector<LPCWSTR> pszArgs;
+    for (const auto& arg : args)
+        pszArgs.push_back(arg.c_str());
+
+    CComPtr<IDxcResult> pResults;
+    if (FAILED(g_dxcCompiler->Compile(&Source, pszArgs.data(), pszArgs.size(), nullptr, IID_PPV_ARGS(&pResults))))
+    {
+        std::cerr << "Failed to compile shader" << std::endl;
+        return false;
+    }
+
+    CComPtr<IDxcBlobUtf8> pErrors = nullptr;
+    pResults->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr);
+    if (pErrors != nullptr && pErrors->GetStringLength() != 0)
+    {
+        std::cerr << "Shader compilation errors/warnings:\n" << pErrors->GetStringPointer() << std::endl;
+    }
+
+    HRESULT hrStatus;
+    pResults->GetStatus(&hrStatus);
+    if (FAILED(hrStatus))
+    {
+        std::cerr << "Shader compilation failed." << std::endl;
+        return false;
+    }
+
+    CComPtr<IDxcBlob> pShader = nullptr;
+    if (FAILED(pResults->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&pShader), nullptr)))
+    {
+        return false;
+    }
+
+    output.resize(pShader->GetBufferSize());
+    memcpy(output.data(), pShader->GetBufferPointer(), pShader->GetBufferSize());
+
+    return true;
+}
+
 int main()
 {
     // NOTE: Init logging
@@ -183,6 +308,7 @@ int main()
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow *windowHandle = glfwCreateWindow(800, 600, "SDPrototype", nullptr, nullptr);
+    glfwSetFramebufferSizeCallback(windowHandle, framebufferResizeCallback);
 
 
     // NOTE: vulkan instance
@@ -261,7 +387,7 @@ int main()
         std::cerr << "glfwCreateWindowSurface failed with VKResult = " << res << "\n";
         throw std::runtime_error("Failed to create window surface");
     }
-    vk::SurfaceKHR surface = rawSurface;
+    vk::UniqueSurfaceKHR surface(rawSurface, *instance);
 
 
     // NOTE: setup queues
@@ -277,7 +403,7 @@ int main()
 
         vk::Bool32 supportsPresent = vk::False;
 
-        if (auto res = physDev.getSurfaceSupportKHR(i, surface, &supportsPresent); res != vk::Result::eSuccess)
+        if (auto res = physDev.getSurfaceSupportKHR(i, *surface, &supportsPresent); res != vk::Result::eSuccess)
         {
             logger->warn("getSurfaceSupportKHR returned vk::Result::{}", static_cast<uint64_t>(res));
         }
@@ -344,7 +470,7 @@ int main()
 
     // Find swapchain width and height
 
-    vk::SurfaceCapabilitiesKHR caps = physDev.getSurfaceCapabilitiesKHR(surface);
+    vk::SurfaceCapabilitiesKHR caps = physDev.getSurfaceCapabilitiesKHR(*surface);
     vk::Extent2D               swapchainExtent;
     int                        windowWidth;
     int                        windowHeight;
@@ -373,7 +499,7 @@ int main()
 
 
     // NOTE: create swapchain
-    auto surfaceFormats = physDev.getSurfaceFormatsKHR(surface);
+    auto surfaceFormats = physDev.getSurfaceFormatsKHR(*surface);
 
     // get surface formats
     vk::SurfaceFormatKHR surfaceFormat;
@@ -398,7 +524,7 @@ int main()
         }
     }
     // get present mode
-    auto               presentModes = physDev.getSurfacePresentModesKHR(surface);
+    auto               presentModes = physDev.getSurfacePresentModesKHR(*surface);
     vk::PresentModeKHR presentMode  = vk::PresentModeKHR::eFifo; // always supported
     for (auto m : presentModes)
     {
@@ -420,7 +546,7 @@ int main()
                                                            : caps.currentTransform;
 
     vk::SwapchainCreateInfoKHR swapchainCreateInfo;
-    swapchainCreateInfo.setSurface(surface)
+    swapchainCreateInfo.setSurface(*surface)
             .setMinImageCount(desiredImageCount)
             .setImageFormat(surfaceFormat.format)
             .setImageColorSpace(surfaceFormat.colorSpace)
@@ -432,7 +558,7 @@ int main()
             .setClipped(true)
             .setImageSharingMode(vk::SharingMode::eExclusive); // for graphics queue == present queue
 
-    vk::SwapchainKHR swapchain = vulkanDevice->createSwapchainKHR(swapchainCreateInfo);
+    vk::UniqueSwapchainKHR swapchain = vulkanDevice->createSwapchainKHRUnique(swapchainCreateInfo);
 
     // Get all swapchain images
     uint32_t imageCount = 0;
@@ -440,13 +566,13 @@ int main()
     // TODO: Check if we might aswell just put it into the vector right away, if that is better or not
     // TODO: Get/create swap chain
 
-    if (auto res = vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, nullptr); res != vk::Result::eSuccess)
+    if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, nullptr); res != vk::Result::eSuccess)
     {
         logger->warn("getSwapChainImagesKHR returned vk::Result::{}", static_cast<uint64_t>(res));
     }
     std::vector<vk::Image> swapchainImages(imageCount);
 
-    if (auto res = vulkanDevice->getSwapchainImagesKHR(swapchain, &imageCount, swapchainImages.data());
+    if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, swapchainImages.data());
         res != vk::Result::eSuccess)
     {
         logger->warn("getSwapChainImagesKHR returned vk::Result::{}", static_cast<uint64_t>(res));
@@ -507,19 +633,152 @@ int main()
         framebuffers.push_back(nvrhiDevice->createFramebuffer(fbDesc));
     }
 
+    nvrhi::CommandListHandle cmdList = nvrhiDevice->createCommandList();
+
+    // Load Texture
+    int      texWidth, texHeight, texChannels;
+    stbi_uc *texPixels = stbi_load("assets/textures/example.jpg", &texWidth, &texHeight, &texChannels, 4);
+
+    nvrhi::TextureHandle exampleTexture;
+    if (texPixels)
+    {
+        nvrhi::TextureDesc textureDesc;
+        textureDesc.width            = texWidth;
+        textureDesc.height           = texHeight;
+        textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
+        textureDesc.debugName        = "Example Texture";
+        textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
+        textureDesc.keepInitialState = true;
+        textureDesc.dimension        = nvrhi::TextureDimension::Texture2D;
+
+        exampleTexture = nvrhiDevice->createTexture(textureDesc);
+
+        cmdList->open();
+        cmdList->writeTexture(exampleTexture, 0, 0, texPixels, texWidth * 4);
+        cmdList->close();
+        nvrhiDevice->executeCommandList(cmdList);
+
+        stbi_image_free(texPixels);
+    }
+    else
+    {
+        logger->error("Failed to load texture: assets/textures/example.jpg");
+        nvrhi::TextureDesc textureDesc;
+        textureDesc.width            = 1;
+        textureDesc.height           = 1;
+        textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
+        textureDesc.debugName        = "Dummy Texture";
+        textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
+        textureDesc.keepInitialState = true;
+        exampleTexture               = nvrhiDevice->createTexture(textureDesc);
+        uint32_t white               = 0xFFFFFFFF;
+
+        cmdList->open();
+        cmdList->writeTexture(exampleTexture, 0, 0, &white, 4);
+        cmdList->close();
+        nvrhiDevice->executeCommandList(cmdList);
+    }
+
+    // ViewProjection Buffer
+    struct ViewProjection
+    {
+        float viewProj[16];
+    };
+
+    nvrhi::BufferDesc constantBufferDesc;
+    constantBufferDesc.byteSize         = sizeof(ViewProjection);
+    constantBufferDesc.isConstantBuffer = true;
+    constantBufferDesc.debugName        = "ViewProjectionConstantBuffer";
+    constantBufferDesc.initialState     = nvrhi::ResourceStates::ConstantBuffer;
+    constantBufferDesc.keepInitialState = true;
+    constantBufferDesc.cpuAccess        = nvrhi::CpuAccessMode::Write;
+    nvrhi::BufferHandle viewProjBuffer  = nvrhiDevice->createBuffer(constantBufferDesc);
+
+    // Vertex Buffer
+    static const Vertex vertices[] = {
+            {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f}}, // TL
+            { {0.5f, -0.5f, 0.0f}, {1.0f, 0.0f}}, // TR
+            { {-0.5f, 0.5f, 0.0f}, {0.0f, 1.0f}}, // BL
+            { {-0.5f, 0.5f, 0.0f}, {0.0f, 1.0f}}, // BL
+            { {0.5f, -0.5f, 0.0f}, {1.0f, 0.0f}}, // TR
+            {  {0.5f, 0.5f, 0.0f}, {1.0f, 1.0f}}  // BR
+    };
+
+    nvrhi::BufferDesc vertexBufferDesc;
+    vertexBufferDesc.byteSize         = sizeof(vertices);
+    vertexBufferDesc.isVertexBuffer   = true;
+    vertexBufferDesc.debugName        = "VertexBuffer";
+    vertexBufferDesc.initialState     = nvrhi::ResourceStates::VertexBuffer;
+    vertexBufferDesc.keepInitialState = true;
+    nvrhi::BufferHandle vertexBuffer  = nvrhiDevice->createBuffer(vertexBufferDesc);
+
+    cmdList->open();
+    cmdList->writeBuffer(vertexBuffer, vertices, sizeof(vertices));
+    cmdList->close();
+    nvrhiDevice->executeCommandList(cmdList);
+
+    // Sampler
+    nvrhi::SamplerDesc samplerDesc;
+    samplerDesc.addressU         = nvrhi::SamplerAddressMode::Wrap;
+    samplerDesc.addressV         = nvrhi::SamplerAddressMode::Wrap;
+    samplerDesc.addressW         = nvrhi::SamplerAddressMode::Wrap;
+    nvrhi::SamplerHandle sampler = nvrhiDevice->createSampler(samplerDesc);
+
+    // Binding Layout
+    nvrhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = nvrhi::ShaderType::All;
+    layoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(0));
+    layoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
+    layoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(2));
+
+    // Zero out offsets to match direct register->binding mapping
+    layoutDesc.bindingOffsets = nvrhi::VulkanBindingOffsets()
+                                        .setShaderResourceOffset(0)
+                                        .setSamplerOffset(0)
+                                        .setConstantBufferOffset(0)
+                                        .setUnorderedAccessViewOffset(0);
+
+    nvrhi::BindingLayoutHandle bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
+
+    // Binding Set
+    nvrhi::BindingSetDesc bindingSetDesc;
+    bindingSetDesc.bindings            = {nvrhi::BindingSetItem::ConstantBuffer(0, viewProjBuffer),
+                                          nvrhi::BindingSetItem::Texture_SRV(1, exampleTexture),
+                                          nvrhi::BindingSetItem::Sampler(2, sampler)};
+    nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
+
     // NOTE: Graphics Pipeline
 
-    // todo: AUtomate compilation somehow
+    // Compile shaders
+    if (!initShaderCompiler())
+    {
+        logger->critical("Failed to initialize shader compiler");
+        return -1;
+    }
+
+    std::vector<char> vertexSpv;
+    if (!compileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
+    {
+        logger->critical("Failed to compile vertex shader");
+        return -1;
+    }
+
+    std::vector<char> pixelSpv;
+    if (!compileShader("assets/shaders/pixel.hlsl", pixelSpv, "ps_6_0"))
+    {
+        logger->critical("Failed to compile pixel shader");
+        return -1;
+    }
 
     nvrhi::ShaderHandle vertexShader =
             nvrhiDevice->createShader(nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex),
-                                      vertex_spv,
-                                      vertex_spv_len);
+                                      vertexSpv.data(),
+                                      vertexSpv.size());
 
     nvrhi::ShaderHandle pixelShader =
             nvrhiDevice->createShader(nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel),
-                                      pixel_spv,
-                                      pixel_spv_len);
+                                      pixelSpv.data(),
+                                      pixelSpv.size());
 
     if (!vertexShader || !pixelShader)
     {
@@ -528,9 +787,18 @@ int main()
     }
 
     // vert attribs
+    nvrhi::VertexAttributeDesc attributes[] = {nvrhi::VertexAttributeDesc()
+                                                       .setName("POSITION")
+                                                       .setFormat(nvrhi::Format::RGB32_FLOAT)
+                                                       .setOffset(0)
+                                                       .setElementStride(sizeof(Vertex)),
+                                               nvrhi::VertexAttributeDesc()
+                                                       .setName("TEXCOORD")
+                                                       .setFormat(nvrhi::Format::RG32_FLOAT)
+                                                       .setOffset(sizeof(float) * 3)
+                                                       .setElementStride(sizeof(Vertex))};
 
-
-    nvrhi::InputLayoutHandle inputLayout = nvrhiDevice->createInputLayout(nullptr, 0, vertexShader);
+    nvrhi::InputLayoutHandle inputLayout = nvrhiDevice->createInputLayout(attributes, 2, vertexShader);
 
     auto fbInfo = framebuffers[0]->getFramebufferInfo();
     logger->debug("colorFormats[0]={}", static_cast<uint32_t>(fbInfo.colorFormats[0]));
@@ -540,7 +808,8 @@ int main()
                                 .setRenderState(renderState)
                                 .setInputLayout(inputLayout)
                                 .setVertexShader(vertexShader)
-                                .setPixelShader(pixelShader);
+                                .setPixelShader(pixelShader)
+                                .addBindingLayout(bindingLayout);
 
     pipelineDesc.renderState.rasterState.setCullMode(nvrhi::RasterCullMode::None);
     pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
@@ -555,17 +824,20 @@ int main()
     }
 
     // sync objects
-    // NOTE: unique now
-    vk::UniqueSemaphore imageAcquiredSem   = vulkanDevice->createSemaphoreUnique({});
-    vk::UniqueSemaphore renderCompletedSem = vulkanDevice->createSemaphoreUnique({});
+    std::vector<vk::UniqueSemaphore> imageAcquiredSemaphores;
+    std::vector<vk::UniqueSemaphore> renderCompletedSemaphores;
+    std::vector<vk::UniqueFence>     frameFences;
 
-    vk::UniqueFence frameFence = vulkanDevice->createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
-
-
-    nvrhi::CommandListHandle cmdList = nvrhiDevice->createCommandList();
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        imageAcquiredSemaphores.push_back(vulkanDevice->createSemaphoreUnique({}));
+        renderCompletedSemaphores.push_back(vulkanDevice->createSemaphoreUnique({}));
+        frameFences.push_back(vulkanDevice->createFenceUnique({vk::FenceCreateFlagBits::eSignaled}));
+    }
 
     bool     isRunning  = true;
     uint32_t frameCount = 0;
+    uint32_t currentFrame = 0;
 
     auto     lastReportTime        = std::chrono::high_resolution_clock::now();
     uint64_t framesSinceLastReport = 0;
@@ -579,42 +851,126 @@ int main()
         isRunning = !glfwWindowShouldClose(windowHandle);
         glfwPollEvents();
 
+        if (g_ResizeRequested)
+        {
+            g_ResizeRequested = false;
+            int width, height;
+            glfwGetWindowSize(windowHandle, &width, &height);
+            if (width > 0 && height > 0)
+            {
+                nvrhiDevice->waitForIdle();
+
+                // Destroy old swapchain resources
+                framebuffers.clear();
+                swapchainTextures.clear();
+                depthTexture = nullptr;
+
+                // Recreate swapchain
+                swapchainExtent.width  = width;
+                swapchainExtent.height = height;
+
+                swapchainCreateInfo.setImageExtent(swapchainExtent);
+                swapchainCreateInfo.setOldSwapchain(*swapchain);
+
+                vk::UniqueSwapchainKHR newSwapchain = vulkanDevice->createSwapchainKHRUnique(swapchainCreateInfo);
+                swapchain = std::move(newSwapchain);
+
+                // Get images
+                if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, nullptr);
+                    res != vk::Result::eSuccess)
+                {
+                }
+                swapchainImages.resize(imageCount);
+                if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, swapchainImages.data());
+                    res != vk::Result::eSuccess)
+                {
+                }
+
+                // Recreate NVRHI textures
+                swapchainTexDesc.setWidth(width).setHeight(height);
+                for (uint32_t i = 0; i < imageCount; ++i)
+                {
+                    VkImage              nativeImage = static_cast<VkImage>(swapchainImages[i]);
+                    nvrhi::TextureHandle tex = nvrhiDevice->createHandleForNativeTexture(nvrhi::ObjectTypes::VK_Image,
+                                                                                         nvrhi::Object(nativeImage),
+                                                                                         swapchainTexDesc);
+                    swapchainTextures.push_back(tex);
+                }
+
+                // Recreate depth
+                depthDesc.setWidth(width).setHeight(height);
+                depthTexture = nvrhiDevice->createTexture(depthDesc);
+
+                // Recreate framebuffers
+                for (uint32_t i = 0; i < imageCount; ++i)
+                {
+                    auto fbDesc = nvrhi::FramebufferDesc().addColorAttachment(swapchainTextures[i]);
+                    fbDesc.setDepthAttachment(depthTexture);
+                    framebuffers.push_back(nvrhiDevice->createFramebuffer(fbDesc));
+                }
+            }
+        }
+
+        // Update ViewProjection
+        {
+            ViewProjection vp;
+            std::fill(std::begin(vp.viewProj), std::end(vp.viewProj), 0.0f);
+
+            // Simple orthographic projection to keep aspect ratio
+            float aspect = (float) swapchainExtent.width / (float) swapchainExtent.height;
+            float scaleX = 1.0f;
+            float scaleY = 1.0f;
+
+            if (aspect > 1.0f)
+                scaleX /= aspect;
+            else
+                scaleY *= aspect;
+
+            vp.viewProj[0]  = scaleX;
+            vp.viewProj[5]  = scaleY;
+            vp.viewProj[10] = 1.0f;
+            vp.viewProj[15] = 1.0f;
+
+            cmdList->open();
+            cmdList->writeBuffer(viewProjBuffer, &vp, sizeof(vp));
+            cmdList->close();
+            nvrhiDevice->executeCommandList(cmdList);
+        }
+
         // wait for previous frame work to finish
-        // vulkanDevice->waitForFences(frameFence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-        // vulkanDevice->resetFences(frameFence);
+        if (vulkanDevice->waitForFences(*frameFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max()) != vk::Result::eSuccess)
+        {
+             logger->critical("Failed to wait for fences");
+             return -1;
+        }
 
         // Acquire image
         uint32_t   imageIndex = 0;
         vk::Result res;
 
-        constexpr int maxAttempts = 3;
-        for (int attempt = 0; attempt < maxAttempts; ++attempt)
-        {
-            res = vulkanDevice->acquireNextImageKHR(swapchain,
-                                                    std::numeric_limits<uint64_t>::max(),
-                                                    *imageAcquiredSem,
-                                                    vk::Fence(),
-                                                    &imageIndex);
-            if ((res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) && attempt < maxAttempts)
-            {
-                // resize backbuffer
-                // get new surface caps
-                // set device params to those
-                // resize swapchain
-            }
-            else
-                break;
-        }
+        res = vulkanDevice->acquireNextImageKHR(*swapchain,
+                                                std::numeric_limits<uint64_t>::max(),
+                                                *imageAcquiredSemaphores[currentFrame],
+                                                vk::Fence(),
+                                                &imageIndex);
 
-        if (res == vk::Result::eSuccess || res == vk::Result::eSuboptimalKHR)
+        if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR)
         {
-            nvrhiDevice->queueWaitForSemaphore(nvrhi::CommandQueue::Graphics, *imageAcquiredSem, 0);
+            g_ResizeRequested = true;
+            // If we acquired an image (Suboptimal), the semaphore is signaled.
+            // If we resize, we discard the frame. We should recreate the semaphore to clear its state.
+            imageAcquiredSemaphores[currentFrame] = vulkanDevice->createSemaphoreUnique({});
+            continue;
         }
-        else
+        else if (res != vk::Result::eSuccess)
         {
-            logger->critical("Failed to wait for something");
+            logger->critical("Failed to acquire image");
             return -1;
         }
+
+        vulkanDevice->resetFences(*frameFences[currentFrame]);
+
+        nvrhiDevice->queueWaitForSemaphore(nvrhi::CommandQueue::Graphics, *imageAcquiredSemaphores[currentFrame], 0);
 
         // Render
         cmdList->open();
@@ -623,41 +979,63 @@ int main()
         cmdList->clearDepthStencilTexture(depthTexture, nvrhi::AllSubresources, true, 1.0f, false, 0);
 
 
-        auto graphicsState = nvrhi::GraphicsState()
-                                     .setPipeline(graphicsPipeline)
-                                     .setFramebuffer(fb)
-                                     .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(
-                                             nvrhi::Viewport(static_cast<float>(swapchainExtent.width),
-                                                             static_cast<float>(swapchainExtent.height))));
+        auto graphicsState =
+                nvrhi::GraphicsState()
+                        .setPipeline(graphicsPipeline)
+                        .setFramebuffer(fb)
+                        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(
+                                nvrhi::Viewport(static_cast<float>(swapchainExtent.width),
+                                                static_cast<float>(swapchainExtent.height))))
+                        .addBindingSet(bindingSet)
+                        .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(vertexBuffer).setSlot(0).setOffset(0));
 
         cmdList->setGraphicsState(graphicsState);
-        cmdList->draw(nvrhi::DrawArguments().setVertexCount(3).setInstanceCount(1));
+        cmdList->draw(nvrhi::DrawArguments().setVertexCount(6).setInstanceCount(1));
         cmdList->close();
 
-        nvrhiDevice->queueSignalSemaphore(nvrhi::CommandQueue::Graphics, *renderCompletedSem, 0);
+        nvrhiDevice->queueSignalSemaphore(nvrhi::CommandQueue::Graphics, *renderCompletedSemaphores[currentFrame], 0);
         nvrhiDevice->executeCommandList(cmdList);
 
-        // vulkanDevice->getQueue(graphicsFamilyIndex, 0).submit(vk::SubmitInfo(), frameFence);
+        // Submit fence
+        // NVRHI doesn't expose fence submission directly in executeCommandList for external fences easily without using queueSubmit
+        // But we can use vulkanDevice->getQueue...submit
+        // Wait, NVRHI executeCommandList submits to the queue.
+        // We need to signal the fence.
+        // NVRHI doesn't seem to have a "signal fence" API easily accessible on CommandList?
+        // We can just submit an empty batch to signal the fence?
+        // Or better: NVRHI's executeCommandList doesn't take a fence.
+        // We can use the underlying queue to submit the fence.
+        // But we need to ensure ordering.
+        // NVRHI submits to the queue.
+        // If we submit to the same queue, it is serialized.
 
-        vk::Semaphore      waitSem     = *renderCompletedSem;
+        vulkanDevice->getQueue(graphicsFamilyIndex, 0).submit(vk::SubmitInfo(), *frameFences[currentFrame]);
+
+
+        vk::Semaphore      waitSem     = *renderCompletedSemaphores[currentFrame];
         vk::PresentInfoKHR presentInfo = vk::PresentInfoKHR()
                                                  .setWaitSemaphoreCount(1)
                                                  .setPWaitSemaphores(&waitSem)
                                                  .setSwapchainCount(1)
-                                                 .setPSwapchains(&swapchain)
+                                                 .setPSwapchains(&*swapchain)
                                                  .setPImageIndices(&imageIndex);
 
         auto presentResult = vulkanDevice->getQueue(graphicsFamilyIndex, 0).presentKHR(presentInfo);
 
-        if (!(presentResult == vk::Result::eSuccess || presentResult == vk::Result::eErrorOutOfDateKHR ||
-              presentResult == vk::Result::eSuboptimalKHR))
+        if (presentResult == vk::Result::eErrorOutOfDateKHR || presentResult == vk::Result::eSuboptimalKHR)
+        {
+            g_ResizeRequested = true;
+        }
+        else if (presentResult != vk::Result::eSuccess)
         {
             logger->critical("Failed to present");
         }
+        // logger->trace("Frame:{}", frameCount++);
 
         // TODO: if vsync or debugruntime, explicitly sync queue with waitidle
         nvrhiDevice->runGarbageCollection();
-        nvrhiDevice->waitForIdle();
+
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
         // TODO: frames in flight
         // TODO: EventQueryHandle. reset and push
@@ -692,9 +1070,6 @@ int main()
 
     graphicsPipeline = nullptr;
     cmdList          = nullptr;
-
-    vulkanDevice->destroySwapchainKHR(swapchain);
-    instance->destroySurfaceKHR(surface);
 
     // TODO: Global nvrhi stuff needs to be cleaned up before main exits
     nvrhiDevice = nullptr;

@@ -1,17 +1,25 @@
-// vertex.hlsl
-struct VSOutput
+cbuffer ViewProjection : register(b0)
 {
-    float4 Pos : SV_POSITION;
+    float4x4 viewProj;
 };
 
-VSOutput main(uint VertexID : SV_VertexID)
+struct VS_INPUT
 {
-    VSOutput output;
+    float3 pos : POSITION;
+    float2 uv : TEXCOORD0;
+};
 
-    // Grid generation logic
-    float2 grid = float2((VertexID << 1) & 2, VertexID & 2);
-    float2 xy = grid * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f);
+struct VS_OUTPUT
+{
+    float4 pos : SV_POSITION;
+    float2 uv : TEXCOORD0;
+};
 
-    output.Pos = float4(xy, 0.0f, 1.0f);
+VS_OUTPUT main(VS_INPUT input)
+{
+    VS_OUTPUT output;
+    float4 worldPos = float4(input.pos, 0.5);
+    output.pos = mul(viewProj, worldPos);
+    output.uv = input.uv;
     return output;
 }
