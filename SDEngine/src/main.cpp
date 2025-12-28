@@ -1,16 +1,8 @@
-// spdlog
-#include <spdlog/spdlog.h>
-#include <spdlog/async.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/basic_file_sink.h>
-
-
-// VULKAN
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#define VULKAN_HPP_ENABLE_DYNAMIC_LOADER_TOOL 1
+#include "VulkanConfig.hpp"
 #include <vulkan/vulkan.hpp>
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
+// 2) Define storage exactly once in the whole program
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 // NVRHI
 #include <nvrhi/vulkan.h>
 
@@ -19,6 +11,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include <nvrhi/validation.h>
 
 // GLFW
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 // STB
@@ -34,17 +27,16 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include <fstream>
 
 // SD
-// #include "assets/shaders/vertex_shader.h"
-// #include "assets/shaders/pixel_shader.h"
+#include "GlfwContext.hpp"
+#include "VulkanContext.hpp"
+#include "MessageCallback.hpp"
+#include "Logging.hpp"
+#include "ShaderCompiler.hpp"
+#include "Window.hpp"
 
 
 constexpr bool enableValidation     = true;
 constexpr int  MAX_FRAMES_IN_FLIGHT = 2;
-
-
-#include <dxc/dxcapi.h>
-// extern unsigned char vertex_spv[], pixel_spv[];
-// extern unsigned int  vertex_spv_len, pixel_spv_len;
 
 struct Vertex
 {
@@ -52,7 +44,8 @@ struct Vertex
     float texCoord[2];
 };
 
-nvrhi::Format toNvrhiFormat(vk::Format fmt)
+
+nvrhi::Format toNvrhiFormat(const vk::Format fmt)
 {
     switch (fmt)
     {
@@ -70,229 +63,63 @@ nvrhi::Format toNvrhiFormat(vk::Format fmt)
 }
 
 
-struct MessageCallback : public nvrhi::IMessageCallback
-{
-    void message(nvrhi::MessageSeverity severity, const char *messageText) override;
-};
-
-void MessageCallback::message(nvrhi::MessageSeverity severity, const char *messageText)
-{
-    switch (severity)
-    {
-        using nvrhi::MessageSeverity;
-
-        case MessageSeverity::Info:
-            std::cout << "nvrhi::INFO: " << messageText << std::endl;
-            break;
-        case MessageSeverity::Warning:
-            std::cout << "nvrhi::WARNING: " << messageText << std::endl;
-            break;
-        case MessageSeverity::Error:
-            std::cerr << "nvrhi::ERROR: " << messageText << std::endl;
-            break;
-        case MessageSeverity::Fatal:
-            std::cerr << "nvrhi::FATAL: " << messageText << std::endl;
-            break;
-        default:
-            std::cout << "nvrhi::OTHER " << messageText << std::endl;
-    }
-}
-
 MessageCallback  g_MessageCallback;
 VkPhysicalDevice vulkanPhysicalDevice = nullptr;
 
 
-#define ENGINE_LOG_LEVEL_TRACE 0
-#define ENGINE_LOG_LEVEL_DEBUG 1
-#define ENGINE_LOG_LEVEL_INFO 2
-#define ENGINE_LOG_LEVEL_WARN 3
-#define ENGINE_LOG_LEVEL_ERROR 4
-#define ENGINE_LOG_LEVEL_CRITICAL 5
-#define ENGINE_LOG_LEVEL_OFF 6
-
-enum class LogLevel
-{
-    Trace    = ENGINE_LOG_LEVEL_TRACE,
-    Debug    = ENGINE_LOG_LEVEL_DEBUG,
-    Info     = ENGINE_LOG_LEVEL_INFO,
-    Warn     = ENGINE_LOG_LEVEL_WARN,
-    Error    = ENGINE_LOG_LEVEL_ERROR,
-    Critical = ENGINE_LOG_LEVEL_CRITICAL,
-    Off      = ENGINE_LOG_LEVEL_OFF
-};
-
-#ifndef ENGINE_LOG_LEVEL
-#define ENGINE_LOG_LEVEL ENGINE_LOG_LEVEL_INFO
-#endif
-constexpr auto cLOG_LEVEL = static_cast<LogLevel>(ENGINE_LOG_LEVEL);
-
-bool constexpr should_log(LogLevel level)
-{
-    return static_cast<int>(level) >= static_cast<int>(cLOG_LEVEL);
-}
-
-// TODO: Custom logging macros that respect log levels and remove calls
-void init_logging()
-{
-    spdlog::init_thread_pool(8192, 1);
-
-    std::vector<spdlog::sink_ptr> sinks;
-    sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
-    sinks.push_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>("engine.log", true));
-
-    auto logger = std::make_shared<spdlog::async_logger>("engine",
-                                                         sinks.begin(),
-                                                         sinks.end(),
-                                                         spdlog::thread_pool(),
-                                                         spdlog::async_overflow_policy::block);
-
-    switch (cLOG_LEVEL)
-    {
-        case LogLevel::Trace:
-            logger->set_level(spdlog::level::trace);
-            break;
-        case LogLevel::Debug:
-            logger->set_level(spdlog::level::debug);
-            break;
-        case LogLevel::Info:
-            logger->set_level(spdlog::level::info);
-            break;
-        case LogLevel::Warn:
-            logger->set_level(spdlog::level::warn);
-            break;
-        case LogLevel::Error:
-            logger->set_level(spdlog::level::err);
-            break;
-        case LogLevel::Critical:
-            logger->set_level(spdlog::level::critical);
-            break;
-        case LogLevel::Off:
-            logger->set_level(spdlog::level::off);
-            break;
-        default:
-            logger->set_level(spdlog::level::info);
-    }
-    logger->flush_on(spdlog::level::warn);
-
-    spdlog::register_logger(logger);
-}
-
 bool g_ResizeRequested = false;
 
-void framebufferResizeCallback(GLFWwindow *window, int width, int height)
+void framebufferResizeCallback(int width, int height)
 {
     g_ResizeRequested = true;
 }
 
-std::vector<char> readFile(const std::string& filename)
+
+nvrhi::TextureHandle CreateTexture(const nvrhi::vulkan::DeviceHandle& nvrhiDevice, std::filesystem::path filePath)
 {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+    auto logger = spdlog::get("engine");
 
-    if (!file.is_open())
+    auto cmdList = nvrhiDevice->createCommandList();
+    int  texWidth, texHeight, texChannels;
+
+    if (stbi_uc *texPixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, 4))
     {
-        throw std::runtime_error("failed to open file: " + filename);
+        nvrhi::TextureDesc textureDesc;
+        textureDesc.width            = texWidth;
+        textureDesc.height           = texHeight;
+        textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
+        textureDesc.debugName        = filePath.string();
+        textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
+        textureDesc.keepInitialState = true;
+        textureDesc.dimension        = nvrhi::TextureDimension::Texture2D;
+
+        auto texture = nvrhiDevice->createTexture(textureDesc);
+
+        cmdList->open();
+        cmdList->writeTexture(texture, 0, 0, texPixels, texWidth * 4);
+        cmdList->close();
+        nvrhiDevice->executeCommandList(cmdList);
+        stbi_image_free(texPixels);
+        return texture;
     }
 
-    size_t            fileSize = (size_t) file.tellg();
-    std::vector<char> buffer(fileSize);
+    logger->error("Failed to load texture: {} (CWD: {})", filePath.string(), std::filesystem::current_path().string());
 
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
+    nvrhi::TextureDesc textureDesc;
+    textureDesc.width            = 1;
+    textureDesc.height           = 1;
+    textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
+    textureDesc.debugName        = "FailedTexture";
+    textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
+    textureDesc.keepInitialState = true;
+    auto     texture             = nvrhiDevice->createTexture(textureDesc);
+    uint32_t white               = 0xFFFFFFFF;
 
-    return buffer;
-}
-
-CComPtr<IDxcUtils>     g_dxcUtils;
-CComPtr<IDxcCompiler3> g_dxcCompiler;
-
-bool initShaderCompiler()
-{
-    if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&g_dxcUtils))))
-    {
-        std::cerr << "Failed to create DXC Utils" << std::endl;
-        return false;
-    }
-    if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&g_dxcCompiler))))
-    {
-        std::cerr << "Failed to create DXC Compiler" << std::endl;
-        return false;
-    }
-    return true;
-}
-
-bool compileShader(const std::string& source, std::vector<char>& output, const std::string& profile)
-{
-    if (!g_dxcUtils || !g_dxcCompiler)
-    {
-        std::cerr << "Shader compiler not initialized" << std::endl;
-        return false;
-    }
-
-    CComPtr<IDxcBlobEncoding> pSource;
-    if (FAILED(g_dxcUtils->LoadFile(CA2W(source.c_str()), nullptr, &pSource)))
-    {
-        std::cerr << "Failed to load shader source: " << source << std::endl;
-        return false;
-    }
-
-    DxcBuffer Source{};
-    Source.Ptr      = pSource->GetBufferPointer();
-    Source.Size     = pSource->GetBufferSize();
-    BOOL   known    = FALSE;
-    UINT32 codePage = 0;
-    if (SUCCEEDED(pSource->GetEncoding(&known, &codePage)))
-    {
-        Source.Encoding = known ? codePage : DXC_CP_ACP;
-    }
-    else
-    {
-        Source.Encoding = DXC_CP_ACP;
-    }
-
-    std::vector<std::wstring> args;
-    args.emplace_back(L"-E");
-    args.emplace_back(L"main");
-    args.emplace_back(L"-T");
-    args.emplace_back(CA2W(profile.c_str()));
-    args.emplace_back(L"-spirv");
-
-    std::vector<LPCWSTR> pszArgs;
-    for (const auto& arg : args)
-        pszArgs.push_back(arg.c_str());
-
-    CComPtr<IDxcResult> pResults;
-    if (FAILED(g_dxcCompiler->Compile(&Source, pszArgs.data(), pszArgs.size(), nullptr, IID_PPV_ARGS(&pResults))))
-    {
-        std::cerr << "Failed to compile shader" << std::endl;
-        return false;
-    }
-
-    CComPtr<IDxcBlobUtf8> pErrors = nullptr;
-    pResults->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr);
-    if (pErrors != nullptr && pErrors->GetStringLength() != 0)
-    {
-        std::cerr << "Shader compilation errors/warnings:\n" << pErrors->GetStringPointer() << std::endl;
-    }
-
-    HRESULT hrStatus;
-    pResults->GetStatus(&hrStatus);
-    if (FAILED(hrStatus))
-    {
-        std::cerr << "Shader compilation failed." << std::endl;
-        return false;
-    }
-
-    CComPtr<IDxcBlob> pShader = nullptr;
-    if (FAILED(pResults->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&pShader), nullptr)))
-    {
-        return false;
-    }
-
-    output.resize(pShader->GetBufferSize());
-    memcpy(output.data(), pShader->GetBufferPointer(), pShader->GetBufferSize());
-
-    return true;
+    cmdList->open();
+    cmdList->writeTexture(texture, 0, 0, &white, 4);
+    cmdList->close();
+    nvrhiDevice->executeCommandList(cmdList);
+    return texture;
 }
 
 int main()
@@ -304,149 +131,28 @@ int main()
 
     // TODO: Create window and such
 
-
-    glfwInit();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow *windowHandle = glfwCreateWindow(800, 600, "SDPrototype", nullptr, nullptr);
-    glfwSetFramebufferSizeCallback(windowHandle, framebufferResizeCallback);
+    GlfwContext glfwCtx;
+    Window      window(800, 600, "SDPrototype");
+    window.SetResizeCallback(framebufferResizeCallback);
 
 
-    // NOTE: vulkan instance
-    static vk::detail::DynamicLoader dl;
-    PFN_vkGetInstanceProcAddr        vkGetInstanceProcAddr =
-            dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
-
-    // Create instance
-    vk::ApplicationInfo appInfo("MyEngine", 1, "NoEngine", 1, VK_API_VERSION_1_3);
-
-    uint32_t extCount = 0;
-
-    const char **glfwExts = glfwGetRequiredInstanceExtensions(&extCount);
-
-    std::vector<const char *> instanceExts(glfwExts, glfwExts + extCount);
+    VulkanContext vulkanCtx(glfwCtx, window);
 
 
-    vk::InstanceCreateInfo instInfo({}, &appInfo, {}, instanceExts);
-    vk::UniqueInstance     instance = vk::createInstanceUnique(instInfo);
-
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
-
-    // physical device
-    vk::PhysicalDevice physDev = instance->enumeratePhysicalDevices().front();
-
-    // Create device
-
-    vk::PhysicalDeviceVulkan12Features features12{};
-    features12.timelineSemaphore   = VK_TRUE;
-    features12.bufferDeviceAddress = VK_TRUE;
-
-    vk::PhysicalDeviceVulkan13Features features13;
-    features13.setDynamicRendering(true).setSynchronization2(true);
-
-    features12.pNext = &features13;
-
-    vk::PhysicalDeviceFeatures2 features2;
-    features2.setPNext(&features12);
-
-    // TODO: actually query for extensions, and not just assume they exist
-    auto available = physDev.enumerateDeviceExtensionProperties();
-
-    auto supports = [&](const char *name)
-    {
-        return std::ranges::any_of(available,
-                                   [&](const vk::ExtensionProperties& e)
-                                   { return std::strcmp(e.extensionName, name) == 0; });
-    };
-
-    std::vector<const char *> deviceExts;
-
-    auto requireExt = [&](const char *name)
-    {
-        if (!supports(name))
-            throw std::runtime_error(std::string("Required device extension missing ") + name);
-        deviceExts.push_back(name);
-    };
-
-    requireExt(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-    auto raytracing = false;
-    if (raytracing)
-    {
-        requireExt(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-        requireExt(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-        requireExt(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-    }
-
-    // NOTE: Create surface
-
-    VkSurfaceKHR rawSurface;
-    if (auto res = glfwCreateWindowSurface(*instance, windowHandle, nullptr, &rawSurface); res != VK_SUCCESS)
-    {
-        std::cerr << "glfwCreateWindowSurface failed with VKResult = " << res << "\n";
-        throw std::runtime_error("Failed to create window surface");
-    }
-    vk::UniqueSurfaceKHR surface(rawSurface, *instance);
-
-
-    // NOTE: setup queues
-    // todo: find graphics family index
-
-    auto     queueFamilies       = physDev.getQueueFamilyProperties();
-    uint32_t graphicsFamilyIndex = UINT32_MAX;
-
-    for (uint32_t i = 0; i < queueFamilies.size(); ++i)
-    {
-        bool supportsGraphics =
-                (queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) == vk::QueueFlagBits::eGraphics;
-
-        vk::Bool32 supportsPresent = vk::False;
-
-        if (auto res = physDev.getSurfaceSupportKHR(i, *surface, &supportsPresent); res != vk::Result::eSuccess)
-        {
-            logger->warn("getSurfaceSupportKHR returned vk::Result::{}", static_cast<uint64_t>(res));
-        }
-
-        if (supportsGraphics && supportsPresent)
-        {
-            graphicsFamilyIndex = i;
-            break;
-        }
-    }
-
-    if (graphicsFamilyIndex == UINT32_MAX)
-    {
-        // TODO: figure out if i want exceptions, how it should be handled, where etc
-        throw std::runtime_error("No queue family supports both graphics and present");
-    }
-
-
-    // NOTE: Create device
-
-    float                     priority = 1.0f;
-    vk::DeviceQueueCreateInfo queueInfo({}, graphicsFamilyIndex, 1, &priority);
-
-    vk::DeviceCreateInfo devInfo({}, queueInfo, {}, deviceExts);
-    devInfo.setPNext(&features2);
-
-
-    vk::UniqueDevice vulkanDevice = physDev.createDeviceUnique(devInfo);
-
-    // init dispatcher for device
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(*vulkanDevice);
-    // endregion
-    // region NVRHIDevice and validation
     // NOTE: Creating NVRHI device
+    auto& vulkanDevice        = vulkanCtx.GetVulkanDevice();
+    auto  graphicsFamilyIndex = vulkanCtx.GetGraphicsFamilyIndex();
+    auto  deviceExts          = vulkanCtx.GetDeviceExtensions();
+
     nvrhi::vulkan::DeviceDesc nvrhiDesc;
     nvrhiDesc.errorCB        = &g_MessageCallback;
-    nvrhiDesc.instance       = *instance;
-    nvrhiDesc.physicalDevice = physDev;
-    nvrhiDesc.device         = *vulkanDevice;
+    nvrhiDesc.instance       = *vulkanCtx.GetInstance();
+    nvrhiDesc.physicalDevice = vulkanCtx.GetPhysicalDevice();
+    nvrhiDesc.device         = vulkanDevice.get();
 
     // queue
     nvrhiDesc.graphicsQueue      = vulkanDevice->getQueue(graphicsFamilyIndex, 0);
-    nvrhiDesc.graphicsQueueIndex = graphicsFamilyIndex;
+    nvrhiDesc.graphicsQueueIndex = static_cast<int>(graphicsFamilyIndex);
 
     // exts
     nvrhiDesc.deviceExtensions             = deviceExts.data();
@@ -462,104 +168,11 @@ int main()
     {
         nvrhi::DeviceHandle nvrhiValidationLayer = nvrhi::validation::createValidationLayer(nvrhiDevice);
         // TODO: fix
-        // nvrhiDevice                              = nvrhiValidationLayer;
+        // nvrhiDevice = nvrhiValidationLayer;
     }
 
-    // endregion
 
-
-    // Find swapchain width and height
-
-    vk::SurfaceCapabilitiesKHR caps = physDev.getSurfaceCapabilitiesKHR(*surface);
-    vk::Extent2D               swapchainExtent;
-    int                        windowWidth;
-    int                        windowHeight;
-    glfwGetWindowSize(windowHandle, &windowWidth, &windowHeight);
-
-    if (caps.currentExtent.width != UINT32_MAX)
-    {
-        swapchainExtent = caps.currentExtent;
-        windowWidth     = static_cast<int>(swapchainExtent.width);
-        windowHeight    = static_cast<int>(swapchainExtent.height);
-    }
-    else
-    {
-        // TODO: Change to the actual window width and such, this just for testing
-        swapchainExtent.width =
-                std::clamp(static_cast<uint32_t>(windowWidth), caps.minImageExtent.width, caps.maxImageExtent.width);
-        swapchainExtent.height =
-                std::clamp(static_cast<uint32_t>(windowHeight), caps.minImageExtent.height, caps.maxImageExtent.height);
-    }
-
-    // image count
-    uint32_t desiredImageCount = caps.minImageCount + 1; // try triple buffering
-
-    if (caps.maxImageCount > 0 && desiredImageCount > caps.maxImageCount)
-        desiredImageCount = caps.maxImageCount;
-
-
-    // NOTE: create swapchain
-    auto surfaceFormats = physDev.getSurfaceFormatsKHR(*surface);
-
-    // get surface formats
-    vk::SurfaceFormatKHR surfaceFormat;
-    if (surfaceFormats.size() == 1 && surfaceFormats[0].format == vk::Format::eUndefined)
-    {
-        // no preference;
-        // todo: study which are best
-        surfaceFormat.format     = vk::Format::eB8G8R8A8Srgb;
-        surfaceFormat.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
-    }
-    else
-    {
-        // prefer SRGB 8bit BGRA if avilable, else fallback
-        surfaceFormat = surfaceFormats[0];
-        for (auto& f : surfaceFormats)
-        {
-            if (f.format == vk::Format::eB8G8R8A8Srgb && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
-            {
-                surfaceFormat = f;
-                break;
-            }
-        }
-    }
-    // get present mode
-    auto               presentModes = physDev.getSurfacePresentModesKHR(*surface);
-    vk::PresentModeKHR presentMode  = vk::PresentModeKHR::eFifo; // always supported
-    for (auto m : presentModes)
-    {
-        if (m == vk::PresentModeKHR::eMailbox)
-        {
-            presentMode = m; // low-latency vsync
-            break;
-        }
-    }
-
-    // find image usage
-    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment;
-    usage |= vk::ImageUsageFlagBits::eTransferDst; // for offscreen hdr buffer blitting
-
-    // find pretransform
-    // for rotated displays to work properly
-    vk::SurfaceTransformFlagBitsKHR preTransform = caps.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity
-                                                           ? vk::SurfaceTransformFlagBitsKHR::eIdentity
-                                                           : caps.currentTransform;
-
-    vk::SwapchainCreateInfoKHR swapchainCreateInfo;
-    swapchainCreateInfo.setSurface(*surface)
-            .setMinImageCount(desiredImageCount)
-            .setImageFormat(surfaceFormat.format)
-            .setImageColorSpace(surfaceFormat.colorSpace)
-            .setImageExtent(swapchainExtent)
-            .setImageArrayLayers(1)
-            .setImageUsage(usage)
-            .setPreTransform(preTransform)
-            .setPresentMode(presentMode)
-            .setClipped(true)
-            .setImageSharingMode(vk::SharingMode::eExclusive); // for graphics queue == present queue
-
-    vk::UniqueSwapchainKHR swapchain = vulkanDevice->createSwapchainKHRUnique(swapchainCreateInfo);
-
+    auto& swapchain = vulkanCtx.CreateSwapchain();
     // Get all swapchain images
     uint32_t imageCount = 0;
 
@@ -580,10 +193,12 @@ int main()
 
     nvrhi::TextureDesc swapchainTexDesc;
 
+    auto     swapchainExtent = vulkanCtx.GetSwapchainExtent();
     uint32_t swapchainWidth  = swapchainExtent.width;
     uint32_t swapchainHeight = swapchainExtent.height;
 
     // TODO: this must match surface specs
+    auto surfaceFormat           = vulkanCtx.GetSurfaceFormat();
     auto swapchainTexImageFormat = toNvrhiFormat(surfaceFormat.format);
 
     swapchainTexDesc.setDimension(nvrhi::TextureDimension::Texture2D)
@@ -613,6 +228,7 @@ int main()
 
     // shared depth texture for all framebuffers TODO: can we fix this in a nother way.
 
+    auto [windowWidth, windowHeight] = window.GetWindowSize();
     nvrhi::TextureDesc depthDesc{};
     depthDesc.setDimension(nvrhi::TextureDimension::Texture2D)
             .setWidth(windowWidth)
@@ -636,48 +252,7 @@ int main()
     nvrhi::CommandListHandle cmdList = nvrhiDevice->createCommandList();
 
     // Load Texture
-    int      texWidth, texHeight, texChannels;
-    stbi_uc *texPixels = stbi_load("assets/textures/example.jpg", &texWidth, &texHeight, &texChannels, 4);
-
-    nvrhi::TextureHandle exampleTexture;
-    if (texPixels)
-    {
-        nvrhi::TextureDesc textureDesc;
-        textureDesc.width            = texWidth;
-        textureDesc.height           = texHeight;
-        textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
-        textureDesc.debugName        = "Example Texture";
-        textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
-        textureDesc.keepInitialState = true;
-        textureDesc.dimension        = nvrhi::TextureDimension::Texture2D;
-
-        exampleTexture = nvrhiDevice->createTexture(textureDesc);
-
-        cmdList->open();
-        cmdList->writeTexture(exampleTexture, 0, 0, texPixels, texWidth * 4);
-        cmdList->close();
-        nvrhiDevice->executeCommandList(cmdList);
-
-        stbi_image_free(texPixels);
-    }
-    else
-    {
-        logger->error("Failed to load texture: assets/textures/example.jpg");
-        nvrhi::TextureDesc textureDesc;
-        textureDesc.width            = 1;
-        textureDesc.height           = 1;
-        textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
-        textureDesc.debugName        = "Dummy Texture";
-        textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
-        textureDesc.keepInitialState = true;
-        exampleTexture               = nvrhiDevice->createTexture(textureDesc);
-        uint32_t white               = 0xFFFFFFFF;
-
-        cmdList->open();
-        cmdList->writeTexture(exampleTexture, 0, 0, &white, 4);
-        cmdList->close();
-        nvrhiDevice->executeCommandList(cmdList);
-    }
+    nvrhi::TextureHandle exampleTexture = CreateTexture(nvrhiDevice, "assets/textures/example.jpg");
 
     // ViewProjection Buffer
     struct ViewProjection
@@ -752,7 +327,8 @@ int main()
     // Compile shaders
     if (!initShaderCompiler())
     {
-        logger->critical("Failed to initialize shader compiler");
+        logger->critical("Failed to initialise shader compiler");
+        nvrhiDevice->waitForIdle();
         return -1;
     }
 
@@ -760,6 +336,7 @@ int main()
     if (!compileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
     {
         logger->critical("Failed to compile vertex shader");
+        nvrhiDevice->waitForIdle();
         return -1;
     }
 
@@ -767,6 +344,7 @@ int main()
     if (!compileShader("assets/shaders/pixel.hlsl", pixelSpv, "ps_6_0"))
     {
         logger->critical("Failed to compile pixel shader");
+        nvrhiDevice->waitForIdle();
         return -1;
     }
 
@@ -848,14 +426,14 @@ int main()
         uint64_t startCycles = __rdtsc();
 
         // TODO: Begin pass somehow?
-        isRunning = !glfwWindowShouldClose(windowHandle);
+        isRunning = !window.ShouldClose();
+        // TODO: Figure out how we do events, event stack?
         glfwPollEvents();
 
         if (g_ResizeRequested)
         {
-            g_ResizeRequested = false;
-            int width, height;
-            glfwGetWindowSize(windowHandle, &width, &height);
+            g_ResizeRequested    = false;
+            auto [width, height] = window.GetWindowSize();
             if (width > 0 && height > 0)
             {
                 nvrhiDevice->waitForIdle();
@@ -869,6 +447,7 @@ int main()
                 swapchainExtent.width  = width;
                 swapchainExtent.height = height;
 
+                auto& swapchainCreateInfo = vulkanCtx.GetSwapchainCreateInfo();
                 swapchainCreateInfo.setImageExtent(swapchainExtent);
                 swapchainCreateInfo.setOldSwapchain(*swapchain);
 
@@ -976,7 +555,7 @@ int main()
         // Render
         cmdList->open();
         auto fb = framebuffers[imageIndex];
-        nvrhi::utils::ClearColorAttachment(cmdList, fb, 0, nvrhi::Color(0.f, 0.f, 0.f, 1.f));
+        nvrhi::utils::ClearColorAttachment(cmdList, fb, 0, nvrhi::Color(2.f, 0.f, 0.f, 1.f));
         cmdList->clearDepthStencilTexture(depthTexture, nvrhi::AllSubresources, true, 1.0f, false, 0);
 
 
@@ -1069,8 +648,10 @@ int main()
 
     // TODO: Global nvrhi stuff needs to be cleaned up before main exits
     nvrhiDevice = nullptr;
-    glfwDestroyWindow(windowHandle);
-    glfwTerminate();
+
+    // Clean up DXC
+    g_dxcUtils.Release();
+    g_dxcCompiler.Release();
 
     return 0;
 }
