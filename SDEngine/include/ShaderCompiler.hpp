@@ -4,6 +4,8 @@
 #include <dxc/dxcapi.h>
 #include "FileUtils.hpp"
 
+#include <iostream>
+
 inline CComPtr<IDxcUtils>     g_dxcUtils;
 inline CComPtr<IDxcCompiler3> g_dxcCompiler;
 

@@ -1,3 +1,6 @@
+#include "LayerList.hpp"
+#include "TestLayer.hpp"
+#include "PerformanceLayer.hpp"
 #include "VulkanConfig.hpp"
 #include <vulkan/vulkan.hpp>
 
@@ -22,7 +25,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <iostream>
 #include <queue>
 #include <chrono>
-#include <x86intrin.h>
 #include <filesystem>
 #include <fstream>
 
@@ -38,30 +40,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 constexpr bool enableValidation     = true;
 constexpr int  MAX_FRAMES_IN_FLIGHT = 2;
 
-struct Vertex
-{
-    float position[3];
-    float texCoord[2];
-};
-
-
-nvrhi::Format toNvrhiFormat(const vk::Format fmt)
-{
-    switch (fmt)
-    {
-        case vk::Format::eB8G8R8A8Srgb:
-            return nvrhi::Format::SBGRA8_UNORM;
-        case vk::Format::eR8G8B8A8Srgb:
-            return nvrhi::Format::SRGBA8_UNORM;
-        case vk::Format::eB8G8R8A8Unorm:
-            return nvrhi::Format::BGRA8_UNORM;
-        case vk::Format::eR8G8B8A8Unorm:
-            return nvrhi::Format::RGBA8_UNORM;
-        default:
-            throw std::runtime_error("Unsupported");
-    }
-}
-
 
 MessageCallback  g_MessageCallback;
 VkPhysicalDevice vulkanPhysicalDevice = nullptr;
@@ -74,53 +52,6 @@ void framebufferResizeCallback(int width, int height)
     g_ResizeRequested = true;
 }
 
-
-nvrhi::TextureHandle CreateTexture(const nvrhi::vulkan::DeviceHandle& nvrhiDevice, std::filesystem::path filePath)
-{
-    auto logger = spdlog::get("engine");
-
-    auto cmdList = nvrhiDevice->createCommandList();
-    int  texWidth, texHeight, texChannels;
-
-    if (stbi_uc *texPixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, 4))
-    {
-        nvrhi::TextureDesc textureDesc;
-        textureDesc.width            = texWidth;
-        textureDesc.height           = texHeight;
-        textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
-        textureDesc.debugName        = filePath.string();
-        textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
-        textureDesc.keepInitialState = true;
-        textureDesc.dimension        = nvrhi::TextureDimension::Texture2D;
-
-        auto texture = nvrhiDevice->createTexture(textureDesc);
-
-        cmdList->open();
-        cmdList->writeTexture(texture, 0, 0, texPixels, texWidth * 4);
-        cmdList->close();
-        nvrhiDevice->executeCommandList(cmdList);
-        stbi_image_free(texPixels);
-        return texture;
-    }
-
-    logger->error("Failed to load texture: {} (CWD: {})", filePath.string(), std::filesystem::current_path().string());
-
-    nvrhi::TextureDesc textureDesc;
-    textureDesc.width            = 1;
-    textureDesc.height           = 1;
-    textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
-    textureDesc.debugName        = "FailedTexture";
-    textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
-    textureDesc.keepInitialState = true;
-    auto     texture             = nvrhiDevice->createTexture(textureDesc);
-    uint32_t white               = 0xFFFFFFFF;
-
-    cmdList->open();
-    cmdList->writeTexture(texture, 0, 0, &white, 4);
-    cmdList->close();
-    nvrhiDevice->executeCommandList(cmdList);
-    return texture;
-}
 
 int main()
 {
@@ -191,6 +122,8 @@ int main()
         logger->warn("getSwapChainImagesKHR returned vk::Result::{}", static_cast<uint64_t>(res));
     }
 
+
+    // region nvrhistuff
     nvrhi::TextureDesc swapchainTexDesc;
 
     auto     swapchainExtent = vulkanCtx.GetSwapchainExtent();
@@ -249,157 +182,15 @@ int main()
         framebuffers.push_back(nvrhiDevice->createFramebuffer(fbDesc));
     }
 
-    nvrhi::CommandListHandle cmdList = nvrhiDevice->createCommandList();
+    // Create Layer Stack
+    LayerList layers;
+    auto      testLayer    = std::make_unique<TestLayer>(nvrhiDevice);
+    auto     *testLayerPtr = testLayer.get();
+    layers.AttachTop(std::move(testLayer));
+    layers.AttachTop(std::make_unique<PerformanceLayer>());
 
-    // Load Texture
-    nvrhi::TextureHandle exampleTexture = CreateTexture(nvrhiDevice, "assets/textures/example.jpg");
-
-    // ViewProjection Buffer
-    struct ViewProjection
-    {
-        float viewProj[16];
-    };
-
-    nvrhi::BufferDesc constantBufferDesc;
-    constantBufferDesc.byteSize         = sizeof(ViewProjection);
-    constantBufferDesc.isConstantBuffer = true;
-    constantBufferDesc.debugName        = "ViewProjectionConstantBuffer";
-    constantBufferDesc.initialState     = nvrhi::ResourceStates::ConstantBuffer;
-    constantBufferDesc.keepInitialState = true;
-    constantBufferDesc.cpuAccess        = nvrhi::CpuAccessMode::Write;
-    nvrhi::BufferHandle viewProjBuffer  = nvrhiDevice->createBuffer(constantBufferDesc);
-
-    // Vertex Buffer
-    static const Vertex vertices[] = {
-            {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f}}, // TL
-            { {0.5f, -0.5f, 0.0f}, {1.0f, 0.0f}}, // TR
-            { {-0.5f, 0.5f, 0.0f}, {0.0f, 1.0f}}, // BL
-            { {-0.5f, 0.5f, 0.0f}, {0.0f, 1.0f}}, // BL
-            { {0.5f, -0.5f, 0.0f}, {1.0f, 0.0f}}, // TR
-            {  {0.5f, 0.5f, 0.0f}, {1.0f, 1.0f}}  // BR
-    };
-
-    nvrhi::BufferDesc vertexBufferDesc;
-    vertexBufferDesc.byteSize         = sizeof(vertices);
-    vertexBufferDesc.isVertexBuffer   = true;
-    vertexBufferDesc.debugName        = "VertexBuffer";
-    vertexBufferDesc.initialState     = nvrhi::ResourceStates::VertexBuffer;
-    vertexBufferDesc.keepInitialState = true;
-    nvrhi::BufferHandle vertexBuffer  = nvrhiDevice->createBuffer(vertexBufferDesc);
-
-    cmdList->open();
-    cmdList->writeBuffer(vertexBuffer, vertices, sizeof(vertices));
-    cmdList->close();
-    nvrhiDevice->executeCommandList(cmdList);
-
-    // Sampler
-    nvrhi::SamplerDesc samplerDesc;
-    samplerDesc.addressU         = nvrhi::SamplerAddressMode::Wrap;
-    samplerDesc.addressV         = nvrhi::SamplerAddressMode::Wrap;
-    samplerDesc.addressW         = nvrhi::SamplerAddressMode::Wrap;
-    nvrhi::SamplerHandle sampler = nvrhiDevice->createSampler(samplerDesc);
-
-    // Binding Layout
-    nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::All;
-    layoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(0));
-    layoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
-    layoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(2));
-
-    // Zero out offsets to match direct register->binding mapping
-    layoutDesc.bindingOffsets = nvrhi::VulkanBindingOffsets()
-                                        .setShaderResourceOffset(0)
-                                        .setSamplerOffset(0)
-                                        .setConstantBufferOffset(0)
-                                        .setUnorderedAccessViewOffset(0);
-
-    nvrhi::BindingLayoutHandle bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
-
-    // Binding Set
-    nvrhi::BindingSetDesc bindingSetDesc;
-    bindingSetDesc.bindings            = {nvrhi::BindingSetItem::ConstantBuffer(0, viewProjBuffer),
-                                          nvrhi::BindingSetItem::Texture_SRV(1, exampleTexture),
-                                          nvrhi::BindingSetItem::Sampler(2, sampler)};
-    nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
-
-    // NOTE: Graphics Pipeline
-
-    // Compile shaders
-    if (!initShaderCompiler())
-    {
-        logger->critical("Failed to initialise shader compiler");
-        nvrhiDevice->waitForIdle();
-        return -1;
-    }
-
-    std::vector<char> vertexSpv;
-    if (!compileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
-    {
-        logger->critical("Failed to compile vertex shader");
-        nvrhiDevice->waitForIdle();
-        return -1;
-    }
-
-    std::vector<char> pixelSpv;
-    if (!compileShader("assets/shaders/pixel.hlsl", pixelSpv, "ps_6_0"))
-    {
-        logger->critical("Failed to compile pixel shader");
-        nvrhiDevice->waitForIdle();
-        return -1;
-    }
-
-    nvrhi::ShaderHandle vertexShader =
-            nvrhiDevice->createShader(nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex),
-                                      vertexSpv.data(),
-                                      vertexSpv.size());
-
-    nvrhi::ShaderHandle pixelShader =
-            nvrhiDevice->createShader(nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Pixel),
-                                      pixelSpv.data(),
-                                      pixelSpv.size());
-
-    if (!vertexShader || !pixelShader)
-    {
-        logger->critical("Failed to create shaders");
-        return -1;
-    }
-
-    // vert attribs
-    nvrhi::VertexAttributeDesc attributes[] = {nvrhi::VertexAttributeDesc()
-                                                       .setName("POSITION")
-                                                       .setFormat(nvrhi::Format::RGB32_FLOAT)
-                                                       .setOffset(0)
-                                                       .setElementStride(sizeof(Vertex)),
-                                               nvrhi::VertexAttributeDesc()
-                                                       .setName("TEXCOORD")
-                                                       .setFormat(nvrhi::Format::RG32_FLOAT)
-                                                       .setOffset(sizeof(float) * 3)
-                                                       .setElementStride(sizeof(Vertex))};
-
-    nvrhi::InputLayoutHandle inputLayout = nvrhiDevice->createInputLayout(attributes, 2, vertexShader);
-
-    auto fbInfo = framebuffers[0]->getFramebufferInfo();
-    logger->debug("colorFormats[0]={}", static_cast<uint32_t>(fbInfo.colorFormats[0]));
-
-    auto renderState  = nvrhi::RenderState{};
-    auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-                                .setRenderState(renderState)
-                                .setInputLayout(inputLayout)
-                                .setVertexShader(vertexShader)
-                                .setPixelShader(pixelShader)
-                                .addBindingLayout(bindingLayout);
-
-    pipelineDesc.renderState.rasterState.setCullMode(nvrhi::RasterCullMode::None);
-    pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-    pipelineDesc.primType                                      = nvrhi::PrimitiveType::TriangleList;
-
-    nvrhi::GraphicsPipelineHandle graphicsPipeline = nvrhiDevice->createGraphicsPipeline(pipelineDesc, fbInfo);
-
-    if (!graphicsPipeline)
-    {
-        logger->critical("Failed to create graphics pipeline");
-        return -1;
-    }
+    // Initial pipeline creation
+    testLayerPtr->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
 
     // sync objects
     std::vector<vk::UniqueSemaphore> imageAcquiredSemaphores;
@@ -413,24 +204,27 @@ int main()
         frameFences.push_back(vulkanDevice->createFenceUnique({vk::FenceCreateFlagBits::eSignaled}));
     }
 
+    // endregion
+
+
     bool                      isRunning    = true;
     [[maybe_unused]] uint32_t frameCount   = 0;
     uint32_t                  currentFrame = 0;
 
-    auto     lastReportTime        = std::chrono::high_resolution_clock::now();
-    uint64_t framesSinceLastReport = 0;
-    uint64_t cyclesSinceLastReport = 0;
+    auto lastTime = std::chrono::high_resolution_clock::now();
 
     while (isRunning)
     {
-        uint64_t startCycles = __rdtsc();
+        auto  now = std::chrono::high_resolution_clock::now();
+        float dt  = std::chrono::duration<float>(now - lastTime).count();
+        lastTime  = now;
 
         // TODO: Begin pass somehow?
         isRunning = !window.ShouldClose();
         // TODO: Figure out how we do events, event stack?
         glfwPollEvents();
 
-        if (g_ResizeRequested)
+        if (g_ResizeRequested) [[unlikely]]
         {
             g_ResizeRequested    = false;
             auto [width, height] = window.GetWindowSize();
@@ -487,33 +281,10 @@ int main()
                     fbDesc.setDepthAttachment(depthTexture);
                     framebuffers.push_back(nvrhiDevice->createFramebuffer(fbDesc));
                 }
+
+                // Recreate pipeline in layer
+                testLayerPtr->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
             }
-        }
-
-        // Update ViewProjection
-        {
-            ViewProjection vp{};
-            std::fill(std::begin(vp.viewProj), std::end(vp.viewProj), 0.0f);
-
-            // Simple orthographic projection to keep aspect ratio
-            float aspect = static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height);
-            float scaleX = 1.0f;
-            float scaleY = 1.0f;
-
-            if (aspect > 1.0f)
-                scaleX /= aspect;
-            else
-                scaleY *= aspect;
-
-            vp.viewProj[0]  = scaleX;
-            vp.viewProj[5]  = scaleY;
-            vp.viewProj[10] = 1.0f;
-            vp.viewProj[15] = 1.0f;
-
-            cmdList->open();
-            cmdList->writeBuffer(viewProjBuffer, &vp, sizeof(vp));
-            cmdList->close();
-            nvrhiDevice->executeCommandList(cmdList);
         }
 
         // wait for previous frame work to finish
@@ -551,30 +322,14 @@ int main()
         vulkanDevice->resetFences(*frameFences[currentFrame]);
 
         nvrhiDevice->queueWaitForSemaphore(nvrhi::CommandQueue::Graphics, *imageAcquiredSemaphores[currentFrame], 0);
+        nvrhiDevice->queueSignalSemaphore(nvrhi::CommandQueue::Graphics, *renderCompletedSemaphores[currentFrame], 0);
 
         // Render
-        cmdList->open();
         auto fb = framebuffers[imageIndex];
-        nvrhi::utils::ClearColorAttachment(cmdList, fb, 0, nvrhi::Color(2.f, 0.f, 0.f, 1.f));
-        cmdList->clearDepthStencilTexture(depthTexture, nvrhi::AllSubresources, true, 1.0f, false, 0);
 
-
-        auto graphicsState =
-                nvrhi::GraphicsState()
-                        .setPipeline(graphicsPipeline)
-                        .setFramebuffer(fb)
-                        .setViewport(nvrhi::ViewportState().addViewportAndScissorRect(
-                                nvrhi::Viewport(static_cast<float>(swapchainExtent.width),
-                                                static_cast<float>(swapchainExtent.height))))
-                        .addBindingSet(bindingSet)
-                        .addVertexBuffer(nvrhi::VertexBufferBinding().setBuffer(vertexBuffer).setSlot(0).setOffset(0));
-
-        cmdList->setGraphicsState(graphicsState);
-        cmdList->draw(nvrhi::DrawArguments().setVertexCount(6).setInstanceCount(1));
-        cmdList->close();
-
-        nvrhiDevice->queueSignalSemaphore(nvrhi::CommandQueue::Graphics, *renderCompletedSemaphores[currentFrame], 0);
-        nvrhiDevice->executeCommandList(cmdList);
+        testLayerPtr->SetFramebuffer(fb);
+        layers.Update(dt);
+        layers.Render();
 
         // Submit fence
         // NVRHI doesn't expose fence submission directly in executeCommandList for external fences easily without using
@@ -615,25 +370,6 @@ int main()
         // TODO: frames in flight
         // TODO: EventQueryHandle. reset and push
 
-        uint64_t endCycles = __rdtsc();
-        cyclesSinceLastReport += endCycles - startCycles;
-        framesSinceLastReport++;
-
-        auto                                      now     = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> elapsed = now - lastReportTime;
-
-        if (elapsed.count() >= 1000.0)
-        {
-            double fps        = framesSinceLastReport / (elapsed.count() / 1000.0);
-            double msPerFrame = elapsed.count() / framesSinceLastReport;
-            double avgCycles  = static_cast<double>(cyclesSinceLastReport) / framesSinceLastReport;
-
-            logger->info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}", fps, msPerFrame, avgCycles);
-
-            lastReportTime        = now;
-            framesSinceLastReport = 0;
-            cyclesSinceLastReport = 0;
-        }
     }
 
 
@@ -642,9 +378,6 @@ int main()
 
     framebuffers.clear();
     swapchainTextures.clear();
-
-    graphicsPipeline = nullptr;
-    cmdList          = nullptr;
 
     // TODO: Global nvrhi stuff needs to be cleaned up before main exits
     nvrhiDevice = nullptr;

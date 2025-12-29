@@ -1,4 +1,7 @@
-add_executable(SDEngine src/main.cpp src/VulkanContext.cpp src/Window.cpp)
+add_executable(SDEngine src/main.cpp src/VulkanContext.cpp src/Window.cpp
+        include/Layer.cpp
+        include/Layer.hpp
+        include/LayerList.hpp)
 find_package(Vulkan REQUIRED)
 target_link_libraries(SDEngine PRIVATE nvrhi_vk nvrhi Vulkan::Vulkan glfw spdlog stb_image dxc)
 target_include_directories(SDEngine PRIVATE include)
