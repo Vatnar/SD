@@ -56,7 +56,32 @@ public:
         }
         if (!e.Handled)
         {
-            spdlog::get("engine")->warn("Event was never handled");
+            switch (e.category())
+            {
+                case EventCategory::KeyPressed:
+                {
+                    auto pressed = dynamic_cast<KeyPressedEvent&>(e);
+                    spdlog::get("engine")->debug("KeyPressed Event missed: key:{}, scancode{}, repeat:{}",
+                                                 pressed.key,
+                                                 pressed.scancode,
+                                                 pressed.repeat);
+                }
+                break;
+                case EventCategory::KeyReleased:
+                {
+                    auto pressed = dynamic_cast<KeyReleasedEvent&>(e);
+                    spdlog::get("engine")->debug("KeyReleased Event missed: key:{}, scancode{}",
+                                                 pressed.key,
+                                                 pressed.scancode);
+                }
+                break;
+                case EventCategory::Window:
+                case EventCategory::Mouse:
+                case EventCategory::Key:
+                case EventCategory::Engine:
+                default:
+                    spdlog::get("engine")->warn("Event was never handled");
+            }
         }
     }
 
@@ -69,6 +94,14 @@ public:
         ref.OnAttach();
     }
 
+    template<IsLayer T, typename... Args>
+    void CreateAndAttachBottom(Args&&...args)
+    {
+        auto layer = std::make_unique<T>(std::forward<Args>(args)...);
+        T&   ref   = *layer;
+        mLayers.emplace_front(std::move(layer));
+        ref.OnAttach();
+    }
     template<IsLayer T>
     void AttachTop(std::unique_ptr<T> layer)
     {
@@ -83,6 +116,19 @@ public:
         T& ref = *layer;
         mLayers.emplace_front(std::move(layer));
         ref.OnAttach();
+    }
+
+    template<IsLayer T>
+    T *GetRef()
+    {
+        for (auto it = mLayers.begin(); it != mLayers.end(); ++it)
+        {
+            if (auto p = dynamic_cast<T *>(it->get()))
+            {
+                return p;
+            }
+        }
+        return nullptr;
     }
 
     // This detaches ownership and returns it. It does not delete the layer.

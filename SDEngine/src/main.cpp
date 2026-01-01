@@ -1,6 +1,4 @@
-#include "LayerList.hpp"
-#include "TestLayer.hpp"
-#include "PerformanceLayer.hpp"
+
 #include "VulkanConfig.hpp"
 #include <vulkan/vulkan.hpp>
 
@@ -17,16 +15,14 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-// STB
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 // STD
 #include <iostream>
 #include <queue>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <thread>
+#include <memory>
 
 // SD
 #include "GlfwContext.hpp"
@@ -36,9 +32,17 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include "ShaderCompiler.hpp"
 #include "Window.hpp"
 
+#include "Event.hpp"
+#include "EventManager.hpp"
+#include "LayerList.hpp"
+#include "TestLayer.hpp"
+#include "PerformanceLayer.hpp"
 
-constexpr bool enableValidation     = true;
-constexpr int  MAX_FRAMES_IN_FLIGHT = 2;
+// STB
+
+constexpr bool   enableValidation     = true;
+constexpr int    MAX_FRAMES_IN_FLIGHT = 2;
+constexpr double TARGET_FPS           = 60.0;
 
 
 MessageCallback  g_MessageCallback;
@@ -46,14 +50,7 @@ VkPhysicalDevice vulkanPhysicalDevice = nullptr;
 
 
 bool g_ResizeRequested = false;
-
-void framebufferResizeCallback(int width, int height)
-{
-    g_ResizeRequested = true;
-}
-
-
-int main()
+int  main()
 {
     // NOTE: Init logging
 
@@ -62,9 +59,9 @@ int main()
 
     // TODO: Create window and such
 
+
     GlfwContext glfwCtx;
     Window      window(800, 600, "SDPrototype");
-    window.SetResizeCallback(framebufferResizeCallback);
 
 
     VulkanContext vulkanCtx(glfwCtx, window);
@@ -159,7 +156,8 @@ int main()
     }
 
 
-    // shared depth texture for all framebuffers TODO: can we fix this in a nother way.
+    // shared depth texture for all framebuffers
+    // TODO: can we fix this in a nother way.
 
     auto [windowWidth, windowHeight] = window.GetWindowSize();
     nvrhi::TextureDesc depthDesc{};
@@ -183,15 +181,46 @@ int main()
     }
 
     // Create Layer Stack
+
+    // TODO: I think we need some other safer way to access the layers.
+
     LayerList layers;
-    auto      testLayer    = std::make_unique<TestLayer>(nvrhiDevice);
-    auto     *testLayerPtr = testLayer.get();
-    layers.AttachTop(std::move(testLayer));
-    layers.AttachTop(std::make_unique<PerformanceLayer>());
+    layers.CreateAndAttachTop<TestLayer>(nvrhiDevice);
+    auto testLayer = layers.GetRef<TestLayer>();
+    if (testLayer == nullptr)
+        throw std::runtime_error("Invalid testlayer");
+
+    layers.CreateAndAttachTop<PerformanceLayer>();
+    auto performanceLayer = layers.GetRef<PerformanceLayer>();
+    if (performanceLayer == nullptr)
+        throw std::runtime_error("Invalid performance layer");
 
     // Initial pipeline creation
-    testLayerPtr->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
+    testLayer->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
 
+
+    // NOTE: EVENTS & callbacks
+    std::vector<std::unique_ptr<Event>> eventManager;
+
+    window.SetKeyCallback(
+            [&eventManager](int key, int scancode, int action, int mods)
+            {
+                switch (action)
+                {
+                    case GLFW_PRESS:
+                        eventManager.push_back(std::make_unique<KeyPressedEvent>(key, scancode, false));
+                        break;
+                    case GLFW_REPEAT:
+                        eventManager.push_back(std::make_unique<KeyPressedEvent>(key, scancode, true));
+                        break;
+                    case GLFW_RELEASE:
+                        eventManager.push_back(std::make_unique<KeyReleasedEvent>(key, scancode));
+                        break;
+                    default:
+                        break;
+                }
+            });
+    window.SetResizeCallback([](int, int) { g_ResizeRequested = true; });
     // sync objects
     std::vector<vk::UniqueSemaphore> imageAcquiredSemaphores;
     std::vector<vk::UniqueSemaphore> renderCompletedSemaphores;
@@ -219,16 +248,27 @@ int main()
         float dt  = std::chrono::duration<float>(now - lastTime).count();
         lastTime  = now;
 
-        // TODO: Begin pass somehow?
         isRunning = !window.ShouldClose();
-        // TODO: Figure out how we do events, event stack?
+
+        // NOTE: Handle events, input etc
+        // TODO: How are these handled etc.
         glfwPollEvents();
 
+
+        // TODO: Poll events
+
+        for (const auto& e : eventManager)
+        {
+            layers.HandleEvent(*e);
+        }
+        eventManager.clear();
+
+        // NOTE: Rendering stuff
+        // NOTE: Swapchain resize TODO: Where should i have this...
         if (g_ResizeRequested) [[unlikely]]
         {
-            g_ResizeRequested    = false;
-            auto [width, height] = window.GetWindowSize();
-            if (width > 0 && height > 0)
+            g_ResizeRequested = false;
+            if (auto [width, height] = window.GetWindowSize(); width > 0 && height > 0)
             {
                 nvrhiDevice->waitForIdle();
 
@@ -249,14 +289,17 @@ int main()
                 swapchain                           = std::move(newSwapchain);
 
                 // Get images
+                // TODO: Why do we need both? Is it not fine to just resize while getting them.
                 if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, nullptr);
                     res != vk::Result::eSuccess)
                 {
+                    logger->error("Failed to get Swapchain images from vulkandevice : {}", static_cast<uint64_t>(res));
                 }
                 swapchainImages.resize(imageCount);
                 if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, swapchainImages.data());
                     res != vk::Result::eSuccess)
                 {
+                    logger->error("Failed to get Swapchain images from vulkandevice : {}", static_cast<uint64_t>(res));
                 }
 
                 // Recreate NVRHI textures
@@ -283,7 +326,7 @@ int main()
                 }
 
                 // Recreate pipeline in layer
-                testLayerPtr->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
+                testLayer->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
             }
         }
 
@@ -327,18 +370,11 @@ int main()
         // Render
         auto fb = framebuffers[imageIndex];
 
-        testLayerPtr->SetFramebuffer(fb);
+        testLayer->SetFramebuffer(fb);
         layers.Update(dt);
         layers.Render();
 
         // Submit fence
-        // NVRHI doesn't expose fence submission directly in executeCommandList for external fences easily without using
-        // queueSubmit But we can use vulkanDevice->getQueue...submit Wait, NVRHI executeCommandList submits to the
-        // queue. We need to signal the fence. NVRHI doesn't seem to have a "signal fence" API easily accessible on
-        // CommandList? We can just submit an empty batch to signal the fence? Or better: NVRHI's executeCommandList
-        // doesn't take a fence. We can use the underlying queue to submit the fence. But we need to ensure ordering.
-        // NVRHI submits to the queue.
-        // If we submit to the same queue, it is serialized.
 
         vulkanDevice->getQueue(graphicsFamilyIndex, 0).submit(vk::SubmitInfo(), *frameFences[currentFrame]);
 
@@ -365,11 +401,22 @@ int main()
         // TODO: if vsync or debugruntime, explicitly sync queue with waitidle
         nvrhiDevice->runGarbageCollection();
 
-        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
-        // TODO: frames in flight
         // TODO: EventQueryHandle. reset and push
 
+        // NOTE: Cap framerate
+
+        auto                          frameEnd = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed  = frameEnd - now;
+        std::chrono::duration<double> targetFrameTime(1.0 / TARGET_FPS);
+        if (elapsed < targetFrameTime)
+        {
+            performanceLayer->BeginSleep();
+            std::this_thread::sleep_for(targetFrameTime - elapsed);
+            performanceLayer->EndSleep();
+        }
+
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
 

@@ -1,4 +1,5 @@
 #pragma once
+#include "Event.hpp"
 #include "ShaderCompiler.hpp"
 #include "Utils.hpp"
 #include "nvrhi/nvrhi.h"
@@ -12,7 +13,10 @@ public:
         float viewProj[16];
     };
 
-    TestLayer(nvrhi::DeviceHandle device) : mDevice(std::move(device)) {}
+    TestLayer(nvrhi::DeviceHandle device) : mDevice(std::move(device))
+    {
+        mClearColor = nvrhi::Color(0.0f, 0.0f, 0.0f, 1.f);
+    }
 
     void OnAttach() override
     {
@@ -172,7 +176,7 @@ public:
         }
 
         // Clear
-        nvrhi::utils::ClearColorAttachment(mCmdList, mFramebuffer, 0, nvrhi::Color(0.2f, 0.2f, 0.2f, 1.f));
+        nvrhi::utils::ClearColorAttachment(mCmdList, mFramebuffer, 0, mClearColor);
         mCmdList->clearDepthStencilTexture(mFramebuffer->getDesc().depthAttachment.texture,
                                            nvrhi::AllSubresources,
                                            true,
@@ -198,6 +202,41 @@ public:
         mDevice->executeCommandList(mCmdList);
     }
 
+    void OnEvent(Event& e) override
+    {
+        switch (e.category())
+        {
+            case EventCategory::Window:
+                break;
+            case EventCategory::Mouse:
+                break;
+            case EventCategory::Key:
+                break;
+            case EventCategory::KeyPressed:
+            {
+                auto pressed = dynamic_cast<KeyPressedEvent&>(e);
+                if (pressed.key == GLFW_KEY_SPACE)
+                {
+                    mClearColor = nvrhi::Color(1.0f, 0.0f, 0.0f, 1.0f);
+                    e.Handled   = true;
+                }
+            }
+            break;
+            case EventCategory::KeyReleased:
+            {
+                auto released = dynamic_cast<KeyReleasedEvent&>(e);
+                if (released.key == GLFW_KEY_SPACE)
+                {
+                    mClearColor = nvrhi::Color(0.0f, 0.0f, 0.0f, 1.0f);
+                    e.Handled   = true;
+                }
+            }
+            break;
+            case EventCategory::Engine:
+                break;
+        }
+    }
+
 private:
     nvrhi::DeviceHandle           mDevice;
     nvrhi::CommandListHandle      mCmdList;
@@ -210,4 +249,6 @@ private:
     nvrhi::ShaderHandle           mVertexShader, mPixelShader;
     nvrhi::InputLayoutHandle      mInputLayout;
     nvrhi::GraphicsPipelineHandle mGraphicsPipeline;
+
+    nvrhi::Color mClearColor;
 };

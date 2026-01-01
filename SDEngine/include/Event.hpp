@@ -1,12 +1,15 @@
 #pragma once
 #include <cstdint>
+#include <vector>
 
 enum class EventCategory : uint32_t
 {
-    Window = 1 << 0,
-    Mouse  = 1 << 1,
-    Key    = 1 << 2,
-    Engine = 1 << 3,
+    Window      = 1 << 0,
+    Mouse       = 1 << 1,
+    Key         = 1 << 2,
+    KeyPressed  = 1 << 3,
+    KeyReleased = 1 << 4,
+    Engine      = 1 << 5,
 };
 struct Event
 {
@@ -40,8 +43,29 @@ struct EngineEvent : Event
 struct KeyPressedEvent : KeyEvent
 {
     int  key{};
+    int  scancode{};
     bool repeat{};
+    // TODO: how do we show modifiers, maybe bool map or some shit
+    // std::vector<int> mods;
+    KeyPressedEvent() = default;
+    KeyPressedEvent(int key, int scancode, bool repeat);
+
+    [[nodiscard]] EventCategory category() const override { return EventCategory::KeyPressed; }
 };
+
+struct KeyReleasedEvent : KeyEvent
+{
+    int key{};
+    int scancode{};
+    KeyReleasedEvent() = default;
+    KeyReleasedEvent(int key, int scancode);
+    [[nodiscard]] EventCategory category() const override { return EventCategory::KeyReleased; }
+};
+inline KeyPressedEvent::KeyPressedEvent(int key, int scancode, bool repeat)
+    : key(key), scancode(scancode), repeat(repeat)
+{}
+inline KeyReleasedEvent::KeyReleasedEvent(int key, int scancode) : key(key), scancode(scancode)
+{}
 
 struct MouseMovedEvent : MouseEvent
 {
