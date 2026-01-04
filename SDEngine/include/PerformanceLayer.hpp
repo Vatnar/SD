@@ -26,7 +26,7 @@ public:
             double fps         = mFrameCount / static_cast<double>(mTimeAccumulator);
             double computeTime = static_cast<double>(mTimeAccumulator) - mSleepTimeAccumulator;
             double msPerFrame  = (computeTime * 1000.0) / mFrameCount;
-            double avgCycles   = static_cast<double>(mCycleAccumulator - mSleepCycleAccumulator);
+            double avgCycles   = static_cast<double>(mCycleAccumulator - mSleepCycleAccumulator) / mFrameCount;
 
 
             if (const auto logger = spdlog::get("engine"))
@@ -49,7 +49,7 @@ public:
     void EndSleep()
     {
         auto now = std::chrono::high_resolution_clock::now();
-        mSleepCycleAccumulator += (__rdtsc() - mSleepStartCycles);
+        mSleepCycleAccumulator += __rdtsc() - mSleepStartCycles;
         mSleepTimeAccumulator += std::chrono::duration<float>(now - mSleepStartTime).count();
     }
 

@@ -140,8 +140,8 @@ void VulkanContext::SetupQueues()
 
     if (graphicsFamilyIndex == UINT32_MAX)
     {
-        // TODO: figure out if i want exceptions, how it should be handled, where etc
-        throw std::runtime_error("No queue family supports both graphics and present");
+        // TODO: Maybe caller should decide to abort or not
+        Engine::Abort("No queue family supports both graphics and present capabilities");
     }
 
     mGraphicsFamilyIndex = graphicsFamilyIndex;
@@ -188,7 +188,7 @@ void VulkanContext::SetupDeviceExtensions()
     auto requireExt = [&](const char *name)
     {
         if (!supports(name))
-            throw std::runtime_error(std::string("Required device extension missing ") + name);
+            Engine::Abort(std::format("Required device extension missing: {} ", name));
         mDeviceExts.push_back(name);
     };
 

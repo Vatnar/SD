@@ -1,21 +1,22 @@
 #pragma once
+#include <expected>
 #include <vector>
 #include <fstream>
 
-inline std::vector<char> readFile(const std::string& filename)
+inline std::expected<std::vector<char>, std::unexpect_t> readFile(const std::string& filename)
 {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
     if (!file.is_open())
     {
-        throw std::runtime_error("failed to open file: " + filename);
+        return std::unexpected(std::unexpect);
     }
 
-    size_t            fileSize = (size_t) file.tellg();
+    const size_t      fileSize = file.tellg();
     std::vector<char> buffer(fileSize);
 
     file.seekg(0);
-    file.read(buffer.data(), fileSize);
+    file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
     file.close();
 
     return buffer;

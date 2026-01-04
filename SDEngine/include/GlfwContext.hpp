@@ -1,9 +1,9 @@
 #pragma once
 
+#include "Utils.hpp"
 #include "VulkanConfig.hpp"
 #include "GLFW/glfw3.h"
 
-#include <stdexcept>
 
 class GlfwContext
 {
@@ -12,8 +12,7 @@ public:
     {
         if (!glfwInit())
         {
-            // TODO: figure out how we do errors
-            throw std::runtime_error("Failed to initialise GLFW");
+            Engine::Abort("Failed to initialise GLFW");
         }
 
         // Global hints

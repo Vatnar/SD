@@ -26,7 +26,9 @@ public:
         mCmdList = mDevice->createCommandList();
 
         // Load Texture
-        mExampleTexture = CreateTexture(mDevice, "assets/textures/example.jpg");
+        auto texture = CreateTexture(mDevice, "assets/textures/example.jpg");
+
+        mExampleTexture = texture.value_or(GetDefaultWhiteTexture(mDevice));
 
         // ViewProjection Buffer
         nvrhi::BufferDesc constantBufferDesc;
@@ -93,15 +95,15 @@ public:
 
         // Shaders
         if (!initShaderCompiler())
-            throw std::runtime_error("Failed to init shader compiler");
+            Engine::Abort("Failed to init shader compiler");
 
         std::vector<char> vertexSpv;
         if (!compileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
-            throw std::runtime_error("Failed to compile vertex shader");
+            Engine::Abort("Failed to compile vertex shader");
 
         std::vector<char> pixelSpv;
         if (!compileShader("assets/shaders/pixel.hlsl", pixelSpv, "ps_6_0"))
-            throw std::runtime_error("Failed to compile pixel shader");
+            Engine::Abort("Failed to compile pixel shader");
 
         mVertexShader = mDevice->createShader(nvrhi::ShaderDesc().setShaderType(nvrhi::ShaderType::Vertex),
                                               vertexSpv.data(),

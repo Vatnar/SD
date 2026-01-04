@@ -1,9 +1,7 @@
-#include "../include/Layer.hpp"
+#include "Layer.hpp"
 
 void Layer::OnRender()
-{
-}
+{}
 
 void Layer::OnUpdate(float dt)
-{
-}
+{}

@@ -1,4 +1,3 @@
-
 #include "VulkanConfig.hpp"
 #include <vulkan/vulkan.hpp>
 
@@ -23,6 +22,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <fstream>
 #include <thread>
 #include <memory>
+#include <deque>
 
 // SD
 #include "GlfwContext.hpp"
@@ -42,7 +42,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
 constexpr bool   enableValidation     = true;
 constexpr int    MAX_FRAMES_IN_FLIGHT = 2;
-constexpr double TARGET_FPS           = 60.0;
+constexpr double TARGET_FPS           = 144.0;
 
 
 MessageCallback  g_MessageCallback;
@@ -56,9 +56,6 @@ int  main()
 
     init_logging();
     auto logger = spdlog::get("engine");
-
-    // TODO: Create window and such
-
 
     GlfwContext glfwCtx;
     Window      window(800, 600, "SDPrototype");
@@ -102,23 +99,8 @@ int  main()
 
     auto& swapchain = vulkanCtx.CreateSwapchain();
     // Get all swapchain images
-    uint32_t imageCount = 0;
-
-    // TODO: Check if we might aswell just put it into the vector right away, if that is better or not
-    // TODO: Get/create swap chain
-
-    if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, nullptr); res != vk::Result::eSuccess)
-    {
-        logger->warn("getSwapChainImagesKHR returned vk::Result::{}", static_cast<uint64_t>(res));
-    }
-    std::vector<vk::Image> swapchainImages(imageCount);
-
-    if (auto res = vulkanDevice->getSwapchainImagesKHR(*swapchain, &imageCount, swapchainImages.data());
-        res != vk::Result::eSuccess)
-    {
-        logger->warn("getSwapChainImagesKHR returned vk::Result::{}", static_cast<uint64_t>(res));
-    }
-
+    std::vector<vk::Image> swapchainImages = vulkanDevice->getSwapchainImagesKHR(*swapchain);
+    uint32_t               imageCount      = static_cast<uint32_t>(swapchainImages.size());
 
     // region nvrhistuff
     nvrhi::TextureDesc swapchainTexDesc;
@@ -127,7 +109,6 @@ int  main()
     uint32_t swapchainWidth  = swapchainExtent.width;
     uint32_t swapchainHeight = swapchainExtent.height;
 
-    // TODO: this must match surface specs
     auto surfaceFormat           = vulkanCtx.GetSurfaceFormat();
     auto swapchainTexImageFormat = toNvrhiFormat(surfaceFormat.format);
 
@@ -156,8 +137,7 @@ int  main()
     }
 
 
-    // shared depth texture for all framebuffers
-    // TODO: can we fix this in a nother way.
+    // TODO: one depth per frame in flight
 
     auto [windowWidth, windowHeight] = window.GetWindowSize();
     nvrhi::TextureDesc depthDesc{};
@@ -168,16 +148,23 @@ int  main()
             .setIsRenderTarget(true)
             .enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
 
-    nvrhi::TextureHandle depthTexture = nvrhiDevice->createTexture(depthDesc);
+    std::vector<nvrhi::TextureHandle> depthTextures;
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        depthTextures.push_back(nvrhiDevice->createTexture(depthDesc));
+    }
 
     // create framebuffer for each nvrhi texture
-    std::vector<nvrhi::FramebufferHandle> framebuffers;
-    framebuffers.reserve(imageCount);
+    std::vector<std::vector<nvrhi::FramebufferHandle>> framebuffers;
+    framebuffers.resize(imageCount);
     for (uint32_t i = 0; i < imageCount; ++i)
     {
-        auto fbDesc = nvrhi::FramebufferDesc().addColorAttachment(swapchainTextures[i]);
-        fbDesc.setDepthAttachment(depthTexture);
-        framebuffers.push_back(nvrhiDevice->createFramebuffer(fbDesc));
+        for (int j = 0; j < MAX_FRAMES_IN_FLIGHT; ++j)
+        {
+            auto fbDesc = nvrhi::FramebufferDesc().addColorAttachment(swapchainTextures[i]);
+            fbDesc.setDepthAttachment(depthTextures[j]);
+            framebuffers[i].push_back(nvrhiDevice->createFramebuffer(fbDesc));
+        }
     }
 
     // Create Layer Stack
@@ -187,16 +174,12 @@ int  main()
     LayerList layers;
     layers.CreateAndAttachTop<TestLayer>(nvrhiDevice);
     auto testLayer = layers.GetRef<TestLayer>();
-    if (testLayer == nullptr)
-        throw std::runtime_error("Invalid testlayer");
 
     layers.CreateAndAttachTop<PerformanceLayer>();
     auto performanceLayer = layers.GetRef<PerformanceLayer>();
-    if (performanceLayer == nullptr)
-        throw std::runtime_error("Invalid performance layer");
 
     // Initial pipeline creation
-    testLayer->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
+    testLayer->UpdatePipeline(framebuffers[0][0]->getFramebufferInfo());
 
 
     // NOTE: EVENTS & callbacks
@@ -221,10 +204,17 @@ int  main()
                 }
             });
     window.SetResizeCallback([](int, int) { g_ResizeRequested = true; });
+    window.SetScrollCallback([&eventManager](double xOffset, double yOffset)
+                             { eventManager.push_back(std::make_unique<ScrollEvent>(xOffset, yOffset)); });
+    window.SetCursorCallback([&eventManager](double xPos, double yPos)
+                             { eventManager.push_back(std::make_unique<CursorEvent>(xPos, yPos)); });
     // sync objects
     std::vector<vk::UniqueSemaphore> imageAcquiredSemaphores;
     std::vector<vk::UniqueSemaphore> renderCompletedSemaphores;
     std::vector<vk::UniqueFence>     frameFences;
+
+    std::deque<std::pair<vk::UniqueSemaphore, uint64_t>> semaphoreGraveyard;
+    uint64_t                                             frameCounter = 0;
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
@@ -275,7 +265,7 @@ int  main()
                 // Destroy old swapchain resources
                 framebuffers.clear();
                 swapchainTextures.clear();
-                depthTexture = nullptr;
+                depthTextures.clear();
 
                 // Recreate swapchain
                 swapchainExtent.width  = width;
@@ -315,18 +305,25 @@ int  main()
 
                 // Recreate depth
                 depthDesc.setWidth(width).setHeight(height);
-                depthTexture = nvrhiDevice->createTexture(depthDesc);
+                for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+                {
+                    depthTextures.push_back(nvrhiDevice->createTexture(depthDesc));
+                }
 
                 // Recreate framebuffers
+                framebuffers.resize(imageCount);
                 for (uint32_t i = 0; i < imageCount; ++i)
                 {
-                    auto fbDesc = nvrhi::FramebufferDesc().addColorAttachment(swapchainTextures[i]);
-                    fbDesc.setDepthAttachment(depthTexture);
-                    framebuffers.push_back(nvrhiDevice->createFramebuffer(fbDesc));
+                    for (int j = 0; j < MAX_FRAMES_IN_FLIGHT; ++j)
+                    {
+                        auto fbDesc = nvrhi::FramebufferDesc().addColorAttachment(swapchainTextures[i]);
+                        fbDesc.setDepthAttachment(depthTextures[j]);
+                        framebuffers[i].push_back(nvrhiDevice->createFramebuffer(fbDesc));
+                    }
                 }
 
                 // Recreate pipeline in layer
-                testLayer->UpdatePipeline(framebuffers[0]->getFramebufferInfo());
+                testLayer->UpdatePipeline(framebuffers[0][0]->getFramebufferInfo());
             }
         }
 
@@ -336,6 +333,11 @@ int  main()
         {
             logger->critical("Failed to wait for fences");
             return -1;
+        }
+
+        while (!semaphoreGraveyard.empty() && (frameCounter - semaphoreGraveyard.front().second > 100))
+        {
+            semaphoreGraveyard.pop_front();
         }
 
         // Acquire image
@@ -368,7 +370,7 @@ int  main()
         nvrhiDevice->queueSignalSemaphore(nvrhi::CommandQueue::Graphics, *renderCompletedSemaphores[currentFrame], 0);
 
         // Render
-        auto fb = framebuffers[imageIndex];
+        auto fb = framebuffers[imageIndex][currentFrame];
 
         testLayer->SetFramebuffer(fb);
         layers.Update(dt);
@@ -416,7 +418,12 @@ int  main()
             performanceLayer->EndSleep();
         }
 
+        // Move the current semaphore to the graveyard and create a new one
+        semaphoreGraveyard.emplace_back(std::move(renderCompletedSemaphores[currentFrame]), frameCounter);
+        renderCompletedSemaphores[currentFrame] = vulkanDevice->createSemaphoreUnique({});
+
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        frameCounter++;
     }
 
 
@@ -425,6 +432,7 @@ int  main()
 
     framebuffers.clear();
     swapchainTextures.clear();
+    semaphoreGraveyard.clear();
 
     // TODO: Global nvrhi stuff needs to be cleaned up before main exits
     nvrhiDevice = nullptr;

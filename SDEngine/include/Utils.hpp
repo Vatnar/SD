@@ -2,11 +2,32 @@
 #include "VulkanConfig.hpp"
 #include "stb_image.h"
 #include "nvrhi/nvrhi.h"
+#include "spdlog/spdlog.h"
 
+#include <expected>
 #include <filesystem>
+#include <iostream>
+
+namespace Engine
+{
+
+    [[noreturn]] inline void Abort(const std::string& message)
+    {
+        if (const auto logger = spdlog::get("engine"))
+        {
+            logger->critical("Fatal error: {}", message);
+            spdlog::shutdown();
+        }
+        else
+        {
+            std::cerr << "Fatal error: " << message << '\n';
+        }
+        std::exit(EXIT_FAILURE);
+    }
+} // namespace Engine
 
 
-nvrhi::Format toNvrhiFormat(const vk::Format fmt)
+inline nvrhi::Format toNvrhiFormat(const vk::Format fmt)
 {
     switch (fmt)
     {
@@ -19,41 +40,51 @@ nvrhi::Format toNvrhiFormat(const vk::Format fmt)
         case vk::Format::eR8G8B8A8Unorm:
             return nvrhi::Format::RGBA8_UNORM;
         default:
-            throw std::runtime_error("Unsupported");
+            Engine::Abort("Unsupported device format");
     }
 }
 
 
-nvrhi::TextureHandle CreateTexture(const nvrhi::DeviceHandle& nvrhiDevice, std::filesystem::path filePath)
+enum class TextureError
+{
+    FailedToLoad
+};
+inline std::expected<nvrhi::TextureHandle, TextureError> CreateTexture(const nvrhi::DeviceHandle&   nvrhiDevice,
+                                                                       const std::filesystem::path& filePath)
 {
     auto logger = spdlog::get("engine");
 
-    auto cmdList = nvrhiDevice->createCommandList();
-    int  texWidth, texHeight, texChannels;
+    auto     cmdList = nvrhiDevice->createCommandList();
+    int      texWidth, texHeight, texChannels;
+    stbi_uc *texPixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, 4);
 
-    if (stbi_uc *texPixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, 4))
+    if (!texPixels)
     {
-        nvrhi::TextureDesc textureDesc;
-        textureDesc.width            = texWidth;
-        textureDesc.height           = texHeight;
-        textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
-        textureDesc.debugName        = filePath.string();
-        textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
-        textureDesc.keepInitialState = true;
-        textureDesc.dimension        = nvrhi::TextureDimension::Texture2D;
-
-        auto texture = nvrhiDevice->createTexture(textureDesc);
-
-        cmdList->open();
-        cmdList->writeTexture(texture, 0, 0, texPixels, texWidth * 4);
-        cmdList->close();
-        nvrhiDevice->executeCommandList(cmdList);
-        stbi_image_free(texPixels);
-        return texture;
+        return std::unexpected(TextureError::FailedToLoad);
     }
 
-    logger->error("Failed to load texture: {} (CWD: {})", filePath.string(), std::filesystem::current_path().string());
+    nvrhi::TextureDesc textureDesc;
+    textureDesc.width            = texWidth;
+    textureDesc.height           = texHeight;
+    textureDesc.format           = nvrhi::Format::RGBA8_UNORM;
+    textureDesc.debugName        = filePath.string();
+    textureDesc.initialState     = nvrhi::ResourceStates::ShaderResource;
+    textureDesc.keepInitialState = true;
+    textureDesc.dimension        = nvrhi::TextureDimension::Texture2D;
 
+    auto texture = nvrhiDevice->createTexture(textureDesc);
+
+    cmdList->open();
+    cmdList->writeTexture(texture, 0, 0, texPixels, texWidth * 4);
+    cmdList->close();
+    nvrhiDevice->executeCommandList(cmdList);
+    stbi_image_free(texPixels);
+    return texture;
+}
+
+inline nvrhi::TextureHandle GetDefaultWhiteTexture(const nvrhi::DeviceHandle& nvrhiDevice)
+{
+    auto               cmdList = nvrhiDevice->createCommandList();
     nvrhi::TextureDesc textureDesc;
     textureDesc.width            = 1;
     textureDesc.height           = 1;

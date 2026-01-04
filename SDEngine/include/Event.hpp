@@ -10,6 +10,8 @@ enum class EventCategory : uint32_t
     KeyPressed  = 1 << 3,
     KeyReleased = 1 << 4,
     Engine      = 1 << 5,
+    MouseScroll = 1 << 6,
+    CursorPos,
 };
 struct Event
 {
@@ -67,7 +69,19 @@ inline KeyPressedEvent::KeyPressedEvent(int key, int scancode, bool repeat)
 inline KeyReleasedEvent::KeyReleasedEvent(int key, int scancode) : key(key), scancode(scancode)
 {}
 
-struct MouseMovedEvent : MouseEvent
+struct ScrollEvent : MouseEvent
 {
-    double x{}, y{};
+    double xOffset{}, yOffset{};
+
+    [[nodiscard]] EventCategory category() const override { return EventCategory::MouseScroll; }
+    ScrollEvent() = default;
+    ScrollEvent(double xOffset, double yOffset) : MouseEvent{}, xOffset(xOffset), yOffset(yOffset) {}
+};
+struct CursorEvent : MouseEvent
+{
+    double xPos{}, yPos{};
+
+    [[nodiscard]] EventCategory category() const override { return EventCategory::CursorPos; }
+    CursorEvent() = default;
+    CursorEvent(double xPos, double yPos) : MouseEvent{}, xPos(xPos), yPos(yPos) {}
 };

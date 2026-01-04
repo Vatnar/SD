@@ -35,8 +35,7 @@ bool constexpr should_log(LogLevel level)
     return static_cast<int>(level) >= static_cast<int>(cLOG_LEVEL);
 }
 
-// TODO: Custom logging macros that respect log levels and remove calls
-void init_logging()
+inline void init_logging()
 {
     spdlog::init_thread_pool(8192, 1);
 
@@ -44,39 +43,55 @@ void init_logging()
     sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
     sinks.push_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>("engine.log", true));
 
-    auto logger = std::make_shared<spdlog::async_logger>("engine",
+    auto engine = std::make_shared<spdlog::async_logger>("engine",
                                                          sinks.begin(),
                                                          sinks.end(),
                                                          spdlog::thread_pool(),
                                                          spdlog::async_overflow_policy::block);
+    auto nvrhi  = std::make_shared<spdlog::async_logger>("nvrhi",
+                                                        sinks.begin(),
+                                                        sinks.end(),
+                                                        spdlog::thread_pool(),
+                                                        spdlog::async_overflow_policy::block);
+
 
     switch (cLOG_LEVEL)
     {
         case LogLevel::Trace:
-            logger->set_level(spdlog::level::trace);
+            engine->set_level(spdlog::level::trace);
             break;
         case LogLevel::Debug:
-            logger->set_level(spdlog::level::debug);
+            engine->set_level(spdlog::level::debug);
+            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Info:
-            logger->set_level(spdlog::level::info);
+            engine->set_level(spdlog::level::info);
+            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Warn:
-            logger->set_level(spdlog::level::warn);
+            engine->set_level(spdlog::level::warn);
+            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Error:
-            logger->set_level(spdlog::level::err);
+            engine->set_level(spdlog::level::err);
+            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Critical:
-            logger->set_level(spdlog::level::critical);
+            engine->set_level(spdlog::level::critical);
+            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Off:
-            logger->set_level(spdlog::level::off);
+            engine->set_level(spdlog::level::off);
+            nvrhi->set_level(spdlog::level::trace);
             break;
         default:
-            logger->set_level(spdlog::level::info);
+            engine->set_level(spdlog::level::info);
+            nvrhi->set_level(spdlog::level::trace);
     }
-    logger->flush_on(spdlog::level::warn);
+    engine->flush_on(spdlog::level::warn);
+    nvrhi->flush_on(spdlog::level::warn);
 
-    spdlog::register_logger(logger);
+
+    spdlog::register_logger(engine);
+    spdlog::register_logger(nvrhi);
 }

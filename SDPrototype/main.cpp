@@ -131,7 +131,6 @@ bool constexpr should_log(LogLevel level)
     return static_cast<int>(level) >= static_cast<int>(cLOG_LEVEL);
 }
 
-// TODO: Custom logging macros that respect log levels and remove calls
 void init_logging()
 {
     spdlog::init_thread_pool(8192, 1);
@@ -302,9 +301,7 @@ int main()
     init_logging();
     auto logger = spdlog::get("engine");
 
-    // TODO: Create window and such
-
-
+    // NOTE: Create window
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow *windowHandle = glfwCreateWindow(800, 600, "SDPrototype", nullptr, nullptr);
@@ -350,7 +347,6 @@ int main()
     vk::PhysicalDeviceFeatures2 features2;
     features2.setPNext(&features12);
 
-    // TODO: actually query for extensions, and not just assume they exist
     auto available = physDev.enumerateDeviceExtensionProperties();
 
     auto supports = [&](const char *name)
@@ -391,7 +387,6 @@ int main()
 
 
     // NOTE: setup queues
-    // todo: find graphics family index
 
     auto     queueFamilies       = physDev.getQueueFamilyProperties();
     uint32_t graphicsFamilyIndex = UINT32_MAX;

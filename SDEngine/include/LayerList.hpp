@@ -58,7 +58,8 @@ public:
         {
             switch (e.category())
             {
-                case EventCategory::KeyPressed:
+                using enum EventCategory;
+                case KeyPressed:
                 {
                     auto pressed = dynamic_cast<KeyPressedEvent&>(e);
                     spdlog::get("engine")->debug("KeyPressed Event missed: key:{}, scancode{}, repeat:{}",
@@ -67,7 +68,7 @@ public:
                                                  pressed.repeat);
                 }
                 break;
-                case EventCategory::KeyReleased:
+                case KeyReleased:
                 {
                     auto pressed = dynamic_cast<KeyReleasedEvent&>(e);
                     spdlog::get("engine")->debug("KeyReleased Event missed: key:{}, scancode{}",
@@ -75,10 +76,22 @@ public:
                                                  pressed.scancode);
                 }
                 break;
-                case EventCategory::Window:
-                case EventCategory::Mouse:
-                case EventCategory::Key:
-                case EventCategory::Engine:
+                case CursorPos:
+                {
+                    auto cursor = dynamic_cast<CursorEvent&>(e);
+                    spdlog::get("engine")->debug("Cursor pos: {}, {}", cursor.xPos, cursor.yPos);
+                }
+                break;
+                case MouseScroll:
+                {
+                    auto scrollWheel = dynamic_cast<ScrollEvent&>(e);
+                    spdlog::get("engine")->debug("Scroll: {}, {}", scrollWheel.xOffset, scrollWheel.yOffset);
+                }
+                break;
+                case Window:
+                case Mouse:
+                case Key:
+                case Engine:
                 default:
                     spdlog::get("engine")->warn("Event was never handled");
             }

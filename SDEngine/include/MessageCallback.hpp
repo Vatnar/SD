@@ -1,34 +1,32 @@
 #pragma once
 #include "nvrhi/nvrhi.h"
 
-
-#include <iostream>
-
-
 struct MessageCallback : nvrhi::IMessageCallback
 {
     void message(nvrhi::MessageSeverity severity, const char *messageText) override;
 };
 
-inline void MessageCallback::message(nvrhi::MessageSeverity severity, const char *messageText)
+
+inline void MessageCallback::message(const nvrhi::MessageSeverity severity, const char *messageText)
 {
+    const auto logger = spdlog::get("nvrhi");
     switch (severity)
     {
         using nvrhi::MessageSeverity;
 
         case MessageSeverity::Info:
-            std::cout << "nvrhi::INFO: " << messageText << std::endl;
+            logger->info(messageText);
             break;
         case MessageSeverity::Warning:
-            std::cout << "nvrhi::WARNING: " << messageText << std::endl;
+            logger->warn(messageText);
             break;
         case MessageSeverity::Error:
-            std::cerr << "nvrhi::ERROR: " << messageText << std::endl;
+            logger->error(messageText);
             break;
         case MessageSeverity::Fatal:
-            std::cerr << "nvrhi::FATAL: " << messageText << std::endl;
+            Engine::Abort(std::format("NVRHI: {}", messageText));
             break;
         default:
-            std::cout << "nvrhi::OTHER " << messageText << std::endl;
+            logger->info(messageText);
     }
 }

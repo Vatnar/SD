@@ -6,6 +6,13 @@
 
 #include <iostream>
 
+#ifdef _WIN32
+#include <wrl/client.h>
+using Microsoft::WRL::ComPtr;
+#else
+#include <dxc/WinAdapter.h>
+#endif
+
 inline CComPtr<IDxcUtils>     g_dxcUtils;
 inline CComPtr<IDxcCompiler3> g_dxcCompiler;
 
@@ -28,7 +35,7 @@ inline bool compileShader(const std::string& source, std::vector<char>& output, 
 {
     if (!g_dxcUtils || !g_dxcCompiler)
     {
-        std::cerr << "Shader compiler not initialized" << std::endl;
+        std::cerr << "Shader compiler not initialised" << std::endl;
         return false;
     }
 
