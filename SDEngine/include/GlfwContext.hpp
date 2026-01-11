@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Utils.hpp"
-#include "VulkanConfig.hpp"
 #include "GLFW/glfw3.h"
 
 
@@ -10,7 +9,7 @@ class GlfwContext
 public:
     GlfwContext()
     {
-        if (!glfwInit())
+        if (glfwInit() == false)
         {
             Engine::Abort("Failed to initialise GLFW");
         }
@@ -21,7 +20,13 @@ public:
     GlfwContext(const GlfwContext&)            = delete;
     GlfwContext& operator=(const GlfwContext&) = delete;
 
-    ~GlfwContext() { glfwTerminate(); }
+    ~GlfwContext()
+    {
+        if (auto logger = spdlog::get("engine"))
+            logger->info("Shutting down GLFW");
+
+        glfwTerminate();
+    }
     static std::pair<const char **, uint32_t> GetRequiredInstanceExtensions()
     {
         uint32_t     count    = 0;

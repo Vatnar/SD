@@ -1,28 +1,42 @@
 #include "VulkanContext.hpp"
 #include "GlfwContext.hpp"
 #include "spdlog/spdlog.h"
+#include <algorithm>
+#include <format>
 
-
-VulkanContext::VulkanContext(const GlfwContext& glfwCtx, const Window& window) : mGlfwCtx(glfwCtx), mWindow(window)
+VulkanContext::VulkanContext(const GlfwContext& glfwCtx, const Window& window, int maxFramesInFlight)
+    : mGlfwCtx(glfwCtx), mWindow(window), mMaxFramesInFlight(maxFramesInFlight)
 {
     static vk::detail::DynamicLoader dl;
-    auto vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 
     mInstance = CreateVulkanApplicationInstance();
+    mSurface  = mWindow.CreateWindowSurface(mInstance, nullptr);
     SetupDeviceExtensions();
-    mSurface = window.CreateWindowSurface(mInstance, nullptr);
     SetupQueues();
 
     CreateVulkanDevice();
+    CreateCommandPool();
+
+    mGraphicsQueue = mVulkanDevice->getQueue(mGraphicsFamilyIndex, 0);
+
+    CreateSwapchain();
+    CreateRenderPass();
+    CreateSwapchainDependentResources();
 }
+
 VulkanContext::~VulkanContext()
 {
+    mVulkanDevice->waitIdle();
+    mFramebuffers.clear();
+    mSwapchainImageViews.clear();
     mSwapchain.reset();
     mSurface.reset();
 }
-vk::UniqueSwapchainKHR& VulkanContext::CreateSwapchain()
+
+void VulkanContext::CreateSwapchain()
 {
     mSurfaceCapabilities             = mPhysDev.getSurfaceCapabilitiesKHR(mSurface.get());
     auto& caps                       = mSurfaceCapabilities;
@@ -31,39 +45,27 @@ vk::UniqueSwapchainKHR& VulkanContext::CreateSwapchain()
     if (caps.currentExtent.width != UINT32_MAX)
     {
         mSwapchainExtent = caps.currentExtent;
-        windowWidth      = static_cast<int>(mSwapchainExtent.width);
-        windowHeight     = static_cast<int>(mSwapchainExtent.height);
     }
     else
     {
-        // TODO: Change to the actual window width and such, this just for testing
         mSwapchainExtent.width =
                 std::clamp(static_cast<uint32_t>(windowWidth), caps.minImageExtent.width, caps.maxImageExtent.width);
         mSwapchainExtent.height =
                 std::clamp(static_cast<uint32_t>(windowHeight), caps.minImageExtent.height, caps.maxImageExtent.height);
     }
 
-    // image count
-    uint32_t desiredImageCount = caps.minImageCount + 1; // try triple buffering
-
+    uint32_t desiredImageCount = caps.minImageCount + 1;
     if (caps.maxImageCount > 0 && desiredImageCount > caps.maxImageCount)
         desiredImageCount = caps.maxImageCount;
 
-
-    // NOTE: create swapchain
     auto surfaceFormats = mPhysDev.getSurfaceFormatsKHR(mSurface.get());
-
-    // get surface formats
     if (surfaceFormats.size() == 1 && surfaceFormats[0].format == vk::Format::eUndefined)
     {
-        // no preference;
-        // todo: study which are best
         mSurfaceFormat.format     = vk::Format::eB8G8R8A8Srgb;
         mSurfaceFormat.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
     }
     else
     {
-        // prefer SRGB 8bit BGRA if avilable, else fallback
         mSurfaceFormat = surfaceFormats[0];
         for (auto& f : surfaceFormats)
         {
@@ -74,27 +76,26 @@ vk::UniqueSwapchainKHR& VulkanContext::CreateSwapchain()
             }
         }
     }
-    // get present mode
+
     auto               presentModes = mPhysDev.getSurfacePresentModesKHR(mSurface.get());
-    vk::PresentModeKHR presentMode  = vk::PresentModeKHR::eFifo; // always supported
+    vk::PresentModeKHR presentMode  = vk::PresentModeKHR::eFifo;
     for (auto m : presentModes)
     {
         if (m == vk::PresentModeKHR::eMailbox)
         {
-            presentMode = m; // low-latency vsync
+            presentMode = m;
             break;
         }
     }
 
-    // find image usage
-    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment;
-    usage |= vk::ImageUsageFlagBits::eTransferDst; // for offscreen hdr buffer blitting
+    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
 
-    // find pretransform
-    // for rotated displays to work properly
-    vk::SurfaceTransformFlagBitsKHR preTransform = caps.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity
-                                                           ? vk::SurfaceTransformFlagBitsKHR::eIdentity
-                                                           : caps.currentTransform;
+    vk::SurfaceTransformFlagBitsKHR preTransform =
+            (caps.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity)
+                    ? vk::SurfaceTransformFlagBitsKHR::eIdentity
+                    : caps.currentTransform;
+
+    vk::SwapchainKHR oldSwapchain = mSwapchain.get();
 
     mSwapchainCreateInfo.setSurface(mSurface.get())
             .setMinImageCount(desiredImageCount)
@@ -106,12 +107,106 @@ vk::UniqueSwapchainKHR& VulkanContext::CreateSwapchain()
             .setPreTransform(preTransform)
             .setPresentMode(presentMode)
             .setClipped(true)
-            .setImageSharingMode(vk::SharingMode::eExclusive); // for graphics queue == present queue
+            .setOldSwapchain(oldSwapchain)
+            .setImageSharingMode(vk::SharingMode::eExclusive);
 
-    // TODO: errors
-    mSwapchain = mVulkanDevice->createSwapchainKHRUnique(mSwapchainCreateInfo);
-    return mSwapchain;
+    mSwapchain       = mVulkanDevice->createSwapchainKHRUnique(mSwapchainCreateInfo);
+    mSwapchainImages = mVulkanDevice->getSwapchainImagesKHR(*mSwapchain);
 }
+
+void VulkanContext::CreateRenderPass()
+{
+    vk::AttachmentDescription colorAttachment{};
+    colorAttachment.setFormat(mSurfaceFormat.format)
+                   .setSamples(vk::SampleCountFlagBits::e1)
+                   .setLoadOp(vk::AttachmentLoadOp::eClear)
+                   .setStoreOp(vk::AttachmentStoreOp::eStore)
+                   .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+                   .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+                   .setInitialLayout(vk::ImageLayout::eUndefined)
+                   .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+
+    vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
+
+    vk::SubpassDescription subpass{};
+    subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+           .setColorAttachmentCount(1)
+           .setPColorAttachments(&colorAttachmentRef);
+
+    vk::SubpassDependency dependency{};
+    dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL)
+              .setDstSubpass(0)
+              .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+              .setSrcAccessMask(vk::AccessFlagBits::eNone)
+              .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+              .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+
+    vk::RenderPassCreateInfo renderPassInfo({}, 1, &colorAttachment, 1, &subpass, 1, &dependency);
+
+    mRenderPass = mVulkanDevice->createRenderPassUnique(renderPassInfo);
+}
+
+void VulkanContext::CreateSwapchainDependentResources()
+{
+    mSwapchainImageViews.clear();
+    mFramebuffers.clear();
+
+    mSwapchainImageViews.reserve(mSwapchainImages.size());
+    for (const auto& image : mSwapchainImages)
+    {
+        vk::ImageViewCreateInfo createInfo{};
+        createInfo.setImage(image)
+                  .setViewType(vk::ImageViewType::e2D)
+                  .setFormat(mSurfaceFormat.format)
+                  .setComponents({ vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity })
+                  .setSubresourceRange({ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 });
+
+        mSwapchainImageViews.push_back(mVulkanDevice->createImageViewUnique(createInfo));
+    }
+
+    CreateFramebuffers();
+}
+
+void VulkanContext::CreateFramebuffers()
+{
+    mFramebuffers.resize(mSwapchainImageViews.size());
+
+    for (size_t i = 0; i < mSwapchainImageViews.size(); i++)
+    {
+        vk::ImageView attachments[] = {
+            *mSwapchainImageViews[i]
+        };
+
+        vk::FramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.setRenderPass(*mRenderPass)
+                       .setAttachmentCount(1)
+                       .setPAttachments(attachments)
+                       .setWidth(mSwapchainExtent.width)
+                       .setHeight(mSwapchainExtent.height)
+                       .setLayers(1);
+
+        mFramebuffers[i] = mVulkanDevice->createFramebufferUnique(framebufferInfo);
+    }
+}
+
+void VulkanContext::RecreateSwapchain()
+{
+    mVulkanDevice->waitIdle();
+    mFramebuffers.clear();
+    mSwapchainImageViews.clear();
+    mSwapchain.reset();
+    
+    vk::SwapchainKHR oldSc = mSwapchain.release();
+    
+    mSurface.reset();
+    mSurface = mWindow.CreateWindowSurface(mInstance, nullptr);
+    
+
+    
+    CreateSwapchain();
+    CreateSwapchainDependentResources();
+}
+
 void VulkanContext::SetupQueues()
 {
     auto     queueFamilies       = mPhysDev.getQueueFamilyProperties();
@@ -119,28 +214,20 @@ void VulkanContext::SetupQueues()
 
     for (uint32_t i = 0; i < queueFamilies.size(); ++i)
     {
-        bool supportsGraphics =
-                (queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) == vk::QueueFlagBits::eGraphics;
-
-        // TODO: ??
-        vk::Bool32 supportsPresent = vk::False;
-
-        if (auto res = mPhysDev.getSurfaceSupportKHR(i, mSurface.get(), &supportsPresent); res != vk::Result::eSuccess)
+        if ((queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) == vk::QueueFlagBits::eGraphics)
         {
-            auto logger = spdlog::get("engine");
-            logger->warn("getSurfaceSupportKHR returned vk::Result::{}", static_cast<uint64_t>(res));
-        }
-
-        if (supportsGraphics && supportsPresent)
-        {
-            graphicsFamilyIndex = i;
-            break;
+            vk::Bool32 supportsPresent = vk::False;
+            if (mPhysDev.getSurfaceSupportKHR(i, mSurface.get(), &supportsPresent) == vk::Result::eSuccess &&
+                supportsPresent)
+            {
+                graphicsFamilyIndex = i;
+                break;
+            }
         }
     }
 
     if (graphicsFamilyIndex == UINT32_MAX)
     {
-        // TODO: Maybe caller should decide to abort or not
         Engine::Abort("No queue family supports both graphics and present capabilities");
     }
 
@@ -148,13 +235,10 @@ void VulkanContext::SetupQueues()
 }
 vk::UniqueInstance VulkanContext::CreateVulkanApplicationInstance()
 {
-    // Create instance
     vk::ApplicationInfo appInfo("Engine", 1, "NoEngine", 1, VK_API_VERSION_1_3);
 
     auto [glfwExts, extCount] = GlfwContext::GetRequiredInstanceExtensions();
-
     std::vector instanceExts(glfwExts, glfwExts + extCount);
-
 
     vk::InstanceCreateInfo instInfo({}, &appInfo, {}, instanceExts);
     vk::UniqueInstance     instance = vk::createInstanceUnique(instInfo);
@@ -168,17 +252,12 @@ void VulkanContext::SetupDeviceExtensions()
 {
     mFeatures12.timelineSemaphore   = VK_TRUE;
     mFeatures12.bufferDeviceAddress = VK_TRUE;
-
     mFeatures13.setDynamicRendering(true).setSynchronization2(true);
-
     mFeatures12.pNext = &mFeatures13;
-
     mFeatures2.setPNext(&mFeatures12);
 
-    // TODO: actually query for extensions, and not just assume they exist
     auto available = mPhysDev.enumerateDeviceExtensionProperties();
-
-    auto supports = [&](const char *name)
+    auto supports  = [&](const char *name)
     {
         return std::ranges::any_of(available,
                                    [&](const vk::ExtensionProperties& e)
@@ -193,14 +272,6 @@ void VulkanContext::SetupDeviceExtensions()
     };
 
     requireExt(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-    auto raytracing = false;
-    if (raytracing)
-    {
-        requireExt(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-        requireExt(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-        requireExt(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-    }
 }
 void VulkanContext::CreateVulkanDevice()
 {
@@ -210,7 +281,12 @@ void VulkanContext::CreateVulkanDevice()
     vk::DeviceCreateInfo devInfo({}, queueInfo, {}, mDeviceExts);
     devInfo.setPNext(&mFeatures2);
 
-
     mVulkanDevice = mPhysDev.createDeviceUnique(devInfo);
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(mVulkanDevice.get());
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*mInstance, mVulkanDevice.get());
+}
+
+void VulkanContext::CreateCommandPool()
+{
+    vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, mGraphicsFamilyIndex);
+    mCommandPool = mVulkanDevice->createCommandPoolUnique(poolInfo);
 }

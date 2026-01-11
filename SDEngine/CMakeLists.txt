@@ -1,10 +1,12 @@
 add_executable(SDEngine src/main.cpp src/VulkanContext.cpp src/Window.cpp
         src/Layer.cpp
         src/stbi_impl.cpp
+        src/ImGuiLayer.cpp
 )
 find_package(Vulkan REQUIRED)
-target_link_libraries(SDEngine PRIVATE nvrhi_vk nvrhi Vulkan::Vulkan glfw spdlog stb_image dxc)
-target_include_directories(SDEngine PRIVATE include)
+find_package(X11 REQUIRED)
+target_link_libraries(SDEngine PRIVATE Vulkan::Vulkan imgui glfw spdlog stb_image dxc X11::X11)
+target_include_directories(SDEngine PRIVATE include ${X11_INCLUDE_DIR})
 
 
 target_compile_definitions(SDEngine PRIVATE

@@ -1,17 +1,17 @@
 #pragma once
-#include <cstdint>
-#include <vector>
+#include "Utils.hpp"
 
-enum class EventCategory : uint32_t
+
+enum class EventCategory
 {
-    Window      = 1 << 0,
-    Mouse       = 1 << 1,
-    Key         = 1 << 2,
-    KeyPressed  = 1 << 3,
-    KeyReleased = 1 << 4,
-    Engine      = 1 << 5,
-    MouseScroll = 1 << 6,
-    CursorPos,
+    Window,
+    Engine,
+    MousePressed,
+    MouseReleased,
+    KeyPressed,
+    KeyReleased,
+    MouseScroll,
+    CursorPos
 };
 struct Event
 {
@@ -20,68 +20,78 @@ struct Event
     [[nodiscard]] virtual EventCategory category() const = 0;
 };
 
-// glfw events etc
 struct WindowEvent : Event
 {
     [[nodiscard]] EventCategory category() const override { return EventCategory::Window; }
 };
 
-struct MouseEvent : Event
-{
-    [[nodiscard]] EventCategory category() const override { return EventCategory::Mouse; }
-};
-
-struct KeyEvent : Event
-{
-    [[nodiscard]] EventCategory category() const override { return EventCategory::Key; }
-};
-
 struct EngineEvent : Event
 {
+    EngineEvent() : Event{} {}
     [[nodiscard]] EventCategory category() const override { return EventCategory::Engine; }
 };
 
+struct MousePressedEvent : Event
+{
+    int  button{};
+    int  mods{};
+    bool repeat{};
 
-struct KeyPressedEvent : KeyEvent
+    MousePressedEvent() = default;
+
+    MousePressedEvent(int button, int mods, bool repeat) : Event{}, button(button), mods(mods), repeat(repeat) {}
+    [[nodiscard]] EventCategory category() const override { return EventCategory::MousePressed; }
+};
+
+struct MouseReleasedEvent : Event
+{
+    int button{};
+    int mods{};
+
+    MouseReleasedEvent() = default;
+    MouseReleasedEvent(int button, int mods) : Event{}, button(button), mods(mods) {}
+    [[nodiscard]] EventCategory category() const override { return EventCategory::MouseReleased; }
+};
+
+struct KeyPressedEvent : Event
 {
     int  key{};
     int  scancode{};
+    int  mods{};
     bool repeat{};
-    // TODO: how do we show modifiers, maybe bool map or some shit
-    // std::vector<int> mods;
+
     KeyPressedEvent() = default;
-    KeyPressedEvent(int key, int scancode, bool repeat);
+    KeyPressedEvent(int key, int scancode, int mods, bool repeat)
+        : Event{}, key(key), scancode(scancode), mods(mods), repeat(repeat)
+    {}
 
     [[nodiscard]] EventCategory category() const override { return EventCategory::KeyPressed; }
 };
 
-struct KeyReleasedEvent : KeyEvent
+struct KeyReleasedEvent : Event
 {
     int key{};
     int scancode{};
+    int mods{};
+
     KeyReleasedEvent() = default;
-    KeyReleasedEvent(int key, int scancode);
+    KeyReleasedEvent(int key, int scancode, int mods) : Event{}, key(key), scancode(scancode), mods(mods) {}
     [[nodiscard]] EventCategory category() const override { return EventCategory::KeyReleased; }
 };
-inline KeyPressedEvent::KeyPressedEvent(int key, int scancode, bool repeat)
-    : key(key), scancode(scancode), repeat(repeat)
-{}
-inline KeyReleasedEvent::KeyReleasedEvent(int key, int scancode) : key(key), scancode(scancode)
-{}
 
-struct ScrollEvent : MouseEvent
+struct ScrollEvent : Event
 {
     double xOffset{}, yOffset{};
 
     [[nodiscard]] EventCategory category() const override { return EventCategory::MouseScroll; }
     ScrollEvent() = default;
-    ScrollEvent(double xOffset, double yOffset) : MouseEvent{}, xOffset(xOffset), yOffset(yOffset) {}
+    ScrollEvent(double xOffset, double yOffset) : Event{}, xOffset(xOffset), yOffset(yOffset) {}
 };
-struct CursorEvent : MouseEvent
+struct CursorEvent : Event
 {
     double xPos{}, yPos{};
 
     [[nodiscard]] EventCategory category() const override { return EventCategory::CursorPos; }
     CursorEvent() = default;
-    CursorEvent(double xPos, double yPos) : MouseEvent{}, xPos(xPos), yPos(yPos) {}
+    CursorEvent(double xPos, double yPos) : Event{}, xPos(xPos), yPos(yPos) {}
 };

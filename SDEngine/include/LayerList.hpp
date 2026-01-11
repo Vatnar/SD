@@ -54,48 +54,6 @@ public:
                     break;
             }
         }
-        if (!e.Handled)
-        {
-            switch (e.category())
-            {
-                using enum EventCategory;
-                case KeyPressed:
-                {
-                    auto pressed = dynamic_cast<KeyPressedEvent&>(e);
-                    spdlog::get("engine")->debug("KeyPressed Event missed: key:{}, scancode{}, repeat:{}",
-                                                 pressed.key,
-                                                 pressed.scancode,
-                                                 pressed.repeat);
-                }
-                break;
-                case KeyReleased:
-                {
-                    auto pressed = dynamic_cast<KeyReleasedEvent&>(e);
-                    spdlog::get("engine")->debug("KeyReleased Event missed: key:{}, scancode{}",
-                                                 pressed.key,
-                                                 pressed.scancode);
-                }
-                break;
-                case CursorPos:
-                {
-                    auto cursor = dynamic_cast<CursorEvent&>(e);
-                    spdlog::get("engine")->debug("Cursor pos: {}, {}", cursor.xPos, cursor.yPos);
-                }
-                break;
-                case MouseScroll:
-                {
-                    auto scrollWheel = dynamic_cast<ScrollEvent&>(e);
-                    spdlog::get("engine")->debug("Scroll: {}, {}", scrollWheel.xOffset, scrollWheel.yOffset);
-                }
-                break;
-                case Window:
-                case Mouse:
-                case Key:
-                case Engine:
-                default:
-                    spdlog::get("engine")->warn("Event was never handled");
-            }
-        }
     }
 
     template<IsLayer T, typename... Args>
@@ -144,7 +102,6 @@ public:
         return nullptr;
     }
 
-    // This detaches ownership and returns it. It does not delete the layer.
     template<IsLayer T>
     std::unique_ptr<T> DetachFirst()
     {

@@ -48,13 +48,6 @@ inline void init_logging()
                                                          sinks.end(),
                                                          spdlog::thread_pool(),
                                                          spdlog::async_overflow_policy::block);
-    auto nvrhi  = std::make_shared<spdlog::async_logger>("nvrhi",
-                                                        sinks.begin(),
-                                                        sinks.end(),
-                                                        spdlog::thread_pool(),
-                                                        spdlog::async_overflow_policy::block);
-
-
     switch (cLOG_LEVEL)
     {
         case LogLevel::Trace:
@@ -62,36 +55,27 @@ inline void init_logging()
             break;
         case LogLevel::Debug:
             engine->set_level(spdlog::level::debug);
-            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Info:
             engine->set_level(spdlog::level::info);
-            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Warn:
             engine->set_level(spdlog::level::warn);
-            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Error:
             engine->set_level(spdlog::level::err);
-            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Critical:
             engine->set_level(spdlog::level::critical);
-            nvrhi->set_level(spdlog::level::trace);
             break;
         case LogLevel::Off:
             engine->set_level(spdlog::level::off);
-            nvrhi->set_level(spdlog::level::trace);
             break;
         default:
             engine->set_level(spdlog::level::info);
-            nvrhi->set_level(spdlog::level::trace);
     }
     engine->flush_on(spdlog::level::warn);
-    nvrhi->flush_on(spdlog::level::warn);
 
 
     spdlog::register_logger(engine);
-    spdlog::register_logger(nvrhi);
 }
