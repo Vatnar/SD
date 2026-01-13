@@ -1,7 +1,6 @@
 #include "ImGuiLayer.hpp"
 #include "Utils.hpp"
 
-constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 ImGuiLayer::ImGuiLayer(VulkanContext& vulkanCtx, Window& window) : mVulkanCtx(vulkanCtx), mWindow(window)
 {}
@@ -55,12 +54,7 @@ void ImGuiLayer::OnAttach()
                                              vk::ImageLayout::ePresentSrcKHR);
 
         vk::AttachmentReference color_attachment(0, vk::ImageLayout::eColorAttachmentOptimal);
-        vk::SubpassDescription  subpass(vk::SubpassDescriptionFlags(),
-                                       vk::PipelineBindPoint::eGraphics,
-                                       0,
-                                       nullptr,
-                                       1,
-                                       &color_attachment);
+        vk::SubpassDescription  subpass({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1, &color_attachment);
 
         vk::SubpassDependency dependency(VK_SUBPASS_EXTERNAL,
                                          0,
@@ -73,7 +67,7 @@ void ImGuiLayer::OnAttach()
         mRenderPass = mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(info);
     }
 
-    ImGui_ImplVulkan_InitInfo init_info   = {};
+    ImGui_ImplVulkan_InitInfo init_info{};
     init_info.Instance                    = *mVulkanCtx.GetInstance();
     init_info.PhysicalDevice              = mVulkanCtx.GetPhysicalDevice();
     init_info.Device                      = *mVulkanCtx.GetVulkanDevice();
@@ -90,7 +84,9 @@ void ImGuiLayer::OnAttach()
                                            mVulkanCtx.GetGraphicsFamilyIndex());
         mCommandPool = mVulkanCtx.GetVulkanDevice()->createCommandPoolUnique(poolInfo);
 
-        vk::CommandBufferAllocateInfo allocInfo(*mCommandPool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT);
+        vk::CommandBufferAllocateInfo allocInfo(*mCommandPool,
+                                                vk::CommandBufferLevel::ePrimary,
+                                                mVulkanCtx.GetMaxFramesInFlight());
         mCommandBuffers = mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo);
     }
 
@@ -117,11 +113,8 @@ void ImGuiLayer::Begin()
     ImGui::NewFrame();
 }
 
-void ImGuiLayer::End(uint32_t      imageIndex,
-                     vk::Semaphore waitSemaphore,
-                     vk::Semaphore signalSemaphore,
-                     vk::Fence     signalFence,
-                     uint32_t      currentFrame)
+
+void ImGuiLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame)
 {
     ImGui::Render();
 
@@ -137,25 +130,22 @@ void ImGuiLayer::End(uint32_t      imageIndex,
                                            {0, 0},
                                            mVulkanCtx.GetSwapchainExtent()
     },
-                                   1,
+                                   static_cast<uint32_t>(clearValues.size()),
                                    clearValues.data());
+
     cmdBuffer->beginRenderPass(rpInfo, vk::SubpassContents::eInline);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *cmdBuffer);
     cmdBuffer->endRenderPass();
     cmdBuffer->end();
-
-    vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-    vk::SubmitInfo         submitInfo;
-    submitInfo.setWaitSemaphores(waitSemaphore);
-    submitInfo.setWaitDstStageMask(waitStage);
-    submitInfo.setCommandBuffers(*cmdBuffer);
-    submitInfo.setSignalSemaphores(signalSemaphore);
-
-    mVulkanCtx.GetGraphicsQueue().submit(submitInfo, signalFence);
 }
+
+void ImGuiLayer::End()
+{}
+
 
 void ImGuiLayer::OnSwapchainRecreated()
 {
+    mVulkanCtx.GetVulkanDevice()->waitIdle();
     DestroySwapchainResources();
     CreateSwapchainResources();
 }

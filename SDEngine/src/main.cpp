@@ -1,3 +1,4 @@
+#include "EngineEvent.hpp"
 #include "VulkanConfig.hpp"
 #include <vulkan/vulkan.hpp>
 
@@ -24,7 +25,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include "ShaderCompiler.hpp"
 #include "Window.hpp"
 
-#include "Event.hpp"
+#include "InputEvent.hpp"
 #include "EventManager.hpp"
 #include "LayerList.hpp"
 #include "TestLayer.hpp"
@@ -32,7 +33,9 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include "ImGuiLayer.hpp"
 #include "DebugInfoLayer.hpp"
 
-constexpr bool   enableValidation     = true;
+constexpr bool enableValidation = true;
+
+// BUG: Works on > 2, but some validation errors
 constexpr int    MAX_FRAMES_IN_FLIGHT = 2;
 constexpr double TARGET_FPS           = 144.0;
 
@@ -59,7 +62,7 @@ int main()
 
     VulkanContext vulkanCtx{glfwCtx, window, MAX_FRAMES_IN_FLIGHT};
 
-    // Create Layer Stack
+    // NOTE: Create and attach layers
     LayerList layers{};
     layers.CreateAndAttachTop<TestLayer>(vulkanCtx);
     auto testLayer = layers.GetRef<TestLayer>();
@@ -73,38 +76,27 @@ int main()
     layers.CreateAndAttachTop<DebugInfoLayer>();
 
 
-
-
     // NOTE: EVENTS & callbacks
-    auto& eventManager = window.GetEventManager();
 
-    // sync objects
-    std::vector<vk::UniqueSemaphore> imageAcquiredSemaphores;
-    std::vector<vk::UniqueSemaphore> testLayerCompleteSemaphores;
-    std::vector<vk::UniqueSemaphore> renderCompletedSemaphores;
-    std::vector<vk::UniqueFence>     frameFences;
+    auto&              inputEventManager = window.GetEventManager();
+    EngineEventManager engineEventManager;
+
+    // NOTE: Create sync objects
 
     uint64_t frameCounter = 0;
 
     auto& vulkanDevice = vulkanCtx.GetVulkanDevice();
 
-    // Initialize per-frame resources
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-    {
-        imageAcquiredSemaphores.push_back(vulkanDevice->createSemaphoreUnique({}));
-        testLayerCompleteSemaphores.push_back(vulkanDevice->createSemaphoreUnique({}));
-        frameFences.push_back(vulkanDevice->createFenceUnique({vk::FenceCreateFlagBits::eSignaled}));
-    }
 
-    // Initialize per-swapchain-image resources
-    for (size_t i = 0; i < vulkanCtx.GetSwapchainImages().size(); i++)
-    {
-        renderCompletedSemaphores.push_back(vulkanDevice->createSemaphoreUnique({}));
-    }
+    // NOTE: MAIN LOOP
 
-    bool                      isRunning    = true;
-    [[maybe_unused]] uint32_t frameCount   = 0;
-    uint32_t                  currentFrame = 0;
+    window.SetResizeCallback([&](int w, int h) { engineEventManager.PushEvent<WindowResizeEvent>(w, h); });
+
+
+    bool                      isRunning  = true;
+    [[maybe_unused]] uint32_t frameCount = 0;
+
+    uint32_t currentFrame = 0;
 
     auto lastTime = std::chrono::high_resolution_clock::now();
 
@@ -119,37 +111,26 @@ int main()
         // NOTE: Handle events, input etc
         glfwPollEvents();
 
+        // NOTE: Handle engine events
 
-        // TODO: Poll events
-
-        for (const auto& e : eventManager)
+        if (engineEventManager.HasResizeEvent())
         {
-            layers.HandleEvent(*e);
-        }
-        eventManager.clear();
-
-        // NOTE: Rendering stuff
-        // NOTE: Swapchain resize TODO: Where should i have this...
-        if (window.ShouldResize()) [[unlikely]]
-        {
-            window.resizeRequested = false;
-            if (auto [width, height] = window.GetWindowSize(); width > 0 && height > 0)
-            {
-                vulkanCtx.RecreateSwapchain();
-                testLayer->OnSwapchainRecreated();
-                imguiLayer->OnSwapchainRecreated();
-
-                // Recreate render completion semaphores to match new swapchain image count
-                renderCompletedSemaphores.clear();
-                for (size_t i = 0; i < vulkanCtx.GetSwapchainImages().size(); i++)
-                {
-                    renderCompletedSemaphores.push_back(vulkanDevice->createSemaphoreUnique({}));
-                }
-            }
+            vulkanCtx.RecreateSwapchain(layers);
+            vulkanCtx.RebuildPerImageSync();
+            engineEventManager.ClearType<WindowResizeEvent>();
+            engineEventManager.ClearType<SwapchainOutOfDateEvent>();
         }
 
-        // wait for previous frame work to finish
-        if (vulkanDevice->waitForFences(*frameFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max()) !=
+        engineEventManager.Clear();
+
+        // NOTE: Handle input events
+        std::ranges::for_each(inputEventManager, [&](const auto& event) { layers.HandleEvent(*event); });
+        inputEventManager.clear();
+
+        auto& frameSync = vulkanCtx.GetFrameSync(currentFrame);
+
+        // NOTE: Wait for last frame
+        if (vulkanDevice->waitForFences(*frameSync.inFlight, VK_TRUE, std::numeric_limits<uint64_t>::max()) !=
             vk::Result::eSuccess)
         {
             logger->critical("Failed to wait for fences");
@@ -157,76 +138,58 @@ int main()
         } // logger->trace("Waited for fence frame {}", currentFrame);
 
 
-        uint32_t   imageIndex = 0;
-        vk::Result res;
+        // NOTE: Get vulkan images
 
-        try
+        uint32_t imageIndex = vulkanCtx.GetVulkanImages(engineEventManager, frameSync.imageAcquired);
+        if (imageIndex == std::numeric_limits<uint32_t>::max())
         {
-            auto resultValue = vulkanDevice->acquireNextImageKHR(*vulkanCtx.GetSwapchain(),
-                                                                 std::numeric_limits<uint64_t>::max(),
-                                                                 *imageAcquiredSemaphores[currentFrame],
-                                                                 vk::Fence());
-            res              = resultValue.result;
-            imageIndex       = resultValue.value;
-        }
-        catch (vk::SystemError& err)
-        {
-            res = static_cast<vk::Result>(err.code().value());
-        }
-
-        if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR)
-        {
-            window.resizeRequested = true;
-            imageAcquiredSemaphores[currentFrame] =
-                    vulkanDevice->createSemaphoreUnique({});
-            continue;
-        }
-        else if (res != vk::Result::eSuccess && res != vk::Result::eSuboptimalKHR)
-        {
-            logger->critical("Failed to acquire image: {}", vk::to_string(res));
+            logger->critical("Couldnt get image");
             continue;
         }
 
-        vulkanDevice->resetFences(*frameFences[currentFrame]);
+        auto& swapchainSync = vulkanCtx.GetSwapchainSync(imageIndex);
 
+        vulkanDevice->resetFences(*frameSync.inFlight);
+
+
+        // NOTE: Render
         imguiLayer->Begin();
 
         layers.Update(dt);
         layers.Render();
 
-        testLayer->Render(imageIndex, *imageAcquiredSemaphores[currentFrame], *testLayerCompleteSemaphores[currentFrame], vk::Fence(), currentFrame);
+        // TODO: Abstract
+        testLayer->RecordCommands(imageIndex, currentFrame);
+        imguiLayer->RecordCommands(imageIndex, currentFrame);
+        imguiLayer->End();
 
-        imguiLayer->End(imageIndex,
-                        *testLayerCompleteSemaphores[currentFrame],
-                        *renderCompletedSemaphores[imageIndex],
-                        *frameFences[currentFrame],
-                        currentFrame);
+        // NOTE: SUBMIT
 
-            vk::PresentInfoKHR presentInfo = vk::PresentInfoKHR()
-                                                 .setWaitSemaphores(*renderCompletedSemaphores[imageIndex])
-                                                 .setSwapchainCount(1)
-                                                 .setPSwapchains(&*vulkanCtx.GetSwapchain())
-                                                 .setPImageIndices(&imageIndex);
 
-        vk::Result presentResult;
-        try
-        {
-            presentResult = vulkanCtx.GetGraphicsQueue().presentKHR(presentInfo);
-        }
-        catch (vk::SystemError& err)
-        {
-            presentResult = static_cast<vk::Result>(err.code().value());
-        }
+        // TODO: Abstract
+        vk::CommandBuffer cmdBuffers[] = {
+                testLayer->getCommandBuffer(currentFrame),
+                imguiLayer->getCommandBuffer(currentFrame),
+        };
 
-        if (presentResult == vk::Result::eErrorOutOfDateKHR || presentResult == vk::Result::eSuboptimalKHR)
-        {
-            window.resizeRequested = true;
-        }
-        else if (presentResult != vk::Result::eSuccess)
-        {
-            logger->critical("Failed to present");
-        }
+        vk::Semaphore          waitSemaphores[] = {*frameSync.imageAcquired};
+        vk::PipelineStageFlags waitStages[]     = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
 
+        vk::Semaphore signalSemaphores[] = {*swapchainSync.renderComplete};
+
+        vk::SubmitInfo submitInfo{};
+        submitInfo.setWaitSemaphores(waitSemaphores);
+        submitInfo.setWaitDstStageMask(waitStages);
+        submitInfo.setCommandBuffers(cmdBuffers);
+        submitInfo.setSignalSemaphores(signalSemaphores);
+
+        vulkanCtx.GetGraphicsQueue().submit(submitInfo, *frameSync.inFlight);
+
+        // NOTE: Present
+        vulkanCtx.PresentImage(engineEventManager, imageIndex);
+
+
+        // NOTE: Performance stuff
         auto                          frameEnd = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed  = frameEnd - now;
         std::chrono::duration<double> targetFrameTime(1.0 / TARGET_FPS);
@@ -237,6 +200,7 @@ int main()
             performanceLayer->EndSleep();
         }
 
+        // NOTE: Frame increment
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         frameCounter++;
     }

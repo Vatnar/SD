@@ -2,6 +2,7 @@
 
 // DXC
 #include <dxc/dxcapi.h>
+#include "Utils.hpp"
 #include "FileUtils.hpp"
 
 #include <iostream>

@@ -1,8 +1,10 @@
 #pragma once
 
-#include "Event.hpp"
+#include "EventManager.hpp"
+#include "InputEvent.hpp"
 #include "VulkanConfig.hpp"
 #include <functional>
+#include <memory>
 #include <GLFW/glfw3.h>
 
 using ResizeCallback      = std::function<void(int, int)>;
@@ -27,8 +29,6 @@ struct WindowDesc
 class Window
 {
 public:
-    bool resizeRequested{false};
-
     Window(int width, int height, const std::string& title);
     explicit Window(const WindowDesc& desc);
 
@@ -39,13 +39,12 @@ public:
     void SetCursorCallback(const CursorCallback& callback) { mCursorCallback = callback; }
     void SetMouseButtonCallback(const MouseButtonCallback& callback) { mMouseButtonCallback = callback; }
 
-    [[nodiscard]] GLFWwindow            *GetNativeHandle() const { return mHandle; }
-    [[nodiscard]] std::pair<int, int>    GetWindowSize() const;
-    [[nodiscard]] bool                   ShouldClose() const { return glfwWindowShouldClose(mHandle); }
-    vk::UniqueSurfaceKHR                 CreateWindowSurface(vk::UniqueInstance&          instance,
-                                                             const VkAllocationCallbacks *allocationCallback) const;
-    std::vector<std::unique_ptr<Event>>& GetEventManager() { return eventManager; }
-    bool                                 ShouldResize() const { return resizeRequested; }
+    [[nodiscard]] GLFWwindow                 *GetNativeHandle() const { return mHandle; }
+    [[nodiscard]] std::pair<int, int>         GetWindowSize() const;
+    [[nodiscard]] bool                        ShouldClose() const { return glfwWindowShouldClose(mHandle); }
+    vk::UniqueSurfaceKHR                      CreateWindowSurface(vk::UniqueInstance&          instance,
+                                                                  const VkAllocationCallbacks *allocationCallback) const;
+    std::vector<std::unique_ptr<InputEvent>>& GetEventManager() { return eventManager; }
 
 private:
     GLFWwindow *mHandle;
@@ -57,7 +56,7 @@ private:
     CursorCallback      mCursorCallback;
     MouseButtonCallback mMouseButtonCallback;
 
-    std::vector<std::unique_ptr<Event>> eventManager;
+    InputEventManager eventManager;
 
 
     static void DispatchResize(GLFWwindow *window, int width, int height);

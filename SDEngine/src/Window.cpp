@@ -46,7 +46,6 @@ Window::Window(const WindowDesc& desc)
 
     ResizeCallback DefaultResizeCallback = [this](int, int)
     {
-        resizeRequested = true;
     };
 
     KeyCallback DefaultKeyCallback = [this](int key, int scancode, int action, int mods)

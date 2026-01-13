@@ -1,5 +1,5 @@
 #pragma once
-#include "Event.hpp"
+#include "InputEvent.hpp"
 
 #include <concepts>
 
@@ -19,7 +19,9 @@ public:
     virtual void OnActivate() {}
     virtual void OnDeactivate() {}
 
-    virtual void OnEvent(Event&) {}
+    virtual void OnEvent(InputEvent&) {}
+    virtual void OnSwapchainRecreated() {}
+
     virtual void OnRender();
     virtual void OnUpdate(float dt);
 

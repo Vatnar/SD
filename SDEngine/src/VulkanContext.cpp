@@ -1,14 +1,18 @@
 #include "VulkanContext.hpp"
 #include "GlfwContext.hpp"
+#include "LayerList.hpp"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <format>
 
+
+class LayerList;
 VulkanContext::VulkanContext(const GlfwContext& glfwCtx, const Window& window, int maxFramesInFlight)
     : mGlfwCtx(glfwCtx), mWindow(window), mMaxFramesInFlight(maxFramesInFlight)
 {
     static vk::detail::DynamicLoader dl;
-    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+    PFN_vkGetInstanceProcAddr        vkGetInstanceProcAddr =
+            dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 
@@ -25,6 +29,24 @@ VulkanContext::VulkanContext(const GlfwContext& glfwCtx, const Window& window, i
     CreateSwapchain();
     CreateRenderPass();
     CreateSwapchainDependentResources();
+    std::generate_n(std::back_inserter(mFrameSyncs),
+                    maxFramesInFlight,
+                    [&]
+                    {
+                        FrameSync f;
+                        f.imageAcquired = mVulkanDevice->createSemaphoreUnique({});
+                        f.inFlight      = mVulkanDevice->createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
+                        return f;
+                    });
+
+    std::generate_n(std::back_inserter(mSwapchainSyncs),
+                    GetSwapchainImages().size(),
+                    [&]
+                    {
+                        SwapchainSync s;
+                        s.renderComplete = mVulkanDevice->createSemaphoreUnique({});
+                        return s;
+                    });
 }
 
 VulkanContext::~VulkanContext()
@@ -118,28 +140,28 @@ void VulkanContext::CreateRenderPass()
 {
     vk::AttachmentDescription colorAttachment{};
     colorAttachment.setFormat(mSurfaceFormat.format)
-                   .setSamples(vk::SampleCountFlagBits::e1)
-                   .setLoadOp(vk::AttachmentLoadOp::eClear)
-                   .setStoreOp(vk::AttachmentStoreOp::eStore)
-                   .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-                   .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-                   .setInitialLayout(vk::ImageLayout::eUndefined)
-                   .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+            .setSamples(vk::SampleCountFlagBits::e1)
+            .setLoadOp(vk::AttachmentLoadOp::eClear)
+            .setStoreOp(vk::AttachmentStoreOp::eStore)
+            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
 
     vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
 
     vk::SubpassDescription subpass{};
     subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-           .setColorAttachmentCount(1)
-           .setPColorAttachments(&colorAttachmentRef);
+            .setColorAttachmentCount(1)
+            .setPColorAttachments(&colorAttachmentRef);
 
     vk::SubpassDependency dependency{};
     dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL)
-              .setDstSubpass(0)
-              .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
-              .setSrcAccessMask(vk::AccessFlagBits::eNone)
-              .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
-              .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+            .setDstSubpass(0)
+            .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+            .setSrcAccessMask(vk::AccessFlagBits::eNone)
+            .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+            .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 
     vk::RenderPassCreateInfo renderPassInfo({}, 1, &colorAttachment, 1, &subpass, 1, &dependency);
 
@@ -156,10 +178,13 @@ void VulkanContext::CreateSwapchainDependentResources()
     {
         vk::ImageViewCreateInfo createInfo{};
         createInfo.setImage(image)
-                  .setViewType(vk::ImageViewType::e2D)
-                  .setFormat(mSurfaceFormat.format)
-                  .setComponents({ vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity })
-                  .setSubresourceRange({ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 });
+                .setViewType(vk::ImageViewType::e2D)
+                .setFormat(mSurfaceFormat.format)
+                .setComponents({vk::ComponentSwizzle::eIdentity,
+                                vk::ComponentSwizzle::eIdentity,
+                                vk::ComponentSwizzle::eIdentity,
+                                vk::ComponentSwizzle::eIdentity})
+                .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
         mSwapchainImageViews.push_back(mVulkanDevice->createImageViewUnique(createInfo));
     }
@@ -173,38 +198,111 @@ void VulkanContext::CreateFramebuffers()
 
     for (size_t i = 0; i < mSwapchainImageViews.size(); i++)
     {
-        vk::ImageView attachments[] = {
-            *mSwapchainImageViews[i]
-        };
+        vk::ImageView attachments[] = {*mSwapchainImageViews[i]};
 
         vk::FramebufferCreateInfo framebufferInfo{};
         framebufferInfo.setRenderPass(*mRenderPass)
-                       .setAttachmentCount(1)
-                       .setPAttachments(attachments)
-                       .setWidth(mSwapchainExtent.width)
-                       .setHeight(mSwapchainExtent.height)
-                       .setLayers(1);
+                .setAttachmentCount(1)
+                .setPAttachments(attachments)
+                .setWidth(mSwapchainExtent.width)
+                .setHeight(mSwapchainExtent.height)
+                .setLayers(1);
 
         mFramebuffers[i] = mVulkanDevice->createFramebufferUnique(framebufferInfo);
     }
 }
 
-void VulkanContext::RecreateSwapchain()
+void VulkanContext::RecreateSwapchain(LayerList& layers)
 {
     mVulkanDevice->waitIdle();
     mFramebuffers.clear();
     mSwapchainImageViews.clear();
     mSwapchain.reset();
-    
+
     vk::SwapchainKHR oldSc = mSwapchain.release();
-    
+
     mSurface.reset();
     mSurface = mWindow.CreateWindowSurface(mInstance, nullptr);
-    
 
-    
+
     CreateSwapchain();
     CreateSwapchainDependentResources();
+
+    layers.OnSwapchainRecreated();
+}
+
+uint32_t VulkanContext::GetVulkanImages(EngineEventManager& engineEventManager, vk::UniqueSemaphore& imageAcquired)
+{
+    vk::Result res;
+    uint32_t   imageIndex{std::numeric_limits<uint32_t>::max()};
+    try
+    {
+        auto resultValue = mVulkanDevice->acquireNextImageKHR(*GetSwapchain(),
+                                                              std::numeric_limits<uint64_t>::max(),
+                                                              *imageAcquired,
+                                                              vk::Fence());
+        res              = resultValue.result;
+        imageIndex       = resultValue.value;
+    }
+    catch (vk::SystemError& err)
+    {
+        res = static_cast<vk::Result>(err.code().value());
+    }
+
+    if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR)
+    {
+        engineEventManager.PushEvent<SwapchainOutOfDateEvent>();
+
+        imageAcquired = mVulkanDevice->createSemaphoreUnique({});
+        // continue;
+    }
+    else if (res != vk::Result::eSuccess && res != vk::Result::eSuboptimalKHR)
+    {
+        spdlog::get("engine")->critical("Failed to acquire image: {}", vk::to_string(res));
+        // continue;
+    }
+    return imageIndex;
+}
+void VulkanContext::PresentImage(EngineEventManager& engineEventManager, const uint32_t imageIndex)
+{
+    auto logger = spdlog::get("engine");
+
+    vk::PresentInfoKHR presentInfo = vk::PresentInfoKHR()
+                                             .setWaitSemaphores(*GetSwapchainSync(imageIndex).renderComplete)
+                                             .setSwapchainCount(1)
+                                             .setPSwapchains(&*mSwapchain)
+                                             .setPImageIndices(&imageIndex);
+
+    vk::Result presentResult;
+    try
+    {
+        presentResult = GetGraphicsQueue().presentKHR(presentInfo);
+    }
+    catch (vk::SystemError& err)
+    {
+        presentResult = static_cast<vk::Result>(err.code().value());
+    }
+
+    if (presentResult == vk::Result::eErrorOutOfDateKHR || presentResult == vk::Result::eSuboptimalKHR)
+        engineEventManager.PushEvent<SwapchainOutOfDateEvent>();
+    else if (presentResult != vk::Result::eSuccess)
+        logger->critical("Failed to present");
+}
+
+void VulkanContext::RebuildPerImageSync()
+{
+    const auto imageCount = GetSwapchainImages().size();
+    mSwapchainSyncs.clear();
+    mSwapchainSyncs.reserve(imageCount);
+
+    std::ranges::generate_n(std::back_inserter(mSwapchainSyncs),
+                            static_cast<int>(imageCount),
+                            [&]
+                            {
+                                SwapchainSync sync;
+                                sync.renderComplete = mVulkanDevice->createSemaphoreUnique({});
+                                return sync;
+                            });
 }
 
 void VulkanContext::SetupQueues()

@@ -14,23 +14,27 @@ public:
     void OnAttach() override;
     void OnDetach() override;
 
-    void          Begin();
-    void End(uint32_t imageIndex, vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, uint32_t currentFrame);
+    void Begin();
+    void RecordCommands(uint32_t imageIndex, uint32_t currentFrame);
+    void End();
 
-    void OnSwapchainRecreated();
+    [[nodiscard]] vk::CommandBuffer getCommandBuffer(uint32_t currentFrame) const
+    {
+        return *mCommandBuffers[currentFrame];
+    }
+
+    void OnSwapchainRecreated() override;
 
 private:
     void CreateSwapchainResources();
     void DestroySwapchainResources();
 
-    VulkanContext&      mVulkanCtx;
-    Window&             mWindow;
+    VulkanContext& mVulkanCtx;
+    Window&        mWindow;
 
-    vk::UniqueDescriptorPool mDescriptorPool;
-    vk::UniqueRenderPass     mRenderPass;
-
+    vk::UniqueDescriptorPool             mDescriptorPool;
+    vk::UniqueRenderPass                 mRenderPass;
     vk::UniqueCommandPool                mCommandPool;
     std::vector<vk::UniqueCommandBuffer> mCommandBuffers;
-
-    std::vector<vk::UniqueFramebuffer> mFramebuffers;
+    std::vector<vk::UniqueFramebuffer>   mFramebuffers;
 };

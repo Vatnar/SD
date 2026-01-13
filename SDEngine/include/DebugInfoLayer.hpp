@@ -1,6 +1,6 @@
 #pragma once
 #include "Layer.hpp"
-#include "Event.hpp"
+#include "InputEvent.hpp"
 #include "imgui.h"
 #include <string>
 #include <vector>
@@ -56,25 +56,25 @@ public:
         ImGui::End();
     }
 
-    void OnEvent(Event& e) override
+    void OnEvent(InputEvent& e) override
     {
         switch (e.category())
         {
-            case EventCategory::CursorPos:
+            case InputEventCategory::CursorPos:
             {
                 auto& cursorEvent = dynamic_cast<CursorEvent&>(e);
                 mMouseX           = cursorEvent.xPos;
                 mMouseY           = cursorEvent.yPos;
                 break;
             }
-            case EventCategory::MouseScroll:
+            case InputEventCategory::MouseScroll:
             {
                 auto& scrollEvent = dynamic_cast<ScrollEvent&>(e);
                 mScrollX += scrollEvent.xOffset;
                 mScrollY += scrollEvent.yOffset;
                 break;
             }
-            case EventCategory::KeyPressed:
+            case InputEventCategory::KeyPressed:
             {
                 auto& keyEvent = dynamic_cast<KeyPressedEvent&>(e);
                 if (!keyEvent.repeat)
@@ -83,19 +83,19 @@ public:
                 }
                 break;
             }
-            case EventCategory::KeyReleased:
+            case InputEventCategory::KeyReleased:
             {
                 auto& keyEvent = dynamic_cast<KeyReleasedEvent&>(e);
                 mPressedKeys.erase(keyEvent.key);
                 break;
             }
-            case EventCategory::MousePressed:
+            case InputEventCategory::MousePressed:
             {
                 auto& mouseEvent = dynamic_cast<MousePressedEvent&>(e);
                 mPressedMouseButtons.insert(mouseEvent.button);
                 break;
             }
-            case EventCategory::MouseReleased:
+            case InputEventCategory::MouseReleased:
             {
                 auto& mouseEvent = dynamic_cast<MouseReleasedEvent&>(e);
                 mPressedMouseButtons.erase(mouseEvent.button);

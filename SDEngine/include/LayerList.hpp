@@ -21,29 +21,30 @@ public:
 
     ~LayerList()
     {
-        for (auto& layer : mLayers)
-        {
-            layer->OnDetach();
-        }
+        std::ranges::for_each(mLayers, [](const auto& layer) { layer->OnDetach(); });
     }
 
     // TODO: possibly a fixed update could be nice in the future aswell
     void Update(const float dt) const
     {
-        for (auto& layer : mLayers)
-            if (layer->IsActive())
-                layer->OnUpdate(dt);
+        std::ranges::for_each(mLayers,
+                              [dt](const auto& layer)
+                              {
+                                  if (layer->IsActive())
+                                      layer->OnUpdate(dt);
+                              });
     }
     void Render() const
     {
-        for (const auto& layer : mLayers)
-        {
-            if (layer->IsActive())
-                layer->OnRender();
-        }
+        std::ranges::for_each(mLayers,
+                              [](const auto& layer)
+                              {
+                                  if (layer->IsActive())
+                                      layer->OnRender();
+                              });
     }
 
-    void HandleEvent(Event& e)
+    void HandleEvent(InputEvent& e)
     {
         for (auto it = mLayers.rbegin(); it != mLayers.rend(); ++it)
         {
@@ -107,17 +108,27 @@ public:
     {
         for (auto it = mLayers.begin(); it != mLayers.end(); ++it)
         {
-            if (dynamic_cast<T *>(it->get()) != nullptr)
+            if (auto *p = dynamic_cast<T *>(it->get()))
             {
                 (*it)->OnDetach();
 
                 std::unique_ptr<Layer> base = std::move(*it);
-                mLayers.erase(it);
+                it                          = mLayers.erase(it);
 
                 return std::unique_ptr<T>(static_cast<T *>(base.release()));
             }
         }
         return nullptr;
+    }
+
+    void OnSwapchainRecreated()
+    {
+        std::ranges::for_each(mLayers,
+                              [](const auto& layer)
+                              {
+                                  if (layer->IsActive())
+                                      layer->OnSwapchainRecreated();
+                              });
     }
 
 private:
