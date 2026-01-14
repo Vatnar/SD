@@ -1,23 +1,21 @@
 #pragma once
 #include <expected>
-#include <vector>
 #include <fstream>
+#include <vector>
 
-inline std::expected<std::vector<char>, std::unexpect_t> readFile(const std::string& filename)
-{
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+inline std::expected<std::vector<char>, std::unexpect_t> readFile(const std::string& filename) {
+  std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
-    if (!file.is_open())
-    {
-        return std::unexpected(std::unexpect);
-    }
+  if (!file.is_open()) {
+    return std::unexpected(std::unexpect);
+  }
 
-    const size_t      fileSize = file.tellg();
-    std::vector<char> buffer(fileSize);
+  const size_t fileSize = file.tellg();
+  std::vector<char> buffer(fileSize);
 
-    file.seekg(0);
-    file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
-    file.close();
+  file.seekg(0);
+  file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
+  file.close();
 
-    return buffer;
+  return buffer;
 }

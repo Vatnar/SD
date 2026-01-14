@@ -1,36 +1,31 @@
 #pragma once
 
-#include "Utils.hpp"
 #include "GLFW/glfw3.h"
+#include "Utils.hpp"
 
 
-class GlfwContext
-{
+class GlfwContext {
 public:
-    GlfwContext()
-    {
-        if (glfwInit() == false)
-        {
-            Engine::Abort("Failed to initialise GLFW");
-        }
-
-        // Global hints
+  GlfwContext() {
+    if (glfwInit() == false) {
+      Engine::Abort("Failed to initialise GLFW");
     }
 
-    GlfwContext(const GlfwContext&)            = delete;
-    GlfwContext& operator=(const GlfwContext&) = delete;
+    // Global hints
+  }
 
-    ~GlfwContext()
-    {
-        if (auto logger = spdlog::get("engine"))
-            logger->info("Shutting down GLFW");
+  GlfwContext(const GlfwContext&) = delete;
+  GlfwContext& operator=(const GlfwContext&) = delete;
 
-        glfwTerminate();
-    }
-    static std::pair<const char **, uint32_t> GetRequiredInstanceExtensions()
-    {
-        uint32_t     count    = 0;
-        const char **glfwExts = glfwGetRequiredInstanceExtensions(&count);
-        return {glfwExts, count};
-    }
+  ~GlfwContext() {
+    if (auto logger = spdlog::get("engine"))
+      logger->info("Shutting down GLFW");
+
+    glfwTerminate();
+  }
+  static std::pair<const char**, uint32_t> GetRequiredInstanceExtensions() {
+    uint32_t count = 0;
+    const char** glfwExts = glfwGetRequiredInstanceExtensions(&count);
+    return {glfwExts, count};
+  }
 };
