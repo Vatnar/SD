@@ -7,7 +7,15 @@ add_executable(SDEngine src/main.cpp src/VulkanContext.cpp src/Window.cpp
 
 find_package(Vulkan REQUIRED)
 find_package(X11 REQUIRED)
-target_link_libraries(SDEngine PRIVATE Vulkan::Vulkan imgui glfw spdlog stb_image dxc X11::X11)
+target_link_libraries(SDEngine PRIVATE
+        imgui
+        glfw
+        spdlog
+        stb_image
+        dxc
+        X11::X11
+        Vulkan::Vulkan
+)
 target_include_directories(SDEngine PRIVATE include ${X11_INCLUDE_DIR})
 
 

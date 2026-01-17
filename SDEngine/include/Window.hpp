@@ -1,4 +1,5 @@
 #pragma once
+#include "VulkanConfig.hpp"
 
 #include <GLFW/glfw3.h>
 #include <functional>
@@ -6,7 +7,6 @@
 
 #include "EventManager.hpp"
 #include "InputEvent.hpp"
-#include "VulkanConfig.hpp"
 
 using ResizeCallback = std::function<void(int, int)>;
 using KeyCallback = std::function<void(int, int, int, int)>;

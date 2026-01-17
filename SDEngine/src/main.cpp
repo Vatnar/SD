@@ -1,9 +1,8 @@
-#include <vulkan/vulkan.hpp>
+#include "VulkanConfig.hpp"
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
 #include "EngineEvent.hpp"
-#include "VulkanConfig.hpp"
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
 // GLFW
 #define GLFW_INCLUDE_VULKAN
@@ -11,12 +10,10 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
 // STD
 #include <chrono>
-#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <queue>
 #include <thread>
 
 // SD
@@ -24,7 +21,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include "EventManager.hpp"
 #include "GlfwContext.hpp"
 #include "ImGuiLayer.hpp"
-#include "InputEvent.hpp"
 #include "LayerList.hpp"
 #include "Logging.hpp"
 #include "PerformanceLayer.hpp"
@@ -63,7 +59,6 @@ int main() {
   // NOTE: Create and attach layers
   LayerList layers{};
   layers.CreateAndAttachTop<TestLayer>(vulkanCtx);
-  auto testLayer = layers.GetRef<TestLayer>();
 
   layers.CreateAndAttachTop<PerformanceLayer>();
   auto performanceLayer = layers.GetRef<PerformanceLayer>();
@@ -125,53 +120,48 @@ int main() {
                           [&](const auto& event) { layers.HandleEvent(*event); });
     inputEventManager.clear();
 
-    auto& frameSync = vulkanCtx.GetFrameSync(currentFrame);
+    auto& [imageAcquired, inFlight] = vulkanCtx.GetFrameSync(currentFrame);
 
     // NOTE: Wait for last frame
-    if (vulkanDevice->waitForFences(*frameSync.inFlight, VK_TRUE,
-                                    std::numeric_limits<uint64_t>::max()) != vk::Result::eSuccess) {
+    if (vulkanDevice->waitForFences(*inFlight, VK_TRUE, std::numeric_limits<uint64_t>::max()) !=
+        vk::Result::eSuccess) {
       logger->critical("Failed to wait for fences");
       Engine::Abort("Failed to wait for fences");
-    } // logger->trace("Waited for fence frame {}", currentFrame);
+    }
 
 
     // NOTE: Get vulkan images
 
-    uint32_t imageIndex = vulkanCtx.GetVulkanImages(engineEventManager, frameSync.imageAcquired);
+    uint32_t imageIndex = vulkanCtx.GetVulkanImages(engineEventManager, imageAcquired);
     if (imageIndex == std::numeric_limits<uint32_t>::max()) {
       logger->critical("Couldnt get image");
       continue;
     }
 
-    auto& swapchainSync = vulkanCtx.GetSwapchainSync(imageIndex);
+    auto& [renderComplete] = vulkanCtx.GetSwapchainSync(imageIndex);
 
-    vulkanDevice->resetFences(*frameSync.inFlight);
+    vulkanDevice->resetFences(*inFlight);
 
 
     // NOTE: Render
+
+    // NOTE: Required to declare new frame for imgui
     imguiLayer->Begin();
 
     layers.Update(dt);
     layers.Render();
+    layers.RecordCommands(imageIndex, currentFrame);
 
-    // TODO: Abstract
-    testLayer->RecordCommands(imageIndex, currentFrame);
-    imguiLayer->RecordCommands(imageIndex, currentFrame);
     imguiLayer->End();
 
     // NOTE: SUBMIT
+    std::vector<vk::CommandBuffer> cmdBuffers = layers.GetCommandBuffers(currentFrame);
 
 
-    // TODO: Abstract
-    vk::CommandBuffer cmdBuffers[] = {
-        testLayer->getCommandBuffer(currentFrame),
-        imguiLayer->getCommandBuffer(currentFrame),
-    };
-
-    vk::Semaphore waitSemaphores[] = {*frameSync.imageAcquired};
+    vk::Semaphore waitSemaphores[] = {*imageAcquired};
     vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+    vk::Semaphore signalSemaphores[] = {*renderComplete};
 
-    vk::Semaphore signalSemaphores[] = {*swapchainSync.renderComplete};
 
     vk::SubmitInfo submitInfo{};
     submitInfo.setWaitSemaphores(waitSemaphores);
@@ -179,7 +169,14 @@ int main() {
     submitInfo.setCommandBuffers(cmdBuffers);
     submitInfo.setSignalSemaphores(signalSemaphores);
 
-    vulkanCtx.GetGraphicsQueue().submit(submitInfo, *frameSync.inFlight);
+    for (const auto& cb : cmdBuffers) {
+      assert(cb);
+    }
+    vulkanCtx.GetGraphicsQueue().submit(submitInfo, *inFlight);
+
+    for (auto& cb : cmdBuffers) {
+      cb.reset(vk::CommandBufferResetFlagBits::eReleaseResources);
+    }
 
     // NOTE: Present
     vulkanCtx.PresentImage(engineEventManager, imageIndex);

@@ -106,6 +106,28 @@ public:
     });
   }
 
+  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
+    std::ranges::for_each(mLayers, [imageIndex, currentFrame](const auto& layer) {
+      if (layer->IsActive())
+        layer->RecordCommands(imageIndex, currentFrame);
+    });
+  }
+
+  std::vector<vk::CommandBuffer> GetCommandBuffers(uint32_t currentFrame) {
+    std::vector<vk::CommandBuffer> commandBuffers;
+
+    std::ranges::for_each(mLayers, [&](const auto& layer) {
+      if (layer->IsActive()) {
+        auto cb = layer->GetCommandBuffer(currentFrame);
+        if (cb != nullptr) {
+          commandBuffers.emplace_back(std::move(cb));
+        }
+      }
+    });
+
+    return commandBuffers;
+  }
+
 private:
   Container mLayers;
 };

@@ -1,4 +1,7 @@
 #pragma once
+#include <cstdint>
+
+#include "VulkanConfig.hpp"
 #include <concepts>
 
 #include "InputEvent.hpp"
@@ -22,6 +25,8 @@ public:
   virtual void OnSwapchainRecreated() {}
 
   virtual void OnRender();
+  virtual void RecordCommands(uint32_t imageIndex, uint32_t currentFrame);
+  virtual vk::CommandBuffer GetCommandBuffer(uint32_t currentFrame);
   virtual void OnUpdate(float dt);
 
   [[nodiscard]] bool IsActive() const noexcept { return mActive; }

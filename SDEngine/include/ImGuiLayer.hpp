@@ -14,10 +14,10 @@ public:
   void OnDetach() override;
 
   void Begin();
-  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame);
+  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) override;
   void End();
 
-  [[nodiscard]] vk::CommandBuffer getCommandBuffer(uint32_t currentFrame) const {
+  [[nodiscard]] vk::CommandBuffer GetCommandBuffer(uint32_t currentFrame) override {
     return *mCommandBuffers[currentFrame];
   }
 

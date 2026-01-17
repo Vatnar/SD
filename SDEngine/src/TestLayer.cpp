@@ -21,9 +21,11 @@ std::array<vk::VertexInputAttributeDescription, 2> TestLayer::Vertex::getAttribu
 
   return attributeDescriptions;
 }
-vk::CommandBuffer TestLayer::getCommandBuffer(uint32_t currentFrame) const {
+
+vk::CommandBuffer TestLayer::GetCommandBuffer(uint32_t currentFrame) {
   return *mCommandBuffers[currentFrame];
 }
+
 void TestLayer::OnAttach() {
   auto& device = mVulkanCtx.GetVulkanDevice();
   auto& physicalDevice = mVulkanCtx.GetPhysicalDevice();
@@ -275,7 +277,7 @@ void TestLayer::CreateGraphicsPipeline() {
 
   ShaderCompiler compiler;
 
-  // Compile Shaders
+  // compile shaders
   std::vector<char> vertexSpv;
   if (!compiler.CompileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
     Engine::Abort("Failed to compile vertex shader");
@@ -284,9 +286,11 @@ void TestLayer::CreateGraphicsPipeline() {
   if (!compiler.CompileShader("assets/shaders/pixel.hlsl", pixelSpv, "ps_6_0"))
     Engine::Abort("Failed to compile pixel shader");
 
+
   auto vertShaderModule = CreateShaderModule(device.get(), vertexSpv);
   auto fragShaderModule = CreateShaderModule(device.get(), pixelSpv);
 
+  // define shader stages
   vk::PipelineShaderStageCreateInfo shaderStages[] = {
       vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertShaderModule,
                                         "main"),
@@ -298,19 +302,28 @@ void TestLayer::CreateGraphicsPipeline() {
 
   vk::PipelineVertexInputStateCreateInfo vertexInputInfo({}, bindingDescription,
                                                          attributeDescriptions);
+
+  // group verticies into primitives for the vertex shader
   vk::PipelineInputAssemblyStateCreateInfo inputAssembly({}, vk::PrimitiveTopology::eTriangleList,
                                                          VK_FALSE);
 
   vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(mVulkanCtx.GetSwapchainExtent().width),
                         static_cast<float>(mVulkanCtx.GetSwapchainExtent().height), 0.0f, 1.0f);
+
+  // TODO: Should this be dynamic? STUDY: Dynamic vs hard-coded scissor extent
   vk::Rect2D scissor({0, 0}, mVulkanCtx.GetSwapchainExtent());
   vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
 
+  // draw solid triangles,
+  // TODO: Discard backfacing triangles when not in debug mode (eBack + ECW)
   vk::PipelineRasterizationStateCreateInfo rasterizer(
       {}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, vk::CullModeFlagBits::eNone,
       vk::FrontFace::eClockwise, VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f);
+
+  // TODO: Enable MSAA later, e4 or something, probably make it dynamic
   vk::PipelineMultisampleStateCreateInfo multisampling({}, vk::SampleCountFlagBits::e1, VK_FALSE);
 
+  // NOTE: We dont need blending for this layer
   vk::PipelineColorBlendAttachmentState colorBlendAttachment(VK_FALSE);
   colorBlendAttachment.colorWriteMask =
       vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -319,6 +332,7 @@ void TestLayer::CreateGraphicsPipeline() {
   vk::PipelineColorBlendStateCreateInfo colorBlending({}, VK_FALSE, vk::LogicOp::eCopy, 1,
                                                       &colorBlendAttachment);
 
+  // define shader inputs
   vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, *mDescriptorSetLayout);
   mPipelineLayout = device->createPipelineLayoutUnique(pipelineLayoutInfo);
 
@@ -328,6 +342,7 @@ void TestLayer::CreateGraphicsPipeline() {
 
   auto result = device->createGraphicsPipelineUnique(nullptr, pipelineInfo);
   if (result.result != vk::Result::eSuccess) {
+    // TODO: Figure out how we do errors and wrap our own errors
     Engine::Abort("Failed to create graphics pipeline");
   }
   mPipeline = std::move(result.value);

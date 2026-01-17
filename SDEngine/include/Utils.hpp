@@ -21,19 +21,35 @@ namespace Engine {
 }
 } // namespace Engine
 
+template<class T>
+void CheckVulkanRes() {
+}
+
 
 inline void SingleTimeCommand(const vk::Device& device, const vk::Queue& queue,
                               const vk::CommandPool& commandPool,
                               const std::function<void(const vk::CommandBuffer&)>& action) {
   vk::CommandBufferAllocateInfo allocInfo(commandPool, vk::CommandBufferLevel::ePrimary, 1);
-  auto cmdBuffer = device.allocateCommandBuffers(allocInfo).front();
+
+  vk::CommandBuffer cmdBuffer;
+  {
+    auto result = device.allocateCommandBuffers(allocInfo);
+    if (result.result != vk::Result::eSuccess) {
+      Engine::Abort("Pipeline creation failed: " + vk::to_string(result.result));
+    }
+    cmdBuffer = result.value.front();
+  }
+
 
   vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  cmdBuffer.begin(beginInfo);
+  if (auto result = cmdBuffer.begin(beginInfo); result != vk::Result::eSuccess) {
+    Engine::Abort("Pipeline creation failed: " + vk::to_string(result));
+  }
 
   action(cmdBuffer);
 
-  cmdBuffer.end();
+  if (auto result = cmdBuffer.end() = c)
+    cmdBuffer.end();
 
   vk::SubmitInfo submitInfo;
   submitInfo.setCommandBuffers(cmdBuffer);

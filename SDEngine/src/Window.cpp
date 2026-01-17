@@ -1,3 +1,4 @@
+#include "VulkanConfig.hpp"
 #include "Window.hpp"
 
 #include "Utils.hpp"

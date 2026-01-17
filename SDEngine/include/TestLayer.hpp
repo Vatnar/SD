@@ -1,5 +1,5 @@
 #pragma once
-#include <vulkan/vulkan.hpp>
+#include <VulkanConfig.hpp>
 
 #include "InputEvent.hpp"
 #include "Layer.hpp"
@@ -26,7 +26,7 @@ public:
     mVulkanCtx(vulkanCtx), mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
 
 
-  [[nodiscard]] vk::CommandBuffer getCommandBuffer(uint32_t currentFrame) const;
+  [[nodiscard]] vk::CommandBuffer GetCommandBuffer(uint32_t currentFrame) override;
 
   void OnAttach() override;
 
@@ -34,7 +34,7 @@ public:
 
   void UpdateUniformBuffer(uint32_t currentImage) const;
 
-  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame);
+  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) override;
 
   void OnRender() override {}
 
