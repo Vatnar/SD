@@ -1,7 +1,6 @@
 #include "VulkanContext.hpp"
 
 #include <algorithm>
-#include <format>
 
 #include "GlfwContext.hpp"
 #include "LayerList.hpp"
@@ -33,20 +32,24 @@ VulkanContext::VulkanContext(const GlfwContext& glfwCtx, const Window& window,
   CreateSwapchainDependentResources();
   std::generate_n(std::back_inserter(mFrameSyncs), maxFramesInFlight, [&] {
     FrameSync f;
-    f.imageAcquired = mVulkanDevice->createSemaphoreUnique({});
-    f.inFlight = mVulkanDevice->createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
+    f.imageAcquired = CheckVulkanResVal(mVulkanDevice->createSemaphoreUnique({}),
+                                        "Failed to create unique semaphore");
+    f.inFlight =
+        CheckVulkanResVal(mVulkanDevice->createFenceUnique({vk::FenceCreateFlagBits::eSignaled}),
+                          "Failed to create unique fence: ");
     return f;
   });
 
   std::generate_n(std::back_inserter(mSwapchainSyncs), GetSwapchainImages().size(), [&] {
     SwapchainSync s;
-    s.renderComplete = mVulkanDevice->createSemaphoreUnique({});
+    s.renderComplete = CheckVulkanResVal(mVulkanDevice->createSemaphoreUnique({}),
+                                         "Failed to create unique semaphore");
     return s;
   });
 }
 
 VulkanContext::~VulkanContext() {
-  mVulkanDevice->waitIdle();
+  CheckVulkanRes(mVulkanDevice->waitIdle(), "Failed to wait for vulkan device");
   mFramebuffers.clear();
   mSwapchainImageViews.clear();
   mSwapchain.reset();
@@ -54,7 +57,8 @@ VulkanContext::~VulkanContext() {
 }
 
 void VulkanContext::CreateSwapchain() {
-  mSurfaceCapabilities = mPhysDev.getSurfaceCapabilitiesKHR(mSurface.get());
+  mSurfaceCapabilities = CheckVulkanResVal(mPhysDev.getSurfaceCapabilitiesKHR(mSurface.get()),
+                                           "Failed to get sufrace capabilities");
   auto& caps = mSurfaceCapabilities;
   auto [windowWidth, windowHeight] = mWindow.GetWindowSize();
 
@@ -71,7 +75,8 @@ void VulkanContext::CreateSwapchain() {
   if (caps.maxImageCount > 0 && desiredImageCount > caps.maxImageCount)
     desiredImageCount = caps.maxImageCount;
 
-  auto surfaceFormats = mPhysDev.getSurfaceFormatsKHR(mSurface.get());
+  auto surfaceFormats = CheckVulkanResVal(mPhysDev.getSurfaceFormatsKHR(mSurface.get()),
+                                          "Failed to get surface formats: ");
   if (surfaceFormats.size() == 1 && surfaceFormats[0].format == vk::Format::eUndefined) {
     mSurfaceFormat.format = vk::Format::eB8G8R8A8Srgb;
     mSurfaceFormat.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
@@ -86,7 +91,8 @@ void VulkanContext::CreateSwapchain() {
     }
   }
 
-  auto presentModes = mPhysDev.getSurfacePresentModesKHR(mSurface.get());
+  auto presentModes = CheckVulkanResVal(mPhysDev.getSurfacePresentModesKHR(mSurface.get()),
+                                        "Failed to get surface present modes: ");
   vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
   for (auto m : presentModes) {
     if (m == vk::PresentModeKHR::eMailbox) {
@@ -118,8 +124,10 @@ void VulkanContext::CreateSwapchain() {
       .setOldSwapchain(oldSwapchain)
       .setImageSharingMode(vk::SharingMode::eExclusive);
 
-  mSwapchain = mVulkanDevice->createSwapchainKHRUnique(mSwapchainCreateInfo);
-  mSwapchainImages = mVulkanDevice->getSwapchainImagesKHR(*mSwapchain);
+  mSwapchain = CheckVulkanResVal(mVulkanDevice->createSwapchainKHRUnique(mSwapchainCreateInfo),
+                                 "Failed to create unique swapchain: ");
+  mSwapchainImages = CheckVulkanResVal(mVulkanDevice->getSwapchainImagesKHR(*mSwapchain),
+                                       "Failed to get swapchain images");
 }
 
 void VulkanContext::CreateRenderPass() {
@@ -150,7 +158,8 @@ void VulkanContext::CreateRenderPass() {
 
   vk::RenderPassCreateInfo renderPassInfo({}, 1, &colorAttachment, 1, &subpass, 1, &dependency);
 
-  mRenderPass = mVulkanDevice->createRenderPassUnique(renderPassInfo);
+  mRenderPass = CheckVulkanResVal(mVulkanDevice->createRenderPassUnique(renderPassInfo),
+                                  "Failed to create unique renderpass");
 }
 
 void VulkanContext::CreateSwapchainDependentResources() {
@@ -167,7 +176,8 @@ void VulkanContext::CreateSwapchainDependentResources() {
                         vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity})
         .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-    mSwapchainImageViews.push_back(mVulkanDevice->createImageViewUnique(createInfo));
+    mSwapchainImageViews.push_back(CheckVulkanResVal(
+        mVulkanDevice->createImageViewUnique(createInfo), "Failed to create unique imageview: "));
   }
 
   CreateFramebuffers();
@@ -187,17 +197,16 @@ void VulkanContext::CreateFramebuffers() {
         .setHeight(mSwapchainExtent.height)
         .setLayers(1);
 
-    mFramebuffers[i] = mVulkanDevice->createFramebufferUnique(framebufferInfo);
+    mFramebuffers[i] = CheckVulkanResVal(mVulkanDevice->createFramebufferUnique(framebufferInfo),
+                                         "Failed to create unique framebuffer: ");
   }
 }
 
 void VulkanContext::RecreateSwapchain(LayerList& layers) {
-  mVulkanDevice->waitIdle();
+  CheckVulkanRes(mVulkanDevice->waitIdle(), "Failed to wait for mvulkandevice: ");
   mFramebuffers.clear();
   mSwapchainImageViews.clear();
   mSwapchain.reset();
-
-  vk::SwapchainKHR oldSc = mSwapchain.release();
 
   mSurface.reset();
   mSurface = mWindow.CreateWindowSurface(mInstance, nullptr);
@@ -213,23 +222,18 @@ uint32_t VulkanContext::GetVulkanImages(EngineEventManager& engineEventManager,
                                         vk::UniqueSemaphore& imageAcquired) {
   vk::Result res;
   uint32_t imageIndex{std::numeric_limits<uint32_t>::max()};
-  try {
-    auto resultValue = mVulkanDevice->acquireNextImageKHR(
-        *GetSwapchain(), std::numeric_limits<uint64_t>::max(), *imageAcquired, vk::Fence());
-    res = resultValue.result;
-    imageIndex = resultValue.value;
-  } catch (vk::SystemError& err) {
-    res = static_cast<vk::Result>(err.code().value());
-  }
+  auto resultValue = mVulkanDevice->acquireNextImageKHR(
+      *GetSwapchain(), std::numeric_limits<uint64_t>::max(), *imageAcquired, vk::Fence());
+  res = resultValue.result;
+  imageIndex = resultValue.value;
 
   if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) {
     engineEventManager.PushEvent<SwapchainOutOfDateEvent>();
 
-    imageAcquired = mVulkanDevice->createSemaphoreUnique({});
-    // continue;
+    imageAcquired = CheckVulkanResVal(mVulkanDevice->createSemaphoreUnique({}),
+                                      "Failed to create unique semaphore: ");
   } else if (res != vk::Result::eSuccess && res != vk::Result::eSuboptimalKHR) {
     spdlog::get("engine")->critical("Failed to acquire image: {}", vk::to_string(res));
-    // continue;
   }
   return imageIndex;
 }
@@ -244,14 +248,8 @@ void VulkanContext::PresentImage(EngineEventManager& engineEventManager,
           .setPSwapchains(&*mSwapchain)
           .setPImageIndices(&imageIndex);
 
-  vk::Result presentResult;
-  try {
-    presentResult = GetGraphicsQueue().presentKHR(presentInfo);
-  } catch (vk::SystemError& err) {
-    presentResult = static_cast<vk::Result>(err.code().value());
-  }
-
-  if (presentResult == vk::Result::eErrorOutOfDateKHR ||
+  if (vk::Result presentResult = GetGraphicsQueue().presentKHR(presentInfo);
+      presentResult == vk::Result::eErrorOutOfDateKHR ||
       presentResult == vk::Result::eSuboptimalKHR)
     engineEventManager.PushEvent<SwapchainOutOfDateEvent>();
   else if (presentResult != vk::Result::eSuccess)
@@ -265,7 +263,8 @@ void VulkanContext::RebuildPerImageSync() {
 
   std::ranges::generate_n(std::back_inserter(mSwapchainSyncs), static_cast<int>(imageCount), [&] {
     SwapchainSync sync;
-    sync.renderComplete = mVulkanDevice->createSemaphoreUnique({});
+    sync.renderComplete = CheckVulkanResVal(mVulkanDevice->createSemaphoreUnique({}),
+                                            "Failed to create unique semaphore: ");
     return sync;
   });
 }
@@ -300,11 +299,14 @@ vk::UniqueInstance VulkanContext::CreateVulkanApplicationInstance() {
   std::vector instanceExts(glfwExts, glfwExts + extCount);
 
   vk::InstanceCreateInfo instInfo({}, &appInfo, {}, instanceExts);
-  vk::UniqueInstance instance = vk::createInstanceUnique(instInfo);
+  vk::UniqueInstance instance =
+      CheckVulkanResVal(vk::createInstanceUnique(instInfo), "Failed to create unique Instance: ");
 
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
 
-  mPhysDev = instance->enumeratePhysicalDevices().front();
+  mPhysDev = CheckVulkanResVal(instance->enumeratePhysicalDevices(),
+                               "Failed to enumerate phyiscal devices: ")
+                 .front();
   return instance;
 }
 void VulkanContext::SetupDeviceExtensions() {
@@ -314,7 +316,8 @@ void VulkanContext::SetupDeviceExtensions() {
   mFeatures12.pNext = &mFeatures13;
   mFeatures2.setPNext(&mFeatures12);
 
-  auto available = mPhysDev.enumerateDeviceExtensionProperties();
+  auto available = CheckVulkanResVal(mPhysDev.enumerateDeviceExtensionProperties(),
+                                     "Failed to enumerate device extension properties: ");
   auto supports = [&](const char* name) {
     return std::ranges::any_of(available, [&](const vk::ExtensionProperties& e) {
       return std::strcmp(e.extensionName, name) == 0;
@@ -323,7 +326,7 @@ void VulkanContext::SetupDeviceExtensions() {
 
   auto requireExt = [&](const char* name) {
     if (!supports(name))
-      Engine::Abort(std::format("Required device extension missing: {} ", name));
+      Engine::Abort("Required device extension missing: " + std::string(name));
     mDeviceExts.push_back(name);
   };
 
@@ -336,12 +339,14 @@ void VulkanContext::CreateVulkanDevice() {
   vk::DeviceCreateInfo devInfo({}, queueInfo, {}, mDeviceExts);
   devInfo.setPNext(&mFeatures2);
 
-  mVulkanDevice = mPhysDev.createDeviceUnique(devInfo);
+  mVulkanDevice =
+      CheckVulkanResVal(mPhysDev.createDeviceUnique(devInfo), "Failed to create unique device: ");
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*mInstance, mVulkanDevice.get());
 }
 
 void VulkanContext::CreateCommandPool() {
   vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
                                      mGraphicsFamilyIndex);
-  mCommandPool = mVulkanDevice->createCommandPoolUnique(poolInfo);
+  mCommandPool = CheckVulkanResVal(mVulkanDevice->createCommandPoolUnique(poolInfo),
+                                   "Failed to create unique command pool: ");
 }

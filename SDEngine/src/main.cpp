@@ -74,18 +74,16 @@ int main() {
   auto& inputEventManager = window.GetEventManager();
   EngineEventManager engineEventManager;
 
+  window.SetResizeCallback(
+      [&](int w, int h) { engineEventManager.PushEvent<WindowResizeEvent>(w, h); });
+
   // NOTE: Create sync objects
 
   uint64_t frameCounter = 0;
 
   auto& vulkanDevice = vulkanCtx.GetVulkanDevice();
 
-
   // NOTE: MAIN LOOP
-
-  window.SetResizeCallback(
-      [&](int w, int h) { engineEventManager.PushEvent<WindowResizeEvent>(w, h); });
-
 
   bool isRunning = true;
   [[maybe_unused]] uint32_t frameCount = 0;
@@ -172,11 +170,8 @@ int main() {
     for (const auto& cb : cmdBuffers) {
       assert(cb);
     }
-    vulkanCtx.GetGraphicsQueue().submit(submitInfo, *inFlight);
-
-    for (auto& cb : cmdBuffers) {
-      cb.reset(vk::CommandBufferResetFlagBits::eReleaseResources);
-    }
+    CheckVulkanRes(vulkanCtx.GetGraphicsQueue().submit(submitInfo, *inFlight),
+                   "Failed to submit to graphics queue");
 
     // NOTE: Present
     vulkanCtx.PresentImage(engineEventManager, imageIndex);
@@ -198,7 +193,7 @@ int main() {
   }
 
 
-  vulkanDevice->waitIdle();
+  CheckVulkanRes(vulkanDevice->waitIdle(), "Failed to wait for vulkandevice idle");
 
 
   g_dxcUtils.Release();

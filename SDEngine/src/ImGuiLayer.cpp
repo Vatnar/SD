@@ -7,8 +7,7 @@ ImGuiLayer::ImGuiLayer(VulkanContext& vulkanCtx, Window& window) :
   mVulkanCtx(vulkanCtx), mWindow(window) {
 }
 
-ImGuiLayer::~ImGuiLayer() {
-}
+ImGuiLayer::~ImGuiLayer() = default;
 
 void ImGuiLayer::OnAttach() {
   IMGUI_CHECKVERSION();
@@ -39,7 +38,9 @@ void ImGuiLayer::OnAttach() {
     vk::DescriptorPoolCreateInfo pool_info(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                                            1000 * std::size(pool_sizes), std::size(pool_sizes),
                                            pool_sizes);
-    mDescriptorPool = mVulkanCtx.GetVulkanDevice()->createDescriptorPoolUnique(pool_info);
+    mDescriptorPool =
+        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createDescriptorPoolUnique(pool_info),
+                          "Failed to create unique descriptor pool");
   }
 
   {
@@ -59,7 +60,8 @@ void ImGuiLayer::OnAttach() {
         vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eColorAttachmentWrite);
 
     vk::RenderPassCreateInfo info({}, 1, &attachment, 1, &subpass, 1, &dependency);
-    mRenderPass = mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(info);
+    mRenderPass = CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(info),
+                                    "Failed to create unique render pass: ");
   }
 
   ImGui_ImplVulkan_InitInfo init_info{};
@@ -77,18 +79,22 @@ void ImGuiLayer::OnAttach() {
   {
     vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
                                        mVulkanCtx.GetGraphicsFamilyIndex());
-    mCommandPool = mVulkanCtx.GetVulkanDevice()->createCommandPoolUnique(poolInfo);
+    mCommandPool =
+        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createCommandPoolUnique(poolInfo),
+                          "Failed to create unique command pool");
 
     vk::CommandBufferAllocateInfo allocInfo(*mCommandPool, vk::CommandBufferLevel::ePrimary,
                                             mVulkanCtx.GetMaxFramesInFlight());
-    mCommandBuffers = mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo);
+    mCommandBuffers =
+        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo),
+                          "Failed to allocate unique command buffer: ");
   }
 
   CreateSwapchainResources();
 }
 
 void ImGuiLayer::OnDetach() {
-  mVulkanCtx.GetVulkanDevice()->waitIdle();
+  CheckVulkanRes(mVulkanCtx.GetVulkanDevice()->waitIdle(), "Failed to wait for vulkan device ");
   DestroySwapchainResources();
   mCommandBuffers.clear();
   mCommandPool.reset();
@@ -110,8 +116,10 @@ void ImGuiLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
   ImGui::Render();
 
   auto& cmdBuffer = mCommandBuffers[currentFrame];
-  cmdBuffer->reset();
-  cmdBuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+  CheckVulkanRes(cmdBuffer->reset(), "Failed to reset commandbuffer");
+  CheckVulkanRes(
+      cmdBuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)),
+      "Failed to begin commandbuffer");
 
   std::array<vk::ClearValue, 1> clearValues = {
       vk::ClearColorValue{std::array<float, 4>{0.1f, 0.1f, 0.1f, 1.0f}}};
@@ -126,7 +134,7 @@ void ImGuiLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
   cmdBuffer->beginRenderPass(rpInfo, vk::SubpassContents::eInline);
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *cmdBuffer);
   cmdBuffer->endRenderPass();
-  cmdBuffer->end();
+  CheckVulkanRes(cmdBuffer->end(), "Failed to end commandbuffer");
 }
 
 void ImGuiLayer::End() {
@@ -134,7 +142,7 @@ void ImGuiLayer::End() {
 
 
 void ImGuiLayer::OnSwapchainRecreated() {
-  mVulkanCtx.GetVulkanDevice()->waitIdle();
+  CheckVulkanRes(mVulkanCtx.GetVulkanDevice()->waitIdle(), "Failed to wait for vulkan device");
   DestroySwapchainResources();
   CreateSwapchainResources();
 }
@@ -147,7 +155,9 @@ void ImGuiLayer::CreateSwapchainResources() {
     vk::ImageView attachments[] = {*view};
     vk::FramebufferCreateInfo fbInfo({}, *mRenderPass, 1, attachments, swapchainExtent.width,
                                      swapchainExtent.height, 1);
-    mFramebuffers.push_back(mVulkanCtx.GetVulkanDevice()->createFramebufferUnique(fbInfo));
+    mFramebuffers.push_back(
+        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createFramebufferUnique(fbInfo),
+                          "Failed to create unique Framebuffer: "));
   }
 }
 

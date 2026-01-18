@@ -5,12 +5,15 @@
 #include "Layer.hpp"
 #include "ShaderCompiler.hpp"
 #include "Utils.hpp"
+#include "VLA/Matrix.hpp"
 #include "VulkanContext.hpp"
 
 class TestLayer : public Layer {
 public:
   struct ViewProjection {
-    float viewProj[16];
+    VLA::Matrix4x4f proj;
+    VLA::Matrix4x4f view;
+    VLA::Matrix4x4f model;
   };
 
   struct Vertex {

@@ -1,12 +1,13 @@
 #pragma once
-#include "VulkanConfig.hpp"
-#include "stb_image.h"
-// #include "nvrhi/nvrhi.h"
 #include <expected>
 #include <filesystem>
 #include <iostream>
+#include <oneapi/tbb/task_arena.h>
+#include <source_location>
 
+#include "VulkanConfig.hpp"
 #include "spdlog/spdlog.h"
+#include "stb_image.h"
 
 namespace Engine {
 
@@ -21,8 +22,24 @@ namespace Engine {
 }
 } // namespace Engine
 
-template<class T>
-void CheckVulkanRes() {
+
+// TODO: prolly make this print locations,
+inline void CheckVulkanRes(vk::Result result, std::string_view message,
+                           std::source_location loc = std::source_location::current()) {
+  if (result != vk::Result::eSuccess) {
+    auto p =
+        std::format("{}:{} {}: {}", loc.file_name(), loc.line(), message, vk::to_string(result));
+    Engine::Abort(p);
+  }
+}
+
+template<typename T>
+T CheckVulkanResVal(vk::ResultValue<T>&& result, std::string_view message,
+                    std::source_location loc = std::source_location::current()) {
+  CheckVulkanRes(result.result, message, loc);
+
+  // NOTE: We need to use an explicit move here to guarantee no calling of deleted constructors
+  return std::move(result.value);
 }
 
 
@@ -31,30 +48,22 @@ inline void SingleTimeCommand(const vk::Device& device, const vk::Queue& queue,
                               const std::function<void(const vk::CommandBuffer&)>& action) {
   vk::CommandBufferAllocateInfo allocInfo(commandPool, vk::CommandBufferLevel::ePrimary, 1);
 
-  vk::CommandBuffer cmdBuffer;
-  {
-    auto result = device.allocateCommandBuffers(allocInfo);
-    if (result.result != vk::Result::eSuccess) {
-      Engine::Abort("Pipeline creation failed: " + vk::to_string(result.result));
-    }
-    cmdBuffer = result.value.front();
-  }
-
+  vk::CommandBuffer cmdBuffer =
+      CheckVulkanResVal(device.allocateCommandBuffers(allocInfo), "Pipeline creation failed: ")
+          .front();
 
   vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  if (auto result = cmdBuffer.begin(beginInfo); result != vk::Result::eSuccess) {
-    Engine::Abort("Pipeline creation failed: " + vk::to_string(result));
-  }
+  CheckVulkanRes(cmdBuffer.begin(beginInfo), "Failed to begin cmdBuffer:");
 
   action(cmdBuffer);
 
-  if (auto result = cmdBuffer.end() = c)
-    cmdBuffer.end();
+  CheckVulkanRes(cmdBuffer.end(), "Failed to end cmdbuffer:");
 
   vk::SubmitInfo submitInfo;
   submitInfo.setCommandBuffers(cmdBuffer);
-  queue.submit(submitInfo, nullptr);
-  queue.waitIdle();
+  CheckVulkanRes(queue.submit(submitInfo, nullptr), "Failed to submit to queue:");
+
+  CheckVulkanRes(queue.waitIdle(), "Failed to wait for queue");
 
   device.freeCommandBuffers(commandPool, cmdBuffer);
 }
@@ -77,16 +86,19 @@ inline std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
 CreateBuffer(const vk::Device& device, const vk::PhysicalDevice& physicalDevice,
              vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
   vk::BufferCreateInfo bufferInfo({}, size, usage, vk::SharingMode::eExclusive);
-  vk::UniqueBuffer buffer = device.createBufferUnique(bufferInfo);
+  vk::UniqueBuffer buffer =
+      CheckVulkanResVal(device.createBufferUnique(bufferInfo), "Failed to create unique buffer: ");
 
   vk::MemoryRequirements memRequirements = device.getBufferMemoryRequirements(*buffer);
 
   vk::MemoryAllocateInfo allocInfo(
       memRequirements.size,
       FindMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties));
-  vk::UniqueDeviceMemory bufferMemory = device.allocateMemoryUnique(allocInfo);
+  vk::UniqueDeviceMemory bufferMemory = CheckVulkanResVal(
+      device.allocateMemoryUnique(allocInfo), "Failed to allocate unique memory for buffer: ");
 
-  device.bindBufferMemory(*buffer, *bufferMemory, 0);
+  CheckVulkanRes(device.bindBufferMemory(*buffer, *bufferMemory, 0),
+                 "Failed to bind buffer memory");
 
   return {std::move(buffer), std::move(bufferMemory)};
 }
@@ -99,15 +111,17 @@ CreateImage(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, 
                                 1, vk::SampleCountFlagBits::e1, tiling, usage,
                                 vk::SharingMode::eExclusive);
 
-  vk::UniqueImage image = device.createImageUnique(imageInfo);
+  vk::UniqueImage image =
+      CheckVulkanResVal(device.createImageUnique(imageInfo), "Failed to create unique image: ");
 
   vk::MemoryRequirements memRequirements = device.getImageMemoryRequirements(*image);
   vk::MemoryAllocateInfo allocInfo(
       memRequirements.size,
       FindMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties));
-  vk::UniqueDeviceMemory imageMemory = device.allocateMemoryUnique(allocInfo);
+  vk::UniqueDeviceMemory imageMemory = CheckVulkanResVal(device.allocateMemoryUnique(allocInfo),
+                                                         "Failed to allocate unique memory:");
 
-  device.bindImageMemory(*image, *imageMemory, 0);
+  CheckVulkanRes(device.bindImageMemory(*image, *imageMemory, 0), "Failed to bind image memory: ");
 
   return {std::move(image), std::move(imageMemory)};
 }
@@ -184,8 +198,10 @@ inline std::expected<Texture, std::string> CreateTexture(const vk::Device& devic
       device, physicalDevice, imageSize, vk::BufferUsageFlagBits::eTransferSrc,
       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-  void* data = device.mapMemory(*stagingBufferMemory, 0, imageSize);
-  memcpy(data, pixels, static_cast<size_t>(imageSize));
+  void* data = CheckVulkanResVal(device.mapMemory(*stagingBufferMemory, 0, imageSize),
+                                 "Failed to map texture image: ");
+
+  memcpy(data, pixels, imageSize);
   device.unmapMemory(*stagingBufferMemory);
 
   stbi_image_free(pixels);
@@ -208,7 +224,8 @@ inline std::expected<Texture, std::string> CreateTexture(const vk::Device& devic
 
   vk::ImageViewCreateInfo viewInfo({}, *image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Srgb,
                                    {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
-  vk::UniqueImageView imageView = device.createImageViewUnique(viewInfo);
+  vk::UniqueImageView imageView = CheckVulkanResVal(device.createImageViewUnique(viewInfo),
+                                                    "Failed to create unique image view: ");
 
   return Texture{std::move(image), std::move(imageMemory), std::move(imageView)};
 }
@@ -217,5 +234,6 @@ inline vk::UniqueShaderModule CreateShaderModule(const vk::Device& device,
                                                  const std::vector<char>& code) {
   vk::ShaderModuleCreateInfo createInfo({}, code.size(),
                                         reinterpret_cast<const uint32_t*>(code.data()));
-  return device.createShaderModuleUnique(createInfo);
+  return CheckVulkanResVal(device.createShaderModuleUnique(createInfo),
+                           "Failed to create unique shaderModule: ");
 }

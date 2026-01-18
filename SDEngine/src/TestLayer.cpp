@@ -61,7 +61,8 @@ void TestLayer::OnAttach() {
       device.get(), physicalDevice, bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-  void* data = device->mapMemory(*stagingBufferMemory, 0, bufferSize);
+  void* data = CheckVulkanResVal(device->mapMemory(*stagingBufferMemory, 0, bufferSize),
+                                 "Failed to map memory: ");
   memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
   device->unmapMemory(*stagingBufferMemory);
 
@@ -86,7 +87,8 @@ void TestLayer::OnAttach() {
     mUniformBuffers.push_back(std::move(ub));
     mUniformBuffersMemory.push_back(std::move(ubMem));
     mUniformBuffersMapped.push_back(
-        device->mapMemory(*mUniformBuffersMemory.back(), 0, vpBufferSize));
+        CheckVulkanResVal(device->mapMemory(*mUniformBuffersMemory.back(), 0, vpBufferSize),
+                          "Failed to map memory: "));
   }
 
   vk::DescriptorPoolSize poolSizes[] = {
@@ -98,20 +100,23 @@ void TestLayer::OnAttach() {
 
   vk::DescriptorPoolCreateInfo poolInfo(
       {}, static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight()), 3, poolSizes);
-  mDescriptorPool = device->createDescriptorPoolUnique(poolInfo);
+  mDescriptorPool = CheckVulkanResVal(device->createDescriptorPoolUnique(poolInfo),
+                                      "Failed to create unique descriptor pool");
 
   std::vector<vk::DescriptorSetLayout> layouts(mVulkanCtx.GetMaxFramesInFlight(),
                                                *mDescriptorSetLayout);
   vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, mVulkanCtx.GetMaxFramesInFlight(),
                                           layouts.data());
-  mDescriptorSets = device->allocateDescriptorSets(allocInfo);
+  mDescriptorSets = CheckVulkanResVal(device->allocateDescriptorSets(allocInfo),
+                                      "Failed to allocate descriptor sets: ");
 
   vk::SamplerCreateInfo samplerCreateInfo(
       {}, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear,
       vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
       vk::SamplerAddressMode::eRepeat, 0.0f, VK_FALSE, 0.0f, VK_FALSE, vk::CompareOp::eAlways, 0.0f,
       0.0f, vk::BorderColor::eIntOpaqueBlack, VK_FALSE);
-  mSampler = device->createSamplerUnique(samplerCreateInfo);
+  mSampler = CheckVulkanResVal(device->createSamplerUnique(samplerCreateInfo),
+                               "Failed to create unique sampler");
 
   for (size_t i = 0; i < mVulkanCtx.GetMaxFramesInFlight(); i++) {
     vk::DescriptorBufferInfo bufferInfo(*mUniformBuffers[i], 0, sizeof(ViewProjection));
@@ -149,11 +154,13 @@ void TestLayer::OnAttach() {
 }
 void TestLayer::OnDetach() {
   auto& device = mVulkanCtx.GetVulkanDevice();
-  device->waitIdle();
+  CheckVulkanRes(device->waitIdle(), "Failed to wait for device to idle");
 }
 void TestLayer::UpdateUniformBuffer(uint32_t currentImage) const {
   ViewProjection vp{};
-  std::ranges::fill(vp.viewProj, 0.0f);
+  std::ranges::fill(vp.proj, 0.0f);
+  std::ranges::fill(vp.model, 0.0f);
+  std::ranges::fill(vp.view, 0.0f);
 
   const auto& extent = mVulkanCtx.GetSwapchainExtent();
   const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
@@ -165,10 +172,27 @@ void TestLayer::UpdateUniformBuffer(uint32_t currentImage) const {
   else
     scaleY *= aspect;
 
-  vp.viewProj[0] = scaleX;
-  vp.viewProj[5] = scaleY;
-  vp.viewProj[10] = 1.0f;
-  vp.viewProj[15] = 1.0f;
+  // clang-format off
+  vp.proj = {
+    scaleX, 0.f,    0.f, 0.f,
+    0.f,    scaleY, 0.f, 0.f,
+    0.f,    0.f,    1.f, 0.f,
+    0.f,    0.f,    0.f, 1.f,
+  };
+  vp.model = {
+    1.f, 0.f, 0.f, 0.f,
+    0.f, 1.f, 0.f, 0.f,
+    0.f, 0.f, 1.f, 0.f,
+    0.f, 0.f, 0.f, 1.f,
+  };
+  vp.view = {
+    1.f, 0.f, 0.f, 0.f,
+    0.f, 1.f, 0.f, 0.f,
+    0.f, 0.f, 1.f, 0.f,
+    0.f, 0.f, 0.f, 1.f,
+  };
+  // clang-format on
+
 
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
@@ -176,10 +200,10 @@ void TestLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
   UpdateUniformBuffer(currentFrame);
 
   auto& cmdBuffer = mCommandBuffers[currentFrame];
-  cmdBuffer->reset();
+  CheckVulkanRes(cmdBuffer->reset(), "Failed to reset commandbuffer");
 
-  vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  cmdBuffer->begin(beginInfo);
+  constexpr vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+  CheckVulkanRes(cmdBuffer->begin(beginInfo), "Failed to begin commandbuffer");
 
   std::array<vk::ClearValue, 1> clearValues{};
   clearValues[0].color = vk::ClearColorValue{mClearColor};
@@ -199,7 +223,7 @@ void TestLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
                                 mDescriptorSets[currentFrame], nullptr);
   cmdBuffer->draw(6, 1, 0, 0);
   cmdBuffer->endRenderPass();
-  cmdBuffer->end();
+  CheckVulkanRes(cmdBuffer->end(), "Failed to end commandbuffer");
 }
 void TestLayer::OnEvent(InputEvent& e) {
   switch (e.category()) {
@@ -235,7 +259,7 @@ void TestLayer::OnEvent(InputEvent& e) {
   }
 }
 void TestLayer::OnSwapchainRecreated() {
-  mVulkanCtx.GetVulkanDevice()->waitIdle();
+  CheckVulkanRes(mVulkanCtx.GetVulkanDevice()->waitIdle(), "Failed to wait for vulkan device");
   mFramebuffers.clear();
   CreateFramebuffers();
   CreateGraphicsPipeline();
@@ -257,7 +281,9 @@ void TestLayer::CreateRenderPass() {
                                    vk::AccessFlagBits::eColorAttachmentWrite);
 
   vk::RenderPassCreateInfo renderPassInfo({}, colorAttachment, subpass, dependency);
-  mRenderPass = mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(renderPassInfo);
+  mRenderPass =
+      CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(renderPassInfo),
+                        "Failed to create unique render pass");
 }
 void TestLayer::CreateDescriptorSetLayout() {
   constexpr vk::DescriptorSetLayoutBinding uboLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
@@ -270,7 +296,9 @@ void TestLayer::CreateDescriptorSetLayout() {
   std::array bindings = {uboLayoutBinding, textureLayoutBinding, samplerLayoutBinding};
   const vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
 
-  mDescriptorSetLayout = mVulkanCtx.GetVulkanDevice()->createDescriptorSetLayoutUnique(layoutInfo);
+  mDescriptorSetLayout =
+      CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createDescriptorSetLayoutUnique(layoutInfo),
+                        "Failed to create unique descriptorsetlayout: ");
 }
 void TestLayer::CreateGraphicsPipeline() {
   auto& device = mVulkanCtx.GetVulkanDevice();
@@ -293,6 +321,7 @@ void TestLayer::CreateGraphicsPipeline() {
   // define shader stages
   vk::PipelineShaderStageCreateInfo shaderStages[] = {
       vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertShaderModule,
+
                                         "main"),
       vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragShaderModule,
                                         "main")};
@@ -334,7 +363,8 @@ void TestLayer::CreateGraphicsPipeline() {
 
   // define shader inputs
   vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, *mDescriptorSetLayout);
-  mPipelineLayout = device->createPipelineLayoutUnique(pipelineLayoutInfo);
+  mPipelineLayout = CheckVulkanResVal(device->createPipelineLayoutUnique(pipelineLayoutInfo),
+                                      "Failed to create pipelinelayoutunique: ");
 
   vk::GraphicsPipelineCreateInfo pipelineInfo(
       {}, shaderStages, &vertexInputInfo, &inputAssembly, nullptr, &viewportState, &rasterizer,
@@ -356,12 +386,16 @@ void TestLayer::CreateFramebuffers() {
     vk::ImageView attachments[] = {*view};
     vk::FramebufferCreateInfo framebufferInfo({}, *mRenderPass, attachments, extent.width,
                                               extent.height, 1);
-    mFramebuffers.push_back(mVulkanCtx.GetVulkanDevice()->createFramebufferUnique(framebufferInfo));
+    mFramebuffers.push_back(
+        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createFramebufferUnique(framebufferInfo),
+                          "Failed to create unique framebuffer: "));
   }
 }
 void TestLayer::CreateCommandBuffers() {
   vk::CommandBufferAllocateInfo allocInfo(mVulkanCtx.GetCommandPool(),
                                           vk::CommandBufferLevel::ePrimary,
                                           mVulkanCtx.GetMaxFramesInFlight());
-  mCommandBuffers = mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo);
+  mCommandBuffers =
+      CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo),
+                        "Failed to allocate unique commandbuffers");
 }

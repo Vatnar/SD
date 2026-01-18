@@ -11,4 +11,3 @@
 [submodule "vendor/VLA"]
 	path = vendor/VLA
 	url = git@github.com:Vatnar/VLA.git
-	branch = main
