@@ -4,8 +4,8 @@
 #include <memory>
 #include <vector>
 
-#include "EngineEvent.hpp"
-#include "InputEvent.hpp"
+#include "Events/EngineEvent.hpp"
+#include "Events/InputEvent.hpp"
 
 using InputEventManager = std::vector<std::unique_ptr<InputEvent>>;
 

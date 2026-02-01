@@ -1,11 +1,11 @@
 #pragma once
+#include <imgui.h>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "InputEvent.hpp"
-#include "Layer.hpp"
-#include "imgui.h"
+#include "Core/Events/InputEvent.hpp"
+#include "Core/Layer.hpp"
 
 class DebugInfoLayer : public Layer {
 public:

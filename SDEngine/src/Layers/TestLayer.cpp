@@ -1,4 +1,4 @@
-#include "TestLayer.hpp"
+#include "Layers/TestLayer.hpp"
 vk::VertexInputBindingDescription TestLayer::Vertex::getBindingDescription() {
   vk::VertexInputBindingDescription bindingDescription{};
   bindingDescription.binding = 0;
@@ -332,7 +332,7 @@ void TestLayer::CreateGraphicsPipeline() {
   vk::PipelineVertexInputStateCreateInfo vertexInputInfo({}, bindingDescription,
                                                          attributeDescriptions);
 
-  // group verticies into primitives for the vertex shader
+  // group vertices into primitives for the vertex shader
   vk::PipelineInputAssemblyStateCreateInfo inputAssembly({}, vk::PrimitiveTopology::eTriangleList,
                                                          VK_FALSE);
 
@@ -364,7 +364,7 @@ void TestLayer::CreateGraphicsPipeline() {
   // define shader inputs
   vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, *mDescriptorSetLayout);
   mPipelineLayout = CheckVulkanResVal(device->createPipelineLayoutUnique(pipelineLayoutInfo),
-                                      "Failed to create pipelinelayoutunique: ");
+                                      "Failed to create pipeline-layout unique: ");
 
   vk::GraphicsPipelineCreateInfo pipelineInfo(
       {}, shaderStages, &vertexInputInfo, &inputAssembly, nullptr, &viewportState, &rasterizer,

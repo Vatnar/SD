@@ -1,7 +1,8 @@
 #pragma once
 
-#include "GLFW/glfw3.h"
-#include "Utils.hpp"
+#include <GLFW/glfw3.h>
+
+#include "Utils/Utils.hpp"
 
 
 class GlfwContext {

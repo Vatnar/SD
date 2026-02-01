@@ -1,12 +1,12 @@
 #pragma once
-#include <VulkanConfig.hpp>
+#include <VLA/Matrix.hpp>
 
-#include "InputEvent.hpp"
-#include "Layer.hpp"
-#include "ShaderCompiler.hpp"
-#include "Utils.hpp"
-#include "VLA/Matrix.hpp"
-#include "VulkanContext.hpp"
+#include "Core/Events/InputEvent.hpp"
+#include "Core/Layer.hpp"
+#include "Core/ShaderCompiler.hpp"
+#include "Core/VulkanConfig.hpp"
+#include "Core/VulkanContext.hpp"
+#include "Utils/Utils.hpp"
 
 class TestLayer : public Layer {
 public:

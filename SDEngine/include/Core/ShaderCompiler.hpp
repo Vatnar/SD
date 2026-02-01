@@ -4,8 +4,8 @@
 #include <dxc/dxcapi.h>
 #include <iostream>
 
-#include "FileUtils.hpp"
-#include "Utils.hpp"
+#include "Utils/FileUtils.hpp"
+#include "Utils/Utils.hpp"
 
 #ifdef _WIN32
 #include <wrl/client.h>

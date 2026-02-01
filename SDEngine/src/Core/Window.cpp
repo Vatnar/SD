@@ -1,7 +1,7 @@
-#include "VulkanConfig.hpp"
-#include "Window.hpp"
+#include "Core/Window.hpp"
 
-#include "Utils.hpp"
+#include "Core/VulkanConfig.hpp"
+#include "Utils/Utils.hpp"
 
 
 Window::Window(int width, int height, const std::string& title) {

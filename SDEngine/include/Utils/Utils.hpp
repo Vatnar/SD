@@ -2,12 +2,11 @@
 #include <expected>
 #include <filesystem>
 #include <iostream>
-#include <oneapi/tbb/task_arena.h>
 #include <source_location>
+#include <spdlog/spdlog.h>
+#include <stb_image.h>
 
-#include "VulkanConfig.hpp"
-#include "spdlog/spdlog.h"
-#include "stb_image.h"
+#include "Core/VulkanConfig.hpp"
 
 namespace Engine {
 

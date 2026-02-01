@@ -1,9 +1,10 @@
 #pragma once
 #include <chrono>
 #include <spdlog/spdlog.h>
+// TODO: Only works on x86, need some backup if not on x86
 #include <x86intrin.h>
 
-#include "Layer.hpp"
+#include "Core/Layer.hpp"
 
 class PerformanceLayer : public Layer {
 public:

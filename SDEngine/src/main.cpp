@@ -1,7 +1,8 @@
-#include "VulkanConfig.hpp"
+#include "Core/VulkanConfig.hpp"
+#include "Layers/Shader2DLayer.hpp"
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
-#include "EngineEvent.hpp"
+#include "Core/Events/EngineEvent.hpp"
 
 
 // GLFW
@@ -17,17 +18,17 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <thread>
 
 // SD
-#include "DebugInfoLayer.hpp"
-#include "EventManager.hpp"
-#include "GlfwContext.hpp"
-#include "ImGuiLayer.hpp"
-#include "LayerList.hpp"
-#include "Logging.hpp"
-#include "PerformanceLayer.hpp"
-#include "ShaderCompiler.hpp"
-#include "TestLayer.hpp"
-#include "VulkanContext.hpp"
-#include "Window.hpp"
+#include "Core/EventManager.hpp"
+#include "Core/GlfwContext.hpp"
+#include "Core/LayerList.hpp"
+#include "Core/Logging.hpp"
+#include "Core/ShaderCompiler.hpp"
+#include "Core/VulkanContext.hpp"
+#include "Core/Window.hpp"
+#include "Layers/DebugInfoLayer.hpp"
+#include "Layers/ImGuiLayer.hpp"
+#include "Layers/PerformanceLayer.hpp"
+#include "Layers/TestLayer.hpp"
 
 constexpr bool enableValidation = true;
 
@@ -58,7 +59,8 @@ int main() {
 
   // NOTE: Create and attach layers
   LayerList layers{};
-  layers.CreateAndAttachTop<TestLayer>(vulkanCtx);
+  // layers.CreateAndAttachTop<TestLayer>(vulkanCtx);
+  layers.CreateAndAttachTop<Shader2DLayer>(vulkanCtx);
 
   layers.CreateAndAttachTop<PerformanceLayer>();
   auto performanceLayer = layers.GetRef<PerformanceLayer>();
@@ -132,6 +134,7 @@ int main() {
 
     uint32_t imageIndex = vulkanCtx.GetVulkanImages(engineEventManager, imageAcquired);
     if (imageIndex == std::numeric_limits<uint32_t>::max()) {
+      // BUG: Why
       logger->critical("Couldnt get image");
       continue;
     }

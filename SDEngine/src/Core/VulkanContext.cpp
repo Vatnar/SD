@@ -1,10 +1,10 @@
-#include "VulkanContext.hpp"
+#include "Core/VulkanContext.hpp"
 
 #include <algorithm>
+#include <spdlog/spdlog.h>
 
-#include "GlfwContext.hpp"
-#include "LayerList.hpp"
-#include "spdlog/spdlog.h"
+#include "Core/GlfwContext.hpp"
+#include "Core/LayerList.hpp"
 
 
 class LayerList;
@@ -220,12 +220,10 @@ void VulkanContext::RecreateSwapchain(LayerList& layers) {
 
 uint32_t VulkanContext::GetVulkanImages(EngineEventManager& engineEventManager,
                                         vk::UniqueSemaphore& imageAcquired) {
-  vk::Result res;
   uint32_t imageIndex{std::numeric_limits<uint32_t>::max()};
-  auto resultValue = mVulkanDevice->acquireNextImageKHR(
-      *GetSwapchain(), std::numeric_limits<uint64_t>::max(), *imageAcquired, vk::Fence());
-  res = resultValue.result;
-  imageIndex = resultValue.value;
+  vk::Result res =
+      mVulkanDevice->acquireNextImageKHR(*GetSwapchain(), std::numeric_limits<uint64_t>::max(),
+                                         *imageAcquired, vk::Fence(), &imageIndex);
 
   if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) {
     engineEventManager.PushEvent<SwapchainOutOfDateEvent>();
@@ -248,7 +246,7 @@ void VulkanContext::PresentImage(EngineEventManager& engineEventManager,
           .setPSwapchains(&*mSwapchain)
           .setPImageIndices(&imageIndex);
 
-  if (vk::Result presentResult = GetGraphicsQueue().presentKHR(presentInfo);
+  if (vk::Result presentResult = GetGraphicsQueue().presentKHR(&presentInfo);
       presentResult == vk::Result::eErrorOutOfDateKHR ||
       presentResult == vk::Result::eSuboptimalKHR)
     engineEventManager.PushEvent<SwapchainOutOfDateEvent>();

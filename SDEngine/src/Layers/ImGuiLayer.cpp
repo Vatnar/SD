@@ -1,6 +1,6 @@
-#include "ImGuiLayer.hpp"
+#include "Layers/ImGuiLayer.hpp"
 
-#include "Utils.hpp"
+#include "Utils/Utils.hpp"
 
 
 ImGuiLayer::ImGuiLayer(VulkanContext& vulkanCtx, Window& window) :

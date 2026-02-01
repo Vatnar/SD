@@ -8,10 +8,10 @@
 #define ENGINE_LOG_LEVEL_CRITICAL 5
 #define ENGINE_LOG_LEVEL_OFF 6
 
-#include "spdlog/async.h"
-#include "spdlog/sinks/basic_file_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/async.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 enum class LogLevel {
   Trace = ENGINE_LOG_LEVEL_TRACE,

@@ -2,10 +2,10 @@
 
 #include <vector>
 
-#include "GlfwContext.hpp"
-#include "LayerList.hpp"
-#include "VulkanConfig.hpp"
-#include "Window.hpp"
+#include "Core/GlfwContext.hpp"
+#include "Core/LayerList.hpp"
+#include "Core/VulkanConfig.hpp"
+#include "Core/Window.hpp"
 
 struct FrameSync {
   vk::UniqueSemaphore imageAcquired;

@@ -1,8 +1,9 @@
-add_executable(SDEngine src/main.cpp src/VulkanContext.cpp src/Window.cpp
-        src/Layer.cpp
-        src/stbi_impl.cpp
-        src/ImGuiLayer.cpp
-        src/TestLayer.cpp
+add_executable(SDEngine src/main.cpp src/Core/VulkanContext.cpp src/Core/Window.cpp
+        src/Core/Layer.cpp
+        src/vendor/stbi_impl.cpp
+        src/Layers/ImGuiLayer.cpp
+        src/Layers/TestLayer.cpp
+        src/Layers/Shader2DLayer.cpp
 )
 
 find_package(Vulkan REQUIRED)

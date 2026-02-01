@@ -1,8 +1,8 @@
 #pragma once
-#include <Layer.hpp>
 #include <list>
+#include <spdlog/spdlog.h>
 
-#include "spdlog/spdlog.h"
+#include "Core/Layer.hpp"
 
 
 struct Vertex {

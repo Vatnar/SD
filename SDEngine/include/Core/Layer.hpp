@@ -1,10 +1,9 @@
 #pragma once
+#include <concepts>
 #include <cstdint>
 
+#include "Core/Events/InputEvent.hpp"
 #include "VulkanConfig.hpp"
-#include <concepts>
-
-#include "InputEvent.hpp"
 
 
 class Layer;
