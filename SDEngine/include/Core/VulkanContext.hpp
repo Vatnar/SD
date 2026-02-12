@@ -7,6 +7,8 @@
 #include "Core/VulkanConfig.hpp"
 #include "Core/Window.hpp"
 
+// TODO: Consider creating a "FrameData" struct to hold all per-frame resources (semaphores, fences,
+// command buffers, etc.)
 struct FrameSync {
   vk::UniqueSemaphore imageAcquired;
   vk::UniqueFence inFlight;
@@ -16,12 +18,23 @@ struct SwapchainSync {
   vk::UniqueSemaphore renderComplete;
 };
 
+// TODO: This class is doing too much. Consider splitting it into smaller, more focused classes
+// (e.g., Device, Swapchain, PipelineManager)
+/**
+ * @brief RAII class for managing the Vulkan Context.
+ * @details Will be split up since its absolutely humongous, perhaps, Device, Swapchain,
+ * PipelineManager
+ */
 class VulkanContext {
 public:
   VulkanContext(const GlfwContext& glfwCtx, const Window& window, int maxFramesInFlight);
   ~VulkanContext();
 
-  int GetMaxFramesInFlight() const { return mMaxFramesInFlight; }
+  /**
+   * @return Max frames in flight, set in constructor.
+   */
+  [[nodiscard]] int GetMaxFramesInFlight() const { return mMaxFramesInFlight; }
+
   FrameSync& GetFrameSync(const uint32_t currentFrame) { return mFrameSyncs[currentFrame]; }
   SwapchainSync& GetSwapchainSync(const uint32_t imageIndex) { return mSwapchainSyncs[imageIndex]; }
 
@@ -37,22 +50,28 @@ public:
   [[nodiscard]] uint32_t GetGraphicsFamilyIndex() const { return mGraphicsFamilyIndex; }
   [[nodiscard]] vk::Queue GetGraphicsQueue() const { return mGraphicsQueue; }
   vk::UniqueSwapchainKHR& GetSwapchain() { return mSwapchain; }
-  const std::vector<vk::Image>& GetSwapchainImages() const { return mSwapchainImages; }
+  [[nodiscard]] const std::vector<vk::Image>& GetSwapchainImages() const {
+    return mSwapchainImages;
+  }
   vk::SurfaceFormatKHR& GetSurfaceFormat() { return mSurfaceFormat; }
   vk::Extent2D& GetSwapchainExtent() { return mSwapchainExtent; }
   vk::SwapchainCreateInfoKHR& GetSwapchainCreateInfo() { return mSwapchainCreateInfo; }
-  const Window& GetWindow() const { return mWindow; }
+  [[nodiscard]] const Window& GetWindow() const { return mWindow; }
 
   // Raw Vulkan Getters
-  vk::RenderPass GetRenderPass() const { return *mRenderPass; }
-  vk::CommandPool GetCommandPool() const { return *mCommandPool; }
-  const std::vector<vk::UniqueImageView>& GetSwapchainImageViews() const {
+  // TODO: Minimize these raw getters. Instead, provide higher-level functions that perform actions
+  // on these resources.
+  [[nodiscard]] vk::RenderPass GetRenderPass() const { return *mRenderPass; }
+  [[nodiscard]] vk::CommandPool GetCommandPool() const { return *mCommandPool; }
+  [[nodiscard]] const std::vector<vk::UniqueImageView>& GetSwapchainImageViews() const {
     return mSwapchainImageViews;
   }
-  const std::vector<vk::UniqueFramebuffer>& GetFramebuffers() const { return mFramebuffers; }
+  [[nodiscard]] const std::vector<vk::UniqueFramebuffer>& GetFramebuffers() const {
+    return mFramebuffers;
+  }
 
-  uint32_t GetVulkanImages(EngineEventManager& engineEventManager,
-                           vk::UniqueSemaphore& imageAcquired);
+  vk::ResultValue<uint32_t> GetVulkanImages(EngineEventManager& engineEventManager,
+                                            vk::UniqueSemaphore& imageAcquired);
   void PresentImage(EngineEventManager& engineEventManager, uint32_t imageIndex);
   void RebuildPerImageSync();
 
@@ -69,6 +88,8 @@ private:
 
   vk::UniqueInstance mInstance;
   std::vector<const char*> mDeviceExts;
+  // TODO: Abstract physical device selection to allow choosing the best device based on
+  // features/performance
   vk::PhysicalDevice mPhysDev;
   vk::PhysicalDeviceFeatures2 mFeatures2;
   vk::PhysicalDeviceVulkan12Features mFeatures12;

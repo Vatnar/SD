@@ -22,6 +22,7 @@ void ImGuiLayer::OnAttach() {
   ImGui_ImplGlfw_InitForVulkan(mWindow.GetNativeHandle(), true);
 
   {
+    // TODO: This descriptor pool is huge and may be wasteful. Consider a more dynamic or specialized pool for ImGui.
     vk::DescriptorPoolSize pool_sizes[] = {
         {             vk::DescriptorType::eSampler, 1000},
         {vk::DescriptorType::eCombinedImageSampler, 1000},
@@ -44,6 +45,7 @@ void ImGuiLayer::OnAttach() {
   }
 
   {
+    // TODO: This render pass is specific to ImGui. Consider making it more generic or using dynamic rendering.
     vk::AttachmentDescription attachment(
         {}, mVulkanCtx.GetSurfaceFormat().format, vk::SampleCountFlagBits::e1,
         vk::AttachmentLoadOp::eLoad, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
@@ -77,6 +79,7 @@ void ImGuiLayer::OnAttach() {
   ImGui_ImplVulkan_Init(&init_info);
 
   {
+    // TODO: ImGuiLayer should probably have its own command pool if it's meant to be self-contained.
     vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
                                        mVulkanCtx.GetGraphicsFamilyIndex());
     mCommandPool =

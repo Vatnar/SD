@@ -23,6 +23,7 @@ public:
       Engine::Abort("Failed to create DXC Compiler");
   }
 
+  // TODO: Add caching mechanism to avoid recompiling shaders if source hasn't changed
   bool CompileShader(const std::string& source, std::vector<char>& output,
                      const std::string& profile) const {
     if (!dxcUtils || !dxcCompiler) {
@@ -54,7 +55,13 @@ public:
     args.emplace_back(CA2W(profile.c_str()));
     args.emplace_back(L"-spirv");
 
-    std::vector<LPCWSTR> pszArgs;
+#if _DEBUG
+    args.emplace_back(L"-D_DEBUG");
+    args.emplace_back(L"-Zi");
+    args.emplace_back(L"-Qembed_debug");
+#endif
+
+    std::vector<LPCWSTR> pszArgs(args.size());
     for (const auto& arg : args)
       pszArgs.push_back(arg.c_str());
 

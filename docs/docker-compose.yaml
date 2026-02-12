@@ -1,0 +1,26 @@
+services:
+  doxygen:
+    build:
+      context: .
+    volumes:
+      - ../:/code:ro
+      - docs_data:/docs_output
+    working_dir: /code
+
+  webserver:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - docs_data:/www/data
+    command: >
+      /bin/sh -c "echo 'server {
+        listen 80;
+        root /www/data;
+        index index.html annotated.html classes.html;
+        autoindex on; 
+      }' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+    restart: always
+
+volumes:
+  docs_data:

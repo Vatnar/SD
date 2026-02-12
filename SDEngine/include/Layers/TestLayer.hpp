@@ -38,7 +38,6 @@ public:
   void UpdateUniformBuffer(uint32_t currentImage) const;
 
   void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) override;
-
   void OnRender() override {}
 
   void OnEvent(InputEvent& e) override;

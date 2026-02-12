@@ -131,6 +131,7 @@ void VulkanContext::CreateSwapchain() {
 }
 
 void VulkanContext::CreateRenderPass() {
+  // TODO: Use dynamic rendering (VK_KHR_dynamic_rendering) to simplify render pass management
   vk::AttachmentDescription colorAttachment{};
   colorAttachment.setFormat(mSurfaceFormat.format)
       .setSamples(vk::SampleCountFlagBits::e1)
@@ -206,11 +207,7 @@ void VulkanContext::RecreateSwapchain(LayerList& layers) {
   CheckVulkanRes(mVulkanDevice->waitIdle(), "Failed to wait for mvulkandevice: ");
   mFramebuffers.clear();
   mSwapchainImageViews.clear();
-  mSwapchain.reset();
-
-  mSurface.reset();
-  mSurface = mWindow.CreateWindowSurface(mInstance, nullptr);
-
+  // mSwapchain.reset();
 
   CreateSwapchain();
   CreateSwapchainDependentResources();
@@ -218,22 +215,21 @@ void VulkanContext::RecreateSwapchain(LayerList& layers) {
   layers.OnSwapchainRecreated();
 }
 
-uint32_t VulkanContext::GetVulkanImages(EngineEventManager& engineEventManager,
-                                        vk::UniqueSemaphore& imageAcquired) {
+vk::ResultValue<uint32_t> VulkanContext::GetVulkanImages(EngineEventManager& engineEventManager,
+                                                         vk::UniqueSemaphore& imageAcquired) {
   uint32_t imageIndex{std::numeric_limits<uint32_t>::max()};
   vk::Result res =
       mVulkanDevice->acquireNextImageKHR(*GetSwapchain(), std::numeric_limits<uint64_t>::max(),
                                          *imageAcquired, vk::Fence(), &imageIndex);
 
   if (res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) {
+    spdlog::get("engine")->warn("ErrorOutOfDate or suboptimal");
     engineEventManager.PushEvent<SwapchainOutOfDateEvent>();
 
-    imageAcquired = CheckVulkanResVal(mVulkanDevice->createSemaphoreUnique({}),
-                                      "Failed to create unique semaphore: ");
-  } else if (res != vk::Result::eSuccess && res != vk::Result::eSuboptimalKHR) {
+  } else if (res != vk::Result::eSuccess) {
     spdlog::get("engine")->critical("Failed to acquire image: {}", vk::to_string(res));
   }
-  return imageIndex;
+  return {res, imageIndex};
 }
 void VulkanContext::PresentImage(EngineEventManager& engineEventManager,
                                  const uint32_t imageIndex) {
@@ -296,6 +292,7 @@ vk::UniqueInstance VulkanContext::CreateVulkanApplicationInstance() {
   auto [glfwExts, extCount] = GlfwContext::GetRequiredInstanceExtensions();
   std::vector instanceExts(glfwExts, glfwExts + extCount);
 
+  // TODO: Enable validation layers if in debug mode
   vk::InstanceCreateInfo instInfo({}, &appInfo, {}, instanceExts);
   vk::UniqueInstance instance =
       CheckVulkanResVal(vk::createInstanceUnique(instInfo), "Failed to create unique Instance: ");

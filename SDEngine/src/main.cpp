@@ -60,7 +60,9 @@ int main() {
   // NOTE: Create and attach layers
   LayerList layers{};
   // layers.CreateAndAttachTop<TestLayer>(vulkanCtx);
-  layers.CreateAndAttachTop<Shader2DLayer>(vulkanCtx);
+  std::vector<std::string> textures = {"assets/textures/CreateNoteInteraction.png",
+                                       "assets/textures/example.jpg"};
+  layers.CreateAndAttachTop<Shader2DLayer>(vulkanCtx, textures);
 
   layers.CreateAndAttachTop<PerformanceLayer>();
   auto performanceLayer = layers.GetRef<PerformanceLayer>();
@@ -107,13 +109,16 @@ int main() {
     // NOTE: Handle engine events
 
     if (engineEventManager.HasResizeEvent()) {
+      auto [width, height]{window.GetFramebufferSize()};
+      if (width == 0 || height == 0)
+        continue;
+
       vulkanCtx.RecreateSwapchain(layers);
       vulkanCtx.RebuildPerImageSync();
       engineEventManager.ClearType<WindowResizeEvent>();
       engineEventManager.ClearType<SwapchainOutOfDateEvent>();
     }
 
-    engineEventManager.Clear();
 
     // NOTE: Handle input events
     std::ranges::for_each(inputEventManager,
@@ -132,12 +137,23 @@ int main() {
 
     // NOTE: Get vulkan images
 
-    uint32_t imageIndex = vulkanCtx.GetVulkanImages(engineEventManager, imageAcquired);
-    if (imageIndex == std::numeric_limits<uint32_t>::max()) {
-      // BUG: Why
-      logger->critical("Couldnt get image");
-      continue;
+    auto imageIndexRes = vulkanCtx.GetVulkanImages(engineEventManager, imageAcquired);
+    switch (imageIndexRes.result) {
+      using enum vk::Result;
+      case eSuboptimalKHR:
+      case eErrorOutOfDateKHR: {
+        continue;
+        break;
+      }
+      case eSuccess: {
+        break;
+      }
+      default: {
+        // for debug lets just log
+        logger->debug(std::to_string(static_cast<int>(imageIndexRes.result)));
+      };
     }
+    uint32_t imageIndex = imageIndexRes.value;
 
     auto& [renderComplete] = vulkanCtx.GetSwapchainSync(imageIndex);
 
@@ -183,6 +199,7 @@ int main() {
     // NOTE: Performance stuff
     auto frameEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = frameEnd - now;
+    // TODO: Use a more robust frame pacing mechanism (e.g., vsync or a dedicated timer)
     std::chrono::duration<double> targetFrameTime(1.0 / TARGET_FPS);
     if (elapsed < targetFrameTime) {
       performanceLayer->BeginSleep();

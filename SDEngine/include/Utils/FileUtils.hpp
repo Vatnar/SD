@@ -3,6 +3,11 @@
 #include <fstream>
 #include <vector>
 
+/**
+ * Reads a file from given path
+ * @param filename
+ * @return array of chars
+ */
 inline std::expected<std::vector<char>, std::unexpect_t> readFile(const std::string& filename) {
   std::ifstream file(filename, std::ios::ate | std::ios::binary);
 

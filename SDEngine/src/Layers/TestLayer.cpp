@@ -74,10 +74,14 @@ void TestLayer::OnAttach() {
   mVertexBuffer = std::move(vb);
   mVertexBufferMemory = std::move(vbMem);
 
-  SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
+  auto res = SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
     vk::BufferCopy copyRegion(0, 0, bufferSize);
     cmdBuffer.copyBuffer(*stagingBuffer, *mVertexBuffer, copyRegion);
   });
+
+  if (!res) {
+      Engine::Abort(res.error());
+  }
 
   for (size_t i = 0; i < mVulkanCtx.GetMaxFramesInFlight(); i++) {
     vk::DeviceSize vpBufferSize = sizeof(ViewProjection);
@@ -265,6 +269,7 @@ void TestLayer::OnSwapchainRecreated() {
   CreateGraphicsPipeline();
 }
 void TestLayer::CreateRenderPass() {
+  // TODO: Use dynamic rendering (VK_KHR_dynamic_rendering) to simplify render pass management
   vk::AttachmentDescription colorAttachment(
       {}, mVulkanCtx.GetSurfaceFormat().format, vk::SampleCountFlagBits::e1,
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
@@ -306,6 +311,7 @@ void TestLayer::CreateGraphicsPipeline() {
   ShaderCompiler compiler;
 
   // compile shaders
+  // TODO: Use a pipeline cache to speed up pipeline creation
   std::vector<char> vertexSpv;
   if (!compiler.CompileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
     Engine::Abort("Failed to compile vertex shader");

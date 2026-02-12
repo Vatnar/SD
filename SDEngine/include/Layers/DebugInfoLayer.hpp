@@ -7,6 +7,7 @@
 #include "Core/Events/InputEvent.hpp"
 #include "Core/Layer.hpp"
 
+// TODO: Consider making this a more generic "DebugUI" layer that can display various debug information, not just input
 class DebugInfoLayer : public Layer {
 public:
   DebugInfoLayer() = default;

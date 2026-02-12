@@ -1,5 +1,7 @@
 # SD - Shader Debugger
 
+[![Docs](https://img.shields.io/badge/docs-gh--pages-blue)](https://vatnar.github.io/SD/annotated.html)
+
 ### Features
 
 * (WIP) Real-time shader debugging

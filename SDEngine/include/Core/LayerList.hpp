@@ -5,6 +5,7 @@
 #include "Core/Layer.hpp"
 
 
+// TODO: Move Vertex struct to a dedicated geometry/mesh header or abstraction
 struct Vertex {
   float position[3];
   float texCoord[2];
@@ -129,5 +130,6 @@ public:
   }
 
 private:
+  // TODO: Consider using a vector if random access or cache locality becomes important, though list is fine for now given the low count of layers.
   Container mLayers;
 };

@@ -33,6 +33,9 @@ bool constexpr should_log(LogLevel level) {
   return static_cast<int>(level) >= static_cast<int>(cLOG_LEVEL);
 }
 
+/**
+ * @brief Initializes asynchronous logging
+ */
 inline void init_logging() {
   spdlog::init_thread_pool(8192, 1);
 

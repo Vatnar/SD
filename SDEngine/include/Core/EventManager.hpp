@@ -11,8 +11,8 @@ using InputEventManager = std::vector<std::unique_ptr<InputEvent>>;
 
 class EngineEventManager {
 public:
-  // TODO: prealloc some prolly
-  EngineEventManager() = default;
+  // TODO: what is the golden number here
+  EngineEventManager() { mEvents.reserve(64); }
   EngineEventManager(const EngineEventManager&) = delete;
   EngineEventManager& operator=(const EngineEventManager&) = delete;
 

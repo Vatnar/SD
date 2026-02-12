@@ -2,6 +2,7 @@
 #include <chrono>
 #include <spdlog/spdlog.h>
 // TODO: Only works on x86, need some backup if not on x86
+// TODO: Use std::chrono or platform-independent high-resolution timer instead of __rdtsc for portability
 #include <x86intrin.h>
 
 #include "Core/Layer.hpp"

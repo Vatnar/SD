@@ -1,0 +1,46 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'SDEngine/**'
+      - 'include/**'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Doxygen & Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Setup Doxygen Awesome Theme
+        run: |
+          git clone https://github.com/jothepro/doxygen-awesome-css.git docs/theme
+          # Adjust Doxyfile to point to the correct theme path for CI if needed
+          # or simply sed replacement if your Doxyfile uses absolute container paths
+          sed -i 's|/theme/|docs/theme/|g' docs/Doxyfile
+          sed -i 's|HTML_OUTPUT.*|HTML_OUTPUT = html|' docs/Doxyfile
+          sed -i 's|OUTPUT_DIRECTORY.*|OUTPUT_DIRECTORY = docs_output|' docs/Doxyfile
+
+      - name: Run Doxygen
+        run: doxygen docs/Doxyfile
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs_output/html
+          force_orphan: true
+          enable_jekyll: 'false'

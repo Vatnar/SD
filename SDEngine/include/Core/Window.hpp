@@ -42,6 +42,7 @@ public:
 
   [[nodiscard]] GLFWwindow* GetNativeHandle() const { return mHandle; }
   [[nodiscard]] std::pair<int, int> GetWindowSize() const;
+  std::pair<int, int> GetFramebufferSize() const;
   [[nodiscard]] bool ShouldClose() const { return glfwWindowShouldClose(mHandle); }
   vk::UniqueSurfaceKHR CreateWindowSurface(vk::UniqueInstance& instance,
                                            const VkAllocationCallbacks* allocationCallback) const;

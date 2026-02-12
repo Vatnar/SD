@@ -27,11 +27,17 @@ public:
     static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions();
   };
 
-  explicit Shader2DLayer(VulkanContext& vulkanCtx) :
-    mVulkanCtx(vulkanCtx), mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
+  explicit Shader2DLayer(VulkanContext& vulkanCtx,
+                         const std::vector<std::string>& texturePaths = {}) :
+    mVulkanCtx(vulkanCtx), mTexturePaths(texturePaths), mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
 
 
   [[nodiscard]] vk::CommandBuffer GetCommandBuffer(uint32_t currentFrame) override;
+
+  std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
+  CreateStagingBuffer(vk::UniqueDevice& device, vk::PhysicalDevice& physicalDevice,
+                      const std::vector<Shader2DLayer::Vertex>& vertices,
+                      vk::DeviceSize bufferSize);
 
   void OnAttach() override;
 
@@ -90,7 +96,10 @@ private:
   std::vector<vk::UniqueDeviceMemory> mUniformBuffersMemory;
   std::vector<void*> mUniformBuffersMapped;
 
-  Texture mTexture;
+  // Textures
+  std::vector<Texture> mTextures;
+  std::vector<std::string> mTexturePaths;
+
   vk::UniqueSampler mSampler;
 
   // Shaders

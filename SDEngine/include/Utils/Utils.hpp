@@ -2,14 +2,28 @@
 #include <expected>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <source_location>
 #include <spdlog/spdlog.h>
 #include <stb_image.h>
 
 #include "Core/VulkanConfig.hpp"
 
+/**
+ * @file Utils.hpp
+ * @brief Utilities for the engine.
+ */
+
+/**
+ * @namespace  Engine
+ * @brief Namespace for Engine intrinsic things
+ */
 namespace Engine {
 
+/**
+ * Terminates the engine and prints following fatal message
+ * @param message
+ */
 [[noreturn]] inline void Abort(const std::string& message) {
   if (const auto logger = spdlog::get("engine")) {
     logger->critical("Fatal error: {}", message);
@@ -22,7 +36,6 @@ namespace Engine {
 } // namespace Engine
 
 
-// TODO: prolly make this print locations,
 inline void CheckVulkanRes(vk::Result result, std::string_view message,
                            std::source_location loc = std::source_location::current()) {
   if (result != vk::Result::eSuccess) {
@@ -42,29 +55,53 @@ T CheckVulkanResVal(vk::ResultValue<T>&& result, std::string_view message,
 }
 
 
-inline void SingleTimeCommand(const vk::Device& device, const vk::Queue& queue,
-                              const vk::CommandPool& commandPool,
-                              const std::function<void(const vk::CommandBuffer&)>& action) {
+inline std::expected<void, std::string>
+SingleTimeCommand(const vk::Device& device, const vk::Queue& queue,
+                  const vk::CommandPool& commandPool,
+                  const std::function<void(const vk::CommandBuffer&)>& action) {
   vk::CommandBufferAllocateInfo allocInfo(commandPool, vk::CommandBufferLevel::ePrimary, 1);
 
-  vk::CommandBuffer cmdBuffer =
-      CheckVulkanResVal(device.allocateCommandBuffers(allocInfo), "Pipeline creation failed: ")
-          .front();
+  auto allocRes = device.allocateCommandBuffers(allocInfo);
+  if (allocRes.result != vk::Result::eSuccess) {
+    return std::unexpected("Failed to allocate command buffers: " + vk::to_string(allocRes.result));
+  }
+  vk::CommandBuffer cmdBuffer = allocRes.value.front();
 
   vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  CheckVulkanRes(cmdBuffer.begin(beginInfo), "Failed to begin cmdBuffer:");
+  if (auto res = cmdBuffer.begin(beginInfo); res != vk::Result::eSuccess) {
+    device.freeCommandBuffers(commandPool, cmdBuffer);
+    return std::unexpected("Failed to begin cmdBuffer: " + vk::to_string(res));
+  }
 
   action(cmdBuffer);
 
-  CheckVulkanRes(cmdBuffer.end(), "Failed to end cmdbuffer:");
+  if (auto res = cmdBuffer.end(); res != vk::Result::eSuccess) {
+    device.freeCommandBuffers(commandPool, cmdBuffer);
+    return std::unexpected("Failed to end cmdbuffer: " + vk::to_string(res));
+  }
+
+  auto fenceRes = device.createFenceUnique({});
+  if (fenceRes.result != vk::Result::eSuccess) {
+    device.freeCommandBuffers(commandPool, cmdBuffer);
+    return std::unexpected("Failed to create fence: " + vk::to_string(fenceRes.result));
+  }
+  vk::UniqueFence fence = std::move(fenceRes.value);
 
   vk::SubmitInfo submitInfo;
   submitInfo.setCommandBuffers(cmdBuffer);
-  CheckVulkanRes(queue.submit(submitInfo, nullptr), "Failed to submit to queue:");
+  if (auto res = queue.submit(submitInfo, *fence); res != vk::Result::eSuccess) {
+    device.freeCommandBuffers(commandPool, cmdBuffer);
+    return std::unexpected("Failed to submit to queue: " + vk::to_string(res));
+  }
 
-  CheckVulkanRes(queue.waitIdle(), "Failed to wait for queue");
+  if (auto res = device.waitForFences(*fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+      res != vk::Result::eSuccess) {
+    device.freeCommandBuffers(commandPool, cmdBuffer);
+    return std::unexpected("Failed to wait for fence: " + vk::to_string(res));
+  }
 
   device.freeCommandBuffers(commandPool, cmdBuffer);
+  return {};
 }
 
 inline uint32_t FindMemoryType(const vk::PhysicalDevice& physicalDevice, uint32_t typeFilter,
@@ -84,6 +121,8 @@ inline uint32_t FindMemoryType(const vk::PhysicalDevice& physicalDevice, uint32_
 inline std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
 CreateBuffer(const vk::Device& device, const vk::PhysicalDevice& physicalDevice,
              vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+  // TODO: Use VMA (Vulkan Memory Allocator) instead of manual memory allocation
+  // TODO: Create a Buffer abstraction class to handle creation, mapping, and destruction
   vk::BufferCreateInfo bufferInfo({}, size, usage, vk::SharingMode::eExclusive);
   vk::UniqueBuffer buffer =
       CheckVulkanResVal(device.createBufferUnique(bufferInfo), "Failed to create unique buffer: ");
@@ -106,6 +145,8 @@ inline std::pair<vk::UniqueImage, vk::UniqueDeviceMemory>
 CreateImage(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t width,
             uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage,
             vk::MemoryPropertyFlags properties) {
+  // TODO: Use VMA (Vulkan Memory Allocator) instead of manual memory allocation
+  // TODO: Create an Image abstraction class to handle creation, views, and memory
   vk::ImageCreateInfo imageInfo({}, vk::ImageType::e2D, format, vk::Extent3D(width, height, 1), 1,
                                 1, vk::SampleCountFlagBits::e1, tiling, usage,
                                 vk::SharingMode::eExclusive);
@@ -136,6 +177,7 @@ inline void CopyBufferToImage(const vk::CommandBuffer& cmdBuffer, const vk::Buff
 inline void TransitionImageLayout(const vk::CommandBuffer& cmdBuffer, const vk::Image& image,
                                   vk::Format format, vk::ImageLayout oldLayout,
                                   vk::ImageLayout newLayout) {
+  // TODO: Use vk::ImageMemoryBarrier2 for better synchronization (requires Vulkan 1.3 or extension)
   vk::ImageMemoryBarrier barrier;
   barrier.oldLayout = oldLayout;
   barrier.newLayout = newLayout;
@@ -173,6 +215,8 @@ inline void TransitionImageLayout(const vk::CommandBuffer& cmdBuffer, const vk::
 }
 
 
+// TODO: Create a proper Texture class abstraction (e.g., class Texture2D) that manages image, view,
+// sampler, and descriptor info
 struct Texture {
   vk::UniqueImage image;
   vk::UniqueDeviceMemory imageMemory;
@@ -211,15 +255,20 @@ inline std::expected<Texture, std::string> CreateTexture(const vk::Device& devic
                   vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
                   vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-  SingleTimeCommand(device, graphicsQueue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
-    TransitionImageLayout(cmdBuffer, *image, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined,
-                          vk::ImageLayout::eTransferDstOptimal);
-    CopyBufferToImage(cmdBuffer, *stagingBuffer, *image, static_cast<uint32_t>(texWidth),
-                      static_cast<uint32_t>(texHeight));
-    TransitionImageLayout(cmdBuffer, *image, vk::Format::eR8G8B8A8Srgb,
-                          vk::ImageLayout::eTransferDstOptimal,
-                          vk::ImageLayout::eShaderReadOnlyOptimal);
-  });
+  auto cmdRes = SingleTimeCommand(
+      device, graphicsQueue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
+        TransitionImageLayout(cmdBuffer, *image, vk::Format::eR8G8B8A8Srgb,
+                              vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        CopyBufferToImage(cmdBuffer, *stagingBuffer, *image, static_cast<uint32_t>(texWidth),
+                          static_cast<uint32_t>(texHeight));
+        TransitionImageLayout(cmdBuffer, *image, vk::Format::eR8G8B8A8Srgb,
+                              vk::ImageLayout::eTransferDstOptimal,
+                              vk::ImageLayout::eShaderReadOnlyOptimal);
+      });
+
+  if (!cmdRes) {
+    return std::unexpected(cmdRes.error());
+  }
 
   vk::ImageViewCreateInfo viewInfo({}, *image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Srgb,
                                    {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});

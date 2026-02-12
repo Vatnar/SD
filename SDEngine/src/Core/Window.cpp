@@ -4,6 +4,8 @@
 #include "Utils/Utils.hpp"
 
 
+// TODO: Maybe we want a builder pattern instead of window desc.
+// TODO: also this repeats a buinch of shit
 Window::Window(int width, int height, const std::string& title) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
@@ -103,6 +105,11 @@ Window::~Window() {
 std::pair<int, int> Window::GetWindowSize() const {
   int w = 0, h = 0;
   glfwGetWindowSize(mHandle, &w, &h);
+  return {w, h};
+}
+std::pair<int, int> Window::GetFramebufferSize() const {
+  int w{0}, h{0};
+  glfwGetFramebufferSize(mHandle, &w, &h);
   return {w, h};
 }
 
