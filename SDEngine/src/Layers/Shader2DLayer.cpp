@@ -1,27 +1,5 @@
 #include "Layers/Shader2DLayer.hpp"
-vk::VertexInputBindingDescription Shader2DLayer::Vertex::getBindingDescription() {
-  vk::VertexInputBindingDescription bindingDescription{};
-  bindingDescription.binding = 0;
-  bindingDescription.stride = sizeof(Vertex);
-  bindingDescription.inputRate = vk::VertexInputRate::eVertex;
-  return bindingDescription;
-}
-std::array<vk::VertexInputAttributeDescription, 2>
-Shader2DLayer::Vertex::getAttributeDescriptions() {
-  std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions{};
 
-  attributeDescriptions[0].binding = 0;
-  attributeDescriptions[0].location = 0;
-  attributeDescriptions[0].format = vk::Format::eR32G32B32Sfloat;
-  attributeDescriptions[0].offset = offsetof(Vertex, position);
-
-  attributeDescriptions[1].binding = 0;
-  attributeDescriptions[1].location = 1;
-  attributeDescriptions[1].format = vk::Format::eR32G32Sfloat;
-  attributeDescriptions[1].offset = offsetof(Vertex, texCoord);
-
-  return attributeDescriptions;
-}
 
 vk::CommandBuffer Shader2DLayer::GetCommandBuffer(uint32_t currentFrame) {
   return *mCommandBuffers[currentFrame];
@@ -29,8 +7,7 @@ vk::CommandBuffer Shader2DLayer::GetCommandBuffer(uint32_t currentFrame) {
 
 std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
 Shader2DLayer::CreateStagingBuffer(vk::UniqueDevice& device, vk::PhysicalDevice& physicalDevice,
-                                   const std::vector<Shader2DLayer::Vertex>& vertices,
-                                   vk::DeviceSize bufferSize) {
+                                   const std::vector<Vertex>& vertices, vk::DeviceSize bufferSize) {
   // Staging buffer
   auto [stagingBuffer, stagingBufferMemory] = CreateBuffer(
       device.get(), physicalDevice, bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
@@ -167,7 +144,7 @@ void Shader2DLayer::OnAttach() {
 
     for (std::size_t j{0}; j < textureCount; j++) {
       textureInfos[j] = vk::DescriptorImageInfo({}, *mTextures[j].imageView,
-                                          vk::ImageLayout::eShaderReadOnlyOptimal);
+                                                vk::ImageLayout::eShaderReadOnlyOptimal);
 
       auto index = j + 2;
       descriptorWrites[index].dstSet = mDescriptorSets[i];
@@ -435,7 +412,8 @@ bool Shader2DLayer::CreateGraphicsPipeline() {
   vk::PipelineMultisampleStateCreateInfo multisampling({}, vk::SampleCountFlagBits::e1, VK_FALSE);
 
   // NOTE: We dont need blending for this layer
-  // TODO: Check if eDontCare is appropriate for store ops if you don't need the attachment content later
+  // TODO: Check if eDontCare is appropriate for store ops if you don't need the attachment content
+  // later
   vk::PipelineColorBlendAttachmentState colorBlendAttachment(VK_FALSE);
   colorBlendAttachment.colorWriteMask =
       vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |

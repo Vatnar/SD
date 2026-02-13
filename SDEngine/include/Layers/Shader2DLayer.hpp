@@ -1,4 +1,5 @@
 #pragma once
+#include <Renderer/Vertex.hpp>
 #include <VLA/Matrix.hpp>
 
 #include "Core/Events/InputEvent.hpp"
@@ -18,14 +19,7 @@ public:
   };
 
   // TODO: Generalize textures, loading and vertices.
-  struct Vertex {
-    float position[3];
-    float texCoord[2];
 
-    static vk::VertexInputBindingDescription getBindingDescription();
-
-    static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions();
-  };
 
   explicit Shader2DLayer(VulkanContext& vulkanCtx,
                          const std::vector<std::string>& texturePaths = {}) :
@@ -36,8 +30,7 @@ public:
 
   std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
   CreateStagingBuffer(vk::UniqueDevice& device, vk::PhysicalDevice& physicalDevice,
-                      const std::vector<Shader2DLayer::Vertex>& vertices,
-                      vk::DeviceSize bufferSize);
+                      const std::vector<Vertex>& vertices, vk::DeviceSize bufferSize);
 
   void OnAttach() override;
 

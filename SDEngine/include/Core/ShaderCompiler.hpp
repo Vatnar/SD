@@ -61,7 +61,8 @@ public:
     args.emplace_back(L"-Qembed_debug");
 #endif
 
-    std::vector<LPCWSTR> pszArgs(args.size());
+    std::vector<LPCWSTR> pszArgs;
+    pszArgs.reserve(args.size());
     for (const auto& arg : args)
       pszArgs.push_back(arg.c_str());
 

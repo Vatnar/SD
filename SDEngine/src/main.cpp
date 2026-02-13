@@ -153,6 +153,7 @@ int main() {
         logger->debug(std::to_string(static_cast<int>(imageIndexRes.result)));
       };
     }
+    // TODO: We shouldnt really be calling vulkan at all here, we should abstract this
     uint32_t imageIndex = imageIndexRes.value;
 
     auto& [renderComplete] = vulkanCtx.GetSwapchainSync(imageIndex);

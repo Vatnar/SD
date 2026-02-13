@@ -13,6 +13,7 @@ add_executable(SDEngine src/main.cpp src/Core/VulkanContext.cpp src/Core/Window.
         src/Layers/ImGuiLayer.cpp
         src/Layers/TestLayer.cpp
         src/Layers/Shader2DLayer.cpp
+        src/Renderer/Vertex.cpp
 )
 
 
