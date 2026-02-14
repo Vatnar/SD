@@ -4,3 +4,6 @@
 #define VULKAN_HPP_USE_STD_EXPECTED 1
 #define VULKAN_HPP_NO_EXCEPTIONS 1
 #include <vulkan/vulkan.hpp>
+
+// TODO: NAMESPACE PACKAGED?
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Core/VulkanConfig.hpp"
 #include <memory>
+
+#include "../../Vulkan/VulkanConfig.hpp"
 
 // TODO: This is a simple shader abstraction. A more complete system would handle
 // shader reflection to automatically determine descriptor set layouts and vertex input descriptions.

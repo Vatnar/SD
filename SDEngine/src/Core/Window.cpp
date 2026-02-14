@@ -1,6 +1,10 @@
 #include "Core/Window.hpp"
 
-#include "Core/VulkanConfig.hpp"
+#include "Core/Events/Event.hpp"
+#include "Core/Events/window/KeyboardEvents.hpp"
+#include "Core/Events/window/MouseEvents.hpp"
+#include "Core/Events/window/WindowEvents.hpp"
+#include "Core/Vulkan/VulkanConfig.hpp"
 #include "Utils/Utils.hpp"
 
 
@@ -28,6 +32,8 @@ Window::Window(int width, int height, const std::string& title) {
   glfwSetScrollCallback(mHandle, DispatchScroll);
   glfwSetCursorPosCallback(mHandle, DispatchCursor);
   glfwSetMouseButtonCallback(mHandle, DispatchMouseButton);
+  glfwSetWindowCloseCallback(mHandle, DispatchClose);
+  glfwSetWindowRefreshCallback(mHandle, DispatchRefresh);
 }
 
 Window::Window(const WindowDesc& desc) {
@@ -43,40 +49,41 @@ Window::Window(const WindowDesc& desc) {
   }
   glfwSetWindowUserPointer(mHandle, this);
 
-  ResizeCallback DefaultResizeCallback = [this](int, int) {
+  ResizeCallback DefaultResizeCallback = [this](int width, int height) {
+    mWindowEventManager.PushEvent<WindowResizeEvent>(width, height);
   };
 
   KeyCallback DefaultKeyCallback = [this](int key, int scancode, int action, int mods) {
     switch (action) {
       case GLFW_PRESS:
-        eventManager.push_back(std::make_unique<KeyPressedEvent>(key, scancode, mods, false));
+        mWindowEventManager.PushEvent<KeyPressedEvent>(key, scancode, mods, false);
         break;
       case GLFW_REPEAT:
-        eventManager.push_back(std::make_unique<KeyPressedEvent>(key, scancode, mods, true));
+        mWindowEventManager.PushEvent<KeyPressedEvent>(key, scancode, mods, true);
         break;
       case GLFW_RELEASE:
-        eventManager.push_back(std::make_unique<KeyReleasedEvent>(key, scancode, mods));
+        mWindowEventManager.PushEvent<KeyReleasedEvent>(key, scancode, mods);
         break;
       default:
         break;
     }
   };
   ScrollCallback DefaultScrollCallback = [this](double xOffset, double yOffset) {
-    eventManager.push_back(std::make_unique<ScrollEvent>(xOffset, yOffset));
+    mWindowEventManager.PushEvent<MouseScrolledEvent>(xOffset, yOffset);
   };
   CursorCallback DefaultCursorCallback = [this](double xPos, double yPos) {
-    eventManager.push_back(std::make_unique<CursorEvent>(xPos, yPos));
+    mWindowEventManager.PushEvent<MouseMovedEvent>(xPos, yPos);
   };
   MouseButtonCallback DefaultMouseCallback = [this](int button, int action, int mods) {
     switch (action) {
       case GLFW_PRESS:
-        eventManager.push_back(std::make_unique<MousePressedEvent>(button, mods, false));
+        mWindowEventManager.PushEvent<MousePressedEvent>(button, mods, false);
         break;
       case GLFW_REPEAT:
-        eventManager.push_back(std::make_unique<MousePressedEvent>(button, mods, true));
+        mWindowEventManager.PushEvent<MousePressedEvent>(button, mods, true);
         break;
       case GLFW_RELEASE:
-        eventManager.push_back(std::make_unique<MouseReleasedEvent>(button, mods));
+        mWindowEventManager.PushEvent<MouseReleasedEvent>(button, mods);
         break;
       default:
         break;
@@ -88,6 +95,7 @@ Window::Window(const WindowDesc& desc) {
   mScrollCallback = desc.scrollCallback ? desc.scrollCallback : DefaultScrollCallback;
   mCursorCallback = desc.cursorCallback ? desc.cursorCallback : DefaultCursorCallback;
   mMouseButtonCallback = desc.mouseButtonCallback ? desc.mouseButtonCallback : DefaultMouseCallback;
+  mRefreshCallback = desc.refreshCallback ? desc.refreshCallback : []() {};
 
   glfwSetWindowSizeCallback(mHandle, DispatchResize);
   glfwSetFramebufferSizeCallback(mHandle, DispatchResize);
@@ -95,6 +103,8 @@ Window::Window(const WindowDesc& desc) {
   glfwSetScrollCallback(mHandle, DispatchScroll);
   glfwSetCursorPosCallback(mHandle, DispatchCursor);
   glfwSetMouseButtonCallback(mHandle, DispatchMouseButton);
+  glfwSetWindowCloseCallback(mHandle, DispatchClose);
+  glfwSetWindowRefreshCallback(mHandle, DispatchRefresh);
 }
 
 Window::~Window() {
@@ -130,6 +140,12 @@ void Window::DispatchResize(GLFWwindow* window, int width, int height) {
       self && self->mResizeCallback)
     self->mResizeCallback(width, height);
 }
+void Window::DispatchClose(GLFWwindow* window) {
+  if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window))) {
+    self->mWindowEventManager.PushEvent<WindowCloseEvent>();
+    glfwSetWindowShouldClose(window, GLFW_FALSE);
+  }
+}
 void Window::DispatchKey(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
       self && self->mKeyCallback)
@@ -147,6 +163,55 @@ void Window::DispatchCursor(GLFWwindow* window, double xPos, double yPos) {
 }
 void Window::DispatchMouseButton(GLFWwindow* window, int button, int action, int mods) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-      self && self->mCursorCallback)
+      self && self->mMouseButtonCallback)
     self->mMouseButtonCallback(button, action, mods);
+}
+void Window::DispatchRefresh(GLFWwindow* window) {
+  if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
+      self && self->mRefreshCallback)
+    self->mRefreshCallback();
+}
+WindowBuilder& WindowBuilder::SetTitle(const char* title) {
+  mDesc.title = title;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetSize(const int width, const int height) {
+  mDesc.width = width;
+  mDesc.height = height;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetWidth(const int width) {
+  mDesc.width = width;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetHeight(const int height) {
+  mDesc.height = height;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetResizeCallback(const ResizeCallback& callback) {
+  mDesc.resizeCallback = callback;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetKeyCallback(const KeyCallback& callback) {
+  mDesc.keyCallback = callback;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetScrollCallback(const ScrollCallback& callback) {
+  mDesc.scrollCallback = callback;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetCursorCallback(const CursorCallback& callback) {
+  mDesc.cursorCallback = callback;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetMouseButtonCallback(const MouseButtonCallback& callback) {
+  mDesc.mouseButtonCallback = callback;
+  return *this;
+}
+WindowBuilder& WindowBuilder::SetRefreshCallback(const RefreshCallback& callback) {
+  mDesc.refreshCallback = callback;
+  return *this;
+}
+std::unique_ptr<Window> WindowBuilder::Build() const {
+  return std::make_unique<Window>(mDesc);
 }

@@ -4,37 +4,31 @@
 #include <imgui.h>
 
 #include "Core/Layer.hpp"
-#include "Core/VulkanContext.hpp"
+#include "Core/Vulkan/VulkanContext.hpp"
 
 class ImGuiLayer : public Layer {
 public:
-  ImGuiLayer(VulkanContext& vulkanCtx, Window& window);
+  ImGuiLayer(Scene& scene, VulkanContext& vulkanCtx, Window& window);
   ~ImGuiLayer() override;
 
   void OnAttach() override;
   void OnDetach() override;
 
   void Begin();
-  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) override;
   void End();
 
-  [[nodiscard]] vk::CommandBuffer GetCommandBuffer(uint32_t currentFrame) override {
-    return *mCommandBuffers[currentFrame];
-  }
+  void OnUpdate(float dt) override;
+
+  void OnRender(vk::CommandBuffer& cmd) override;
 
   void OnSwapchainRecreated() override;
 
 private:
-  void CreateSwapchainResources();
-  void DestroySwapchainResources();
-
+  void CreateCompatibleRenderPass();
 
   VulkanContext& mVulkanCtx;
   Window& mWindow;
 
   vk::UniqueDescriptorPool mDescriptorPool;
-  vk::UniqueRenderPass mRenderPass;
-  vk::UniqueCommandPool mCommandPool;
-  std::vector<vk::UniqueCommandBuffer> mCommandBuffers;
-  std::vector<vk::UniqueFramebuffer> mFramebuffers;
+  vk::UniqueRenderPass mCompatibleRenderPass;
 };

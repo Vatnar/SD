@@ -17,3 +17,4 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory(vendor)
 add_subdirectory(SDEngine)
+add_subdirectory(testing)

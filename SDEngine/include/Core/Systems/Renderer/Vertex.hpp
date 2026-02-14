@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/VulkanConfig.hpp"
+#include "../../Vulkan/VulkanConfig.hpp"
 
 struct Vertex {
   float position[3];

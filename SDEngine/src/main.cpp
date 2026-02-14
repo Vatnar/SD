@@ -12,18 +12,17 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 // STD
 #include <chrono>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <memory>
 #include <thread>
 
 // SD
-#include "Core/EventManager.hpp"
+#include "../include/Core/Events/EventManager.hpp"
+#include "../include/Core/Vulkan/VulkanContext.hpp"
 #include "Core/GlfwContext.hpp"
 #include "Core/LayerList.hpp"
 #include "Core/Logging.hpp"
 #include "Core/ShaderCompiler.hpp"
-#include "Core/VulkanContext.hpp"
 #include "Core/Window.hpp"
 #include "Layers/DebugInfoLayer.hpp"
 #include "Layers/ImGuiLayer.hpp"
@@ -41,14 +40,14 @@ VkPhysicalDevice vulkanPhysicalDevice = nullptr;
 
 
 int main() {
-  // NOTE: Init logging
-
+  // NOTE: Login INIT
   init_logging();
   auto logger = spdlog::get("engine");
   if (!logger) {
     std::cout << "Failed to get logger \"engine\"" << '\n';
   }
 
+  // NOTE: GLFW, WINDOW, and VULKAN INIT
   GlfwContext glfwCtx;
   Window window{
       {"SDEngine - Vulkan", 800, 600}
@@ -56,8 +55,10 @@ int main() {
 
 
   VulkanContext vulkanCtx{glfwCtx, window, MAX_FRAMES_IN_FLIGHT};
+  auto& vulkanDevice = vulkanCtx.GetVulkanDevice();
 
-  // NOTE: Create and attach layers
+
+  // NOTE: Layerlist INIT
   LayerList layers{};
   // layers.CreateAndAttachTop<TestLayer>(vulkanCtx);
   std::vector<std::string> textures = {"assets/textures/CreateNoteInteraction.png",
@@ -67,13 +68,13 @@ int main() {
   layers.CreateAndAttachTop<PerformanceLayer>();
   auto performanceLayer = layers.GetRef<PerformanceLayer>();
 
+  layers.CreateAndAttachTop<DebugInfoLayer>();
+
   layers.CreateAndAttachTop<ImGuiLayer>(vulkanCtx, window);
   auto imguiLayer = layers.GetRef<ImGuiLayer>();
 
-  layers.CreateAndAttachTop<DebugInfoLayer>();
 
-
-  // NOTE: EVENTS & callbacks
+  // NOTE: EVENTS & callbacks INIT
 
   auto& inputEventManager = window.GetEventManager();
   EngineEventManager engineEventManager;
@@ -81,49 +82,22 @@ int main() {
   window.SetResizeCallback(
       [&](int w, int h) { engineEventManager.PushEvent<WindowResizeEvent>(w, h); });
 
-  // NOTE: Create sync objects
-
+  // NOTE: Rendering logic
+  uint64_t currentFrame = 0;
   uint64_t frameCounter = 0;
-
-  auto& vulkanDevice = vulkanCtx.GetVulkanDevice();
-
-  // NOTE: MAIN LOOP
-
-  bool isRunning = true;
-  [[maybe_unused]] uint32_t frameCount = 0;
-
-  uint32_t currentFrame = 0;
-
-  auto lastTime = std::chrono::high_resolution_clock::now();
-
-  while (isRunning) {
-    auto now = std::chrono::high_resolution_clock::now();
-    float dt = std::chrono::duration<float>(now - lastTime).count();
-    lastTime = now;
-
-    isRunning = !window.ShouldClose();
-
-    // NOTE: Handle events, input etc
-    glfwPollEvents();
-
-    // NOTE: Handle engine events
-
+  auto renderFrame = [&]() {
+    // NOTE: Engine Events
+    // resize if needed
     if (engineEventManager.HasResizeEvent()) {
       auto [width, height]{window.GetFramebufferSize()};
       if (width == 0 || height == 0)
-        continue;
+        return;
 
       vulkanCtx.RecreateSwapchain(layers);
       vulkanCtx.RebuildPerImageSync();
       engineEventManager.ClearType<WindowResizeEvent>();
       engineEventManager.ClearType<SwapchainOutOfDateEvent>();
     }
-
-
-    // NOTE: Handle input events
-    std::ranges::for_each(inputEventManager,
-                          [&](const auto& event) { layers.HandleEvent(*event); });
-    inputEventManager.clear();
 
     auto& [imageAcquired, inFlight] = vulkanCtx.GetFrameSync(currentFrame);
 
@@ -134,16 +108,13 @@ int main() {
       Engine::Abort("Failed to wait for fences");
     }
 
-
     // NOTE: Get vulkan images
-
     auto imageIndexRes = vulkanCtx.GetVulkanImages(engineEventManager, imageAcquired);
     switch (imageIndexRes.result) {
       using enum vk::Result;
       case eSuboptimalKHR:
       case eErrorOutOfDateKHR: {
-        continue;
-        break;
+        return;
       }
       case eSuccess: {
         break;
@@ -153,7 +124,6 @@ int main() {
         logger->debug(std::to_string(static_cast<int>(imageIndexRes.result)));
       };
     }
-    // TODO: We shouldnt really be calling vulkan at all here, we should abstract this
     uint32_t imageIndex = imageIndexRes.value;
 
     auto& [renderComplete] = vulkanCtx.GetSwapchainSync(imageIndex);
@@ -166,7 +136,11 @@ int main() {
     // NOTE: Required to declare new frame for imgui
     imguiLayer->Begin();
 
-    layers.Update(dt);
+    // We use a fixed dt for refresh callback or pass it in? 
+    // For now, let's just use 0 or last dt if we want animations to continue.
+    // However, refresh is usually for static content during drag.
+    // layers.Update(dt); // dt is from outer scope
+
     layers.Render();
     layers.RecordCommands(imageIndex, currentFrame);
 
@@ -187,14 +161,41 @@ int main() {
     submitInfo.setCommandBuffers(cmdBuffers);
     submitInfo.setSignalSemaphores(signalSemaphores);
 
-    for (const auto& cb : cmdBuffers) {
-      assert(cb);
-    }
     CheckVulkanRes(vulkanCtx.GetGraphicsQueue().submit(submitInfo, *inFlight),
                    "Failed to submit to graphics queue");
 
+
     // NOTE: Present
     vulkanCtx.PresentImage(engineEventManager, imageIndex);
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    frameCounter++;
+  };
+
+  window.SetRefreshCallback(renderFrame);
+
+  // NOTE: MAIN LOOP
+
+  bool isRunning = true;
+
+  auto lastTime = std::chrono::high_resolution_clock::now();
+
+  while (isRunning) {
+    auto now = std::chrono::high_resolution_clock::now();
+    float dt = std::chrono::duration<float>(now - lastTime).count();
+    lastTime = now;
+
+    isRunning = !window.ShouldClose();
+
+    glfwPollEvents();
+
+    // NOTE: Input Events
+    std::ranges::for_each(inputEventManager,
+                          [&](const auto& event) { layers.HandleEvent(*event); });
+    inputEventManager.clear();
+
+    layers.Update(dt);
+    renderFrame();
 
 
     // NOTE: Performance stuff
@@ -208,12 +209,13 @@ int main() {
       performanceLayer->EndSleep();
     }
 
-    // NOTE: Frame increment
+
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     frameCounter++;
   }
 
 
+  // cleanup
   CheckVulkanRes(vulkanDevice->waitIdle(), "Failed to wait for vulkandevice idle");
 
 

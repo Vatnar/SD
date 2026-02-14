@@ -4,13 +4,15 @@
 #include <string>
 #include <vector>
 
-#include "Core/Events/InputEvent.hpp"
 #include "Core/Layer.hpp"
+#include "Core/Events/window/KeyboardEvents.hpp"
+#include "Core/Events/window/MouseEvents.hpp"
 
-// TODO: Consider making this a more generic "DebugUI" layer that can display various debug information, not just input
+// TODO: Consider making this a more generic "DebugUI" layer that can display various debug
+// information, not just input
 class DebugInfoLayer : public Layer {
 public:
-  DebugInfoLayer() = default;
+  DebugInfoLayer(Scene& scene) : Layer(scene) {};
 
   void OnAttach() override {}
 
@@ -18,7 +20,7 @@ public:
 
   void OnUpdate(float dt) override {}
 
-  void OnRender() override {
+  void OnRender(vk::CommandBuffer& cmd) override {
     ImGui::Begin("Debug Info");
 
     ImGui::Text("Mouse Position: (%.1f, %.1f)", mMouseX, mMouseY);
@@ -48,38 +50,38 @@ public:
     ImGui::End();
   }
 
-  void OnEvent(InputEvent& e) override {
-    switch (e.category()) {
-      case InputEventCategory::CursorPos: {
-        auto& cursorEvent = dynamic_cast<CursorEvent&>(e);
+  void OnEvent(Event& e) override {
+    switch (e.GetEventType()) {
+      case EventType::MouseMoved: {
+        auto& cursorEvent = dynamic_cast<MouseMovedEvent&>(e);
         mMouseX = cursorEvent.xPos;
         mMouseY = cursorEvent.yPos;
         break;
       }
-      case InputEventCategory::MouseScroll: {
-        auto& scrollEvent = dynamic_cast<ScrollEvent&>(e);
+      case EventType::MouseScrolled: {
+        auto& scrollEvent = dynamic_cast<MouseScrolledEvent&>(e);
         mScrollX += scrollEvent.xOffset;
         mScrollY += scrollEvent.yOffset;
         break;
       }
-      case InputEventCategory::KeyPressed: {
+      case EventType::KeyPressed: {
         auto& keyEvent = dynamic_cast<KeyPressedEvent&>(e);
         if (!keyEvent.repeat) {
           mPressedKeys.insert(keyEvent.key);
         }
         break;
       }
-      case InputEventCategory::KeyReleased: {
+      case EventType::KeyReleased: {
         auto& keyEvent = dynamic_cast<KeyReleasedEvent&>(e);
         mPressedKeys.erase(keyEvent.key);
         break;
       }
-      case InputEventCategory::MousePressed: {
+      case EventType::MousePressed: {
         auto& mouseEvent = dynamic_cast<MousePressedEvent&>(e);
         mPressedMouseButtons.insert(mouseEvent.button);
         break;
       }
-      case InputEventCategory::MouseReleased: {
+      case EventType::MouseReleased: {
         auto& mouseEvent = dynamic_cast<MouseReleasedEvent&>(e);
         mPressedMouseButtons.erase(mouseEvent.button);
         break;

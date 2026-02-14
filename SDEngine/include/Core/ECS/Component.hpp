@@ -1,0 +1,72 @@
+#pragma once
+
+#include <cstddef>
+#include <tuple>
+
+template<typename... Ts>
+struct ComponentGroup {};
+
+template<typename T>
+struct ComponentTraits;
+
+namespace detail {
+/**
+ * @internal Implementation detail
+ * @brief Generates component ids, used internally by ComponentTraits
+ */
+struct ComponentIdGenerator {
+  ComponentIdGenerator() = delete;
+  ~ComponentIdGenerator() = delete;
+  ComponentIdGenerator(const ComponentIdGenerator&) = delete;
+  ComponentIdGenerator& operator=(const ComponentIdGenerator&) = delete;
+
+private:
+  static inline size_t counter = 0;
+  static size_t Next() { return counter++; }
+  template<typename T>
+  friend struct ::ComponentTraits;
+};
+
+} // namespace detail
+/**
+ * @brief Traits for a component, Name, and Id
+ * @details Use @ref REGISTER_SD_COMPONENT or @ref REGISTER_COMPONENT macro to properly define the
+ * correct traits
+ * @tparam T Pure data struct
+ */
+template<typename T>
+struct ComponentTraits {
+  static constexpr bool IsRegistered = false;
+};
+
+/**
+ * @brief Registers a SD component for use with ECS
+ * @details Needs to be run to use a component with ECS
+ * @param Type struct type
+ */
+#define REGISTER_SD_COMPONENT(Type)                                       \
+  template<>                                                              \
+  struct ComponentTraits<Type> {                                          \
+    static constexpr bool IsRegistered = true;                            \
+    static constexpr const char* Name = "SD_" #Type;                      \
+    static inline const size_t Id = detail::ComponentIdGenerator::Next(); \
+  };
+
+/**
+ * @brief Registers a component for use with ECS
+ * @details Needs to be run to use a component with ECS
+ * @param Type struct type
+ */
+#define REGISTER_COMPONENT(Type)                                          \
+  template<>                                                              \
+  struct ComponentTraits<Type> {                                          \
+    static constexpr bool IsRegistered = true;                            \
+    static constexpr const char* Name = #Type;                            \
+    static inline const size_t Id = detail::ComponentIdGenerator::Next(); \
+  };
+
+struct ComponentDebugInfo {
+  size_t id;
+  const char* name;
+  void* data;
+};

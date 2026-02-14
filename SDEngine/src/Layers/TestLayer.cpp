@@ -1,4 +1,7 @@
 #include "Layers/TestLayer.hpp"
+#include "Core/Events/window/KeyboardEvents.hpp"
+#include "Core/Events/window/MouseEvents.hpp"
+
 vk::VertexInputBindingDescription TestLayer::Vertex::getBindingDescription() {
   vk::VertexInputBindingDescription bindingDescription{};
   bindingDescription.binding = 0;
@@ -22,20 +25,15 @@ std::array<vk::VertexInputAttributeDescription, 2> TestLayer::Vertex::getAttribu
   return attributeDescriptions;
 }
 
-vk::CommandBuffer TestLayer::GetCommandBuffer(uint32_t currentFrame) {
-  return *mCommandBuffers[currentFrame];
-}
-
 void TestLayer::OnAttach() {
   auto& device = mVulkanCtx.GetVulkanDevice();
   auto& physicalDevice = mVulkanCtx.GetPhysicalDevice();
-  auto commandPool = mVulkanCtx.GetCommandPool();
+  auto commandPool = mWindow.GetCommandPool();
   auto queue = mVulkanCtx.GetGraphicsQueue();
 
-  CreateRenderPass();
+  CreateCompatibleRenderPass();
   CreateDescriptorSetLayout();
   CreateGraphicsPipeline();
-  CreateCommandBuffers();
 
   auto textureResult = CreateTexture(device.get(), physicalDevice, queue, commandPool,
                                      "assets/textures/example.jpg");
@@ -83,7 +81,7 @@ void TestLayer::OnAttach() {
       Engine::Abort(res.error());
   }
 
-  for (size_t i = 0; i < mVulkanCtx.GetMaxFramesInFlight(); i++) {
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vk::DeviceSize vpBufferSize = sizeof(ViewProjection);
     auto [ub, ubMem] = CreateBuffer(
         device.get(), physicalDevice, vpBufferSize, vk::BufferUsageFlagBits::eUniformBuffer,
@@ -97,19 +95,19 @@ void TestLayer::OnAttach() {
 
   vk::DescriptorPoolSize poolSizes[] = {
       {vk::DescriptorType::eUniformBuffer,
-       static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight())                                    },
-      { vk::DescriptorType::eSampledImage, static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight())},
-      {      vk::DescriptorType::eSampler, static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight())}
+       static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)                                    },
+      { vk::DescriptorType::eSampledImage, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
+      {      vk::DescriptorType::eSampler, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)}
   };
 
   vk::DescriptorPoolCreateInfo poolInfo(
-      {}, static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight()), 3, poolSizes);
+      {}, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT), 3, poolSizes);
   mDescriptorPool = CheckVulkanResVal(device->createDescriptorPoolUnique(poolInfo),
                                       "Failed to create unique descriptor pool");
 
-  std::vector<vk::DescriptorSetLayout> layouts(mVulkanCtx.GetMaxFramesInFlight(),
+  std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT,
                                                *mDescriptorSetLayout);
-  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, mVulkanCtx.GetMaxFramesInFlight(),
+  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, MAX_FRAMES_IN_FLIGHT,
                                           layouts.data());
   mDescriptorSets = CheckVulkanResVal(device->allocateDescriptorSets(allocInfo),
                                       "Failed to allocate descriptor sets: ");
@@ -122,7 +120,7 @@ void TestLayer::OnAttach() {
   mSampler = CheckVulkanResVal(device->createSamplerUnique(samplerCreateInfo),
                                "Failed to create unique sampler");
 
-  for (size_t i = 0; i < mVulkanCtx.GetMaxFramesInFlight(); i++) {
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vk::DescriptorBufferInfo bufferInfo(*mUniformBuffers[i], 0, sizeof(ViewProjection));
     vk::DescriptorImageInfo textureInfo({}, *mTexture.imageView,
                                         vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -153,8 +151,6 @@ void TestLayer::OnAttach() {
 
     device->updateDescriptorSets(descriptorWrites, nullptr);
   }
-
-  CreateFramebuffers();
 }
 void TestLayer::OnDetach() {
   auto& device = mVulkanCtx.GetVulkanDevice();
@@ -166,7 +162,7 @@ void TestLayer::UpdateUniformBuffer(uint32_t currentImage) const {
   std::ranges::fill(vp.model, 0.0f);
   std::ranges::fill(vp.view, 0.0f);
 
-  const auto& extent = mVulkanCtx.GetSwapchainExtent();
+  const auto& extent = mWindow.GetSwapchainExtent();
   const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
   float scaleX = 1.0f;
   float scaleY = 1.0f;
@@ -200,62 +196,47 @@ void TestLayer::UpdateUniformBuffer(uint32_t currentImage) const {
 
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
-void TestLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
-  UpdateUniformBuffer(currentFrame);
+void TestLayer::OnRender(vk::CommandBuffer& cmd) {
+  // Hack: calculate frame index
+  static uint32_t frameIndex = 0;
+  frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+  UpdateUniformBuffer(frameIndex);
 
-  auto& cmdBuffer = mCommandBuffers[currentFrame];
-  CheckVulkanRes(cmdBuffer->reset(), "Failed to reset commandbuffer");
 
-  constexpr vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  CheckVulkanRes(cmdBuffer->begin(beginInfo), "Failed to begin commandbuffer");
-
-  std::array<vk::ClearValue, 1> clearValues{};
-  clearValues[0].color = vk::ClearColorValue{mClearColor};
-
-  vk::RenderPassBeginInfo renderPassInfo(*mRenderPass, *mFramebuffers[imageIndex],
-                                         {
-                                             {0, 0},
-                                             mVulkanCtx.GetSwapchainExtent()
-  },
-                                         clearValues);
-
-  cmdBuffer->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-  cmdBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *mPipeline);
+  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *mPipeline);
   vk::DeviceSize offsets[] = {0};
-  cmdBuffer->bindVertexBuffers(0, 1, &*mVertexBuffer, offsets);
-  cmdBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *mPipelineLayout, 0,
-                                mDescriptorSets[currentFrame], nullptr);
-  cmdBuffer->draw(6, 1, 0, 0);
-  cmdBuffer->endRenderPass();
-  CheckVulkanRes(cmdBuffer->end(), "Failed to end commandbuffer");
+  cmd.bindVertexBuffers(0, 1, &*mVertexBuffer, offsets);
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *mPipelineLayout, 0,
+                         mDescriptorSets[frameIndex], nullptr);
+  cmd.draw(6, 1, 0, 0);
 }
-void TestLayer::OnEvent(InputEvent& e) {
-  switch (e.category()) {
-    case InputEventCategory::KeyReleased: {
+void TestLayer::OnEvent(Event& e) {
+  switch (e.GetEventType()) {
+    case EventType::KeyReleased: {
       if (const auto key = dynamic_cast<KeyReleasedEvent&>(e); GLFW_KEY_SPACE == key.key) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.Handled = true;
+        e.isHandled = true;
       }
     } break;
-    case InputEventCategory::MouseReleased: {
+    case EventType::MouseReleased: {
       if (const auto button = dynamic_cast<MouseReleasedEvent&>(e);
           GLFW_MOUSE_BUTTON_LEFT == button.button) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.Handled = true;
+        e.isHandled = true;
       }
     } break;
-    case InputEventCategory::MousePressed: {
+    case EventType::MousePressed: {
       if (const auto button = dynamic_cast<MousePressedEvent&>(e);
           GLFW_MOUSE_BUTTON_LEFT == button.button) {
         mClearColor = std::array{0.0f, 1.0f, 0.0f, 1.0f};
-        e.Handled = true;
+        e.isHandled = true;
       }
     } break;
-    case InputEventCategory::KeyPressed: {
+    case EventType::KeyPressed: {
       if (const auto key = dynamic_cast<KeyPressedEvent&>(e);
           GLFW_KEY_SPACE == key.key && false == key.repeat) {
         mClearColor = std::array{1.0f, 0.0f, 0.0f, 1.0f};
-        e.Handled = true;
+        e.isHandled = true;
       }
     } break;
     default:
@@ -264,29 +245,22 @@ void TestLayer::OnEvent(InputEvent& e) {
 }
 void TestLayer::OnSwapchainRecreated() {
   CheckVulkanRes(mVulkanCtx.GetVulkanDevice()->waitIdle(), "Failed to wait for vulkan device");
-  mFramebuffers.clear();
-  CreateFramebuffers();
+  CreateCompatibleRenderPass();
   CreateGraphicsPipeline();
 }
-void TestLayer::CreateRenderPass() {
-  // TODO: Use dynamic rendering (VK_KHR_dynamic_rendering) to simplify render pass management
+void TestLayer::CreateCompatibleRenderPass() {
   vk::AttachmentDescription colorAttachment(
       {}, mVulkanCtx.GetSurfaceFormat().format, vk::SampleCountFlagBits::e1,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
-      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eColorAttachmentOptimal);
+      vk::AttachmentLoadOp::eLoad, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
+      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eColorAttachmentOptimal,
+      vk::ImageLayout::ePresentSrcKHR);
 
   vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
 
   vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, {}, colorAttachmentRef);
 
-  vk::SubpassDependency dependency(VK_SUBPASS_EXTERNAL, 0,
-                                   vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                   vk::PipelineStageFlagBits::eColorAttachmentOutput, {},
-                                   vk::AccessFlagBits::eColorAttachmentWrite);
-
-  vk::RenderPassCreateInfo renderPassInfo({}, colorAttachment, subpass, dependency);
-  mRenderPass =
+  vk::RenderPassCreateInfo renderPassInfo({}, colorAttachment, subpass);
+  mCompatibleRenderPass =
       CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(renderPassInfo),
                         "Failed to create unique render pass");
 }
@@ -342,12 +316,11 @@ void TestLayer::CreateGraphicsPipeline() {
   vk::PipelineInputAssemblyStateCreateInfo inputAssembly({}, vk::PrimitiveTopology::eTriangleList,
                                                          VK_FALSE);
 
-  vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(mVulkanCtx.GetSwapchainExtent().width),
-                        static_cast<float>(mVulkanCtx.GetSwapchainExtent().height), 0.0f, 1.0f);
-
-  // TODO: Should this be dynamic? STUDY: Dynamic vs hard-coded scissor extent
-  vk::Rect2D scissor({0, 0}, mVulkanCtx.GetSwapchainExtent());
-  vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
+  // Dynamic viewport/scissor
+  vk::PipelineViewportStateCreateInfo viewportState({}, 1, nullptr, 1, nullptr);
+  std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport,
+                                                 vk::DynamicState::eScissor};
+  vk::PipelineDynamicStateCreateInfo dynamicState({}, dynamicStates);
 
   // draw solid triangles,
   // TODO: Discard backfacing triangles when not in debug mode (eBack + ECW)
@@ -374,7 +347,7 @@ void TestLayer::CreateGraphicsPipeline() {
 
   vk::GraphicsPipelineCreateInfo pipelineInfo(
       {}, shaderStages, &vertexInputInfo, &inputAssembly, nullptr, &viewportState, &rasterizer,
-      &multisampling, nullptr, &colorBlending, nullptr, *mPipelineLayout, *mRenderPass, 0);
+      &multisampling, nullptr, &colorBlending, &dynamicState, *mPipelineLayout, *mCompatibleRenderPass, 0);
 
   auto result = device->createGraphicsPipelineUnique(nullptr, pipelineInfo);
   if (result.result != vk::Result::eSuccess) {
@@ -382,26 +355,4 @@ void TestLayer::CreateGraphicsPipeline() {
     Engine::Abort("Failed to create graphics pipeline");
   }
   mPipeline = std::move(result.value);
-}
-void TestLayer::CreateFramebuffers() {
-  mFramebuffers.clear();
-  const auto& imageViews = mVulkanCtx.GetSwapchainImageViews();
-  const auto& extent = mVulkanCtx.GetSwapchainExtent();
-
-  for (const auto& view : imageViews) {
-    vk::ImageView attachments[] = {*view};
-    vk::FramebufferCreateInfo framebufferInfo({}, *mRenderPass, attachments, extent.width,
-                                              extent.height, 1);
-    mFramebuffers.push_back(
-        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createFramebufferUnique(framebufferInfo),
-                          "Failed to create unique framebuffer: "));
-  }
-}
-void TestLayer::CreateCommandBuffers() {
-  vk::CommandBufferAllocateInfo allocInfo(mVulkanCtx.GetCommandPool(),
-                                          vk::CommandBufferLevel::ePrimary,
-                                          mVulkanCtx.GetMaxFramesInFlight());
-  mCommandBuffers =
-      CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo),
-                        "Failed to allocate unique commandbuffers");
 }

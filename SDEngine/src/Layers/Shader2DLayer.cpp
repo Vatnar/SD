@@ -1,53 +1,90 @@
 #include "Layers/Shader2DLayer.hpp"
+#include "Core/Events/window/KeyboardEvents.hpp"
+#include "Core/Events/window/MouseEvents.hpp"
 
-
-vk::CommandBuffer Shader2DLayer::GetCommandBuffer(uint32_t currentFrame) {
-  return *mCommandBuffers[currentFrame];
-}
 
 std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
-Shader2DLayer::CreateStagingBuffer(vk::UniqueDevice& device, vk::PhysicalDevice& physicalDevice,
-                                   const std::vector<Vertex>& vertices, vk::DeviceSize bufferSize) {
-  // Staging buffer
-  auto [stagingBuffer, stagingBufferMemory] = CreateBuffer(
-      device.get(), physicalDevice, bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+CreateBuffer2(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, vk::DeviceSize size,
+              vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+  vk::BufferCreateInfo bufferInfo({}, size, usage, vk::SharingMode::eExclusive);
 
-  void* data = CheckVulkanResVal(device->mapMemory(*stagingBufferMemory, 0, bufferSize),
-                                 "Failed to map memory: ");
-  memcpy(data, vertices.data(), bufferSize);
-  device->unmapMemory(*stagingBufferMemory);
-  return {std::move(stagingBuffer), std::move(stagingBufferMemory)};
+  vk::UniqueBuffer buffer =
+      CheckVulkanResVal(device.createBufferUnique(bufferInfo), "Failed to create unique buffer");
+
+  vk::MemoryRequirements memRequirements = device.getBufferMemoryRequirements(*buffer);
+
+  vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
+  uint32_t memoryTypeIndex = -1;
+  for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+    if ((memRequirements.memoryTypeBits & (1 << i)) &&
+        (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+      memoryTypeIndex = i;
+      break;
+    }
+  }
+  if (memoryTypeIndex == -1) {
+    Engine::Abort("failed to find suitable memory type!");
+  }
+
+  vk::MemoryAllocateInfo allocInfo(memRequirements.size, memoryTypeIndex);
+
+  vk::UniqueDeviceMemory bufferMemory =
+      CheckVulkanResVal(device.allocateMemoryUnique(allocInfo), "Failed to allocate unique memory");
+
+  CheckVulkanRes(device.bindBufferMemory(*buffer, *bufferMemory, 0), "Failed to bind buffer memory");
+
+  return {std::move(buffer), std::move(bufferMemory)};
 }
+
+vk::VertexInputBindingDescription Shader2DLayer::Vertex::getBindingDescription() {
+  vk::VertexInputBindingDescription bindingDescription{};
+  bindingDescription.binding = 0;
+  bindingDescription.stride = sizeof(Vertex);
+  bindingDescription.inputRate = vk::VertexInputRate::eVertex;
+  return bindingDescription;
+}
+std::array<vk::VertexInputAttributeDescription, 2> Shader2DLayer::Vertex::getAttributeDescriptions() {
+  std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions{};
+
+  attributeDescriptions[0].binding = 0;
+  attributeDescriptions[0].location = 0;
+  attributeDescriptions[0].format = vk::Format::eR32G32B32Sfloat;
+  attributeDescriptions[0].offset = offsetof(Vertex, position);
+
+  attributeDescriptions[1].binding = 0;
+  attributeDescriptions[1].location = 1;
+  attributeDescriptions[1].format = vk::Format::eR32G32Sfloat;
+  attributeDescriptions[1].offset = offsetof(Vertex, texCoord);
+
+  return attributeDescriptions;
+}
+
+Shader2DLayer::Shader2DLayer(Scene& scene, VulkanContext& vulkanCtx, VulkanWindow& window,
+                             const std::vector<std::string>& texturePaths) :
+  Layer(scene), mVulkanCtx(vulkanCtx), mWindow(window), mTexturePaths(texturePaths),
+  mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
+
+
 void Shader2DLayer::OnAttach() {
   auto& device = mVulkanCtx.GetVulkanDevice();
   auto& physicalDevice = mVulkanCtx.GetPhysicalDevice();
-  auto commandPool = mVulkanCtx.GetCommandPool();
+  auto commandPool = mWindow.GetCommandPool();
   auto queue = mVulkanCtx.GetGraphicsQueue();
 
-  CreateRenderPass();
+  CreateCompatibleRenderPass();
   CreateDescriptorSetLayout();
   CreateGraphicsPipeline();
-  CreateCommandBuffers();
 
-  auto& device_ = device.get();
-  std::vector<std::expected<Texture, std::string>> textureResults;
-  // TODO: Move texture loading out of the layer and into a resource manager
-  for (auto& texturePath : mTexturePaths) {
-    textureResults.push_back(
-        CreateTexture(device_, physicalDevice, queue, commandPool, texturePath.c_str()));
-  }
-  for (auto& textureResult : textureResults) {
-    if (textureResult) {
-      mTextures.push_back(std::move(textureResult.value()));
-    } else {
-      Engine::Abort(textureResult.error());
-    }
+  // Load texture (using the first path for now)
+  std::string texturePath = mTexturePaths.empty() ? "assets/textures/example.jpg" : mTexturePaths[0];
+  auto textureResult = CreateTexture(device.get(), physicalDevice, queue, commandPool,
+                                     texturePath);
+  if (textureResult) {
+    mTexture = std::move(textureResult.value());
+  } else {
+    Engine::Abort(textureResult.error());
   }
 
-
-  // NOTE: Vertices + texture coords
-  // TODO: Abstract mesh/geometry data into a Mesh class or similar resource
   const std::vector<Vertex> vertices = {
       {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f}},
       { {0.5f, -0.5f, 0.0f}, {1.0f, 0.0f}},
@@ -59,30 +96,36 @@ void Shader2DLayer::OnAttach() {
 
   vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
-  auto [stagingBuffer, stagingBufferMemory] =
-      CreateStagingBuffer(device, physicalDevice, vertices, bufferSize);
+  // Staging buffer
+  auto [stagingBuffer, stagingBufferMemory] = CreateBuffer2(
+      device.get(), physicalDevice, bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+  void* data = CheckVulkanResVal(device->mapMemory(*stagingBufferMemory, 0, bufferSize),
+                                 "Failed to map memory: ");
+  memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
+  device->unmapMemory(*stagingBufferMemory);
 
   // Vertex buffer
   auto [vb, vbMem] =
-      CreateBuffer(device.get(), physicalDevice, bufferSize,
+      CreateBuffer2(device.get(), physicalDevice, bufferSize,
                    vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
                    vk::MemoryPropertyFlagBits::eDeviceLocal);
   mVertexBuffer = std::move(vb);
   mVertexBufferMemory = std::move(vbMem);
 
-  auto res =
-      SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
-        vk::BufferCopy copyRegion(0, 0, bufferSize);
-        cmdBuffer.copyBuffer(*stagingBuffer, *mVertexBuffer, copyRegion);
-      });
+  auto res = SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
+    vk::BufferCopy copyRegion(0, 0, bufferSize);
+    cmdBuffer.copyBuffer(*stagingBuffer, *mVertexBuffer, copyRegion);
+  });
 
   if (!res) {
-    Engine::Abort(res.error());
+      Engine::Abort(res.error());
   }
 
-  for (size_t i = 0; i < mVulkanCtx.GetMaxFramesInFlight(); i++) {
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vk::DeviceSize vpBufferSize = sizeof(ViewProjection);
-    auto [ub, ubMem] = CreateBuffer(
+    auto [ub, ubMem] = CreateBuffer2(
         device.get(), physicalDevice, vpBufferSize, vk::BufferUsageFlagBits::eUniformBuffer,
         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     mUniformBuffers.push_back(std::move(ub));
@@ -94,18 +137,19 @@ void Shader2DLayer::OnAttach() {
 
   vk::DescriptorPoolSize poolSizes[] = {
       {vk::DescriptorType::eUniformBuffer,
-       static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight())                                    },
-      { vk::DescriptorType::eSampledImage, static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight())},
-      {      vk::DescriptorType::eSampler, static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight())}
+       static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)                                    },
+      { vk::DescriptorType::eSampledImage, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
+      {      vk::DescriptorType::eSampler, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)}
   };
 
   vk::DescriptorPoolCreateInfo poolInfo(
-      {}, static_cast<uint32_t>(mVulkanCtx.GetMaxFramesInFlight()), 3, poolSizes);
+      {}, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT), 3, poolSizes);
   mDescriptorPool = CheckVulkanResVal(device->createDescriptorPoolUnique(poolInfo),
                                       "Failed to create unique descriptor pool");
 
-  std::vector layouts(mVulkanCtx.GetMaxFramesInFlight(), *mDescriptorSetLayout);
-  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, mVulkanCtx.GetMaxFramesInFlight(),
+  std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT,
+                                               *mDescriptorSetLayout);
+  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, MAX_FRAMES_IN_FLIGHT,
                                           layouts.data());
   mDescriptorSets = CheckVulkanResVal(device->allocateDescriptorSets(allocInfo),
                                       "Failed to allocate descriptor sets: ");
@@ -118,12 +162,13 @@ void Shader2DLayer::OnAttach() {
   mSampler = CheckVulkanResVal(device->createSamplerUnique(samplerCreateInfo),
                                "Failed to create unique sampler");
 
-  for (size_t i = 0; i < mVulkanCtx.GetMaxFramesInFlight(); i++) {
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vk::DescriptorBufferInfo bufferInfo(*mUniformBuffers[i], 0, sizeof(ViewProjection));
+    vk::DescriptorImageInfo textureInfo({}, *mTexture.imageView,
+                                        vk::ImageLayout::eShaderReadOnlyOptimal);
     vk::DescriptorImageInfo samplerInfo(*mSampler, {}, {});
 
-    const std::size_t setSize = mTextures.size() + 2;
-    std::vector<vk::WriteDescriptorSet> descriptorWrites(setSize);
+    std::array<vk::WriteDescriptorSet, 3> descriptorWrites{};
 
     descriptorWrites[0].dstSet = mDescriptorSets[i];
     descriptorWrites[0].dstBinding = 0;
@@ -135,43 +180,31 @@ void Shader2DLayer::OnAttach() {
     descriptorWrites[1].dstSet = mDescriptorSets[i];
     descriptorWrites[1].dstBinding = 1;
     descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = vk::DescriptorType::eSampler;
+    descriptorWrites[1].descriptorType = vk::DescriptorType::eSampledImage;
     descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pImageInfo = &samplerInfo;
+    descriptorWrites[1].pImageInfo = &textureInfo;
 
-    auto textureCount = mTextures.size();
-    std::vector<vk::DescriptorImageInfo> textureInfos(textureCount);
-
-    for (std::size_t j{0}; j < textureCount; j++) {
-      textureInfos[j] = vk::DescriptorImageInfo({}, *mTextures[j].imageView,
-                                                vk::ImageLayout::eShaderReadOnlyOptimal);
-
-      auto index = j + 2;
-      descriptorWrites[index].dstSet = mDescriptorSets[i];
-      descriptorWrites[index].dstBinding = static_cast<uint32_t>(index);
-      descriptorWrites[index].dstArrayElement = 0;
-      descriptorWrites[index].descriptorType = vk::DescriptorType::eSampledImage;
-      descriptorWrites[index].descriptorCount = 1;
-      descriptorWrites[index].pImageInfo = &textureInfos[j];
-    }
+    descriptorWrites[2].dstSet = mDescriptorSets[i];
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].dstArrayElement = 0;
+    descriptorWrites[2].descriptorType = vk::DescriptorType::eSampler;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].pImageInfo = &samplerInfo;
 
     device->updateDescriptorSets(descriptorWrites, nullptr);
   }
-
-  CreateFramebuffers();
 }
 void Shader2DLayer::OnDetach() {
   auto& device = mVulkanCtx.GetVulkanDevice();
   CheckVulkanRes(device->waitIdle(), "Failed to wait for device to idle");
 }
 void Shader2DLayer::UpdateUniformBuffer(uint32_t currentImage) const {
-  // TODO: Abstract camera/view projection logic into a Camera class
   ViewProjection vp{};
   std::ranges::fill(vp.proj, 0.0f);
   std::ranges::fill(vp.model, 0.0f);
   std::ranges::fill(vp.view, 0.0f);
 
-  const auto& extent = mVulkanCtx.GetSwapchainExtent();
+  const auto& extent = mWindow.GetSwapchainExtent();
   const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
   float scaleX = 1.0f;
   float scaleY = 1.0f;
@@ -205,70 +238,55 @@ void Shader2DLayer::UpdateUniformBuffer(uint32_t currentImage) const {
 
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
-void Shader2DLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
-  UpdateUniformBuffer(currentFrame);
+void Shader2DLayer::OnRender(vk::CommandBuffer& cmd) {
+  // Hack: calculate frame index
+  static uint32_t frameIndex = 0;
+  frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+  UpdateUniformBuffer(frameIndex);
 
-  auto& cmdBuffer = mCommandBuffers[currentFrame];
-  CheckVulkanRes(cmdBuffer->reset(), "Failed to reset commandbuffer");
 
-  constexpr vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  CheckVulkanRes(cmdBuffer->begin(beginInfo), "Failed to begin commandbuffer");
-
-  std::array<vk::ClearValue, 1> clearValues{};
-  clearValues[0].color = vk::ClearColorValue{mClearColor};
-
-  vk::RenderPassBeginInfo renderPassInfo(*mRenderPass, *mFramebuffers[imageIndex],
-                                         {
-                                             {0, 0},
-                                             mVulkanCtx.GetSwapchainExtent()
-  },
-                                         clearValues);
-
-  cmdBuffer->beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
-  cmdBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *mPipeline);
+  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *mPipeline);
   vk::DeviceSize offsets[] = {0};
-  cmdBuffer->bindVertexBuffers(0, 1, &*mVertexBuffer, offsets);
-  cmdBuffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *mPipelineLayout, 0,
-                                mDescriptorSets[currentFrame], nullptr);
-  cmdBuffer->draw(6, 1, 0, 0);
-  cmdBuffer->endRenderPass();
-  CheckVulkanRes(cmdBuffer->end(), "Failed to end commandbuffer");
+  cmd.bindVertexBuffers(0, 1, &*mVertexBuffer, offsets);
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *mPipelineLayout, 0,
+                         mDescriptorSets[frameIndex], nullptr);
+  cmd.draw(6, 1, 0, 0);
 }
-void Shader2DLayer::OnEvent(InputEvent& e) {
-  switch (e.category()) {
-    case InputEventCategory::KeyReleased: {
+void Shader2DLayer::OnEvent(Event& e) {
+  switch (e.GetEventType()) {
+    case EventType::KeyReleased: {
       if (const auto key = dynamic_cast<KeyReleasedEvent&>(e); GLFW_KEY_SPACE == key.key) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.Handled = true;
+        e.isHandled = true;
       }
     } break;
-    case InputEventCategory::MouseReleased: {
+    case EventType::MouseReleased: {
       if (const auto button = dynamic_cast<MouseReleasedEvent&>(e);
           GLFW_MOUSE_BUTTON_LEFT == button.button) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.Handled = true;
+        e.isHandled = true;
       }
     } break;
-    case InputEventCategory::MousePressed: {
+    case EventType::MousePressed: {
       if (const auto button = dynamic_cast<MousePressedEvent&>(e);
           GLFW_MOUSE_BUTTON_LEFT == button.button) {
         mClearColor = std::array{0.0f, 1.0f, 0.0f, 1.0f};
-        e.Handled = true;
+        e.isHandled = true;
       }
     } break;
-    case InputEventCategory::KeyPressed: {
-      const auto key = dynamic_cast<KeyPressedEvent&>(e);
-      if (key.key == GLFW_KEY_SPACE && key.repeat == false) {
+    case EventType::KeyPressed: {
+      if (const auto key = dynamic_cast<KeyPressedEvent&>(e);
+          GLFW_KEY_SPACE == key.key && false == key.repeat) {
         mClearColor = std::array{1.0f, 0.0f, 0.0f, 1.0f};
-        e.Handled = true;
-      }
-      if (key.key == GLFW_KEY_LEFT && key.repeat == false) {
-        SetPixelSource("assets/shaders/pixel2.hlsl");
-        e.Handled = true;
-      }
-      if (key.key == GLFW_KEY_RIGHT && key.repeat == false) {
-        SetPixelSource("assets/shaders/pixel.hlsl");
-        e.Handled = true;
+        e.isHandled = true;
+      } else if (key.key == GLFW_KEY_RIGHT && !key.repeat) {
+        mCurrentShaderIndex = (mCurrentShaderIndex + 1) % mShaderPaths.size();
+        CreateGraphicsPipeline();
+        e.isHandled = true;
+      } else if (key.key == GLFW_KEY_LEFT && !key.repeat) {
+        mCurrentShaderIndex = (mCurrentShaderIndex == 0) ? mShaderPaths.size() - 1 : mCurrentShaderIndex - 1;
+        CreateGraphicsPipeline();
+        e.isHandled = true;
       }
     } break;
     default:
@@ -277,101 +295,54 @@ void Shader2DLayer::OnEvent(InputEvent& e) {
 }
 void Shader2DLayer::OnSwapchainRecreated() {
   CheckVulkanRes(mVulkanCtx.GetVulkanDevice()->waitIdle(), "Failed to wait for vulkan device");
-  mFramebuffers.clear();
-  CreateFramebuffers();
+  CreateCompatibleRenderPass();
   CreateGraphicsPipeline();
 }
-
-void Shader2DLayer::OnUpdate(float dt) {
-  Layer::OnUpdate(dt);
-  const auto logger = spdlog::get("engine");
-
-  const std::filesystem::file_time_type lastWriteVertex =
-      std::filesystem::last_write_time(mVertexSource);
-  const std::filesystem::file_time_type lastWritePixel =
-      std::filesystem::last_write_time(mPixelSource);
-
-  if (lastWritePixel != mLastWritePixel || lastWriteVertex != mLastWriteVertex)
-    mNewShaderSource = true;
-
-
-  if (mNewShaderSource) {
-    mNewShaderSource = false;
-    using clock = std::chrono::steady_clock;
-
-    const auto before = clock::now();
-    CreateGraphicsPipeline();
-    const auto after = clock::now();
-
-    const auto duration = after - before;
-    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-
-    logger->info("Time to change shaders: {}ms", ms);
-  }
-
-  mLastWriteVertex = lastWriteVertex;
-  mLastWritePixel = lastWritePixel;
-}
-
-void Shader2DLayer::CreateRenderPass() {
+void Shader2DLayer::CreateCompatibleRenderPass() {
   vk::AttachmentDescription colorAttachment(
       {}, mVulkanCtx.GetSurfaceFormat().format, vk::SampleCountFlagBits::e1,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
-      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eColorAttachmentOptimal);
+      vk::AttachmentLoadOp::eLoad, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
+      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eColorAttachmentOptimal,
+      vk::ImageLayout::ePresentSrcKHR);
 
   vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
 
   vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, {}, colorAttachmentRef);
 
-  vk::SubpassDependency dependency(VK_SUBPASS_EXTERNAL, 0,
-                                   vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                                   vk::PipelineStageFlagBits::eColorAttachmentOutput, {},
-                                   vk::AccessFlagBits::eColorAttachmentWrite);
-
-  vk::RenderPassCreateInfo renderPassInfo({}, colorAttachment, subpass, dependency);
-  mRenderPass =
+  vk::RenderPassCreateInfo renderPassInfo({}, colorAttachment, subpass);
+  mCompatibleRenderPass =
       CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(renderPassInfo),
                         "Failed to create unique render pass");
 }
 void Shader2DLayer::CreateDescriptorSetLayout() {
-  vk::DescriptorSetLayoutBinding uboLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
-                                                  vk::ShaderStageFlagBits::eVertex);
+  constexpr vk::DescriptorSetLayoutBinding uboLayoutBinding(0, vk::DescriptorType::eUniformBuffer,
+                                                            1, vk::ShaderStageFlagBits::eVertex);
+  constexpr vk::DescriptorSetLayoutBinding textureLayoutBinding(
+      1, vk::DescriptorType::eSampledImage, 1, vk::ShaderStageFlagBits::eFragment);
+  constexpr vk::DescriptorSetLayoutBinding samplerLayoutBinding(2, vk::DescriptorType::eSampler, 1,
+                                                                vk::ShaderStageFlagBits::eFragment);
 
-  vk::DescriptorSetLayoutBinding samplerLayoutBinding(1, vk::DescriptorType::eSampler, 1,
-                                                      vk::ShaderStageFlagBits::eFragment);
-
-  std::vector<vk::DescriptorSetLayoutBinding> bindings = {uboLayoutBinding, samplerLayoutBinding};
-  for (size_t i = 0; i < mTexturePaths.size(); i++) {
-    bindings.emplace_back(static_cast<uint32_t>(i + 2), vk::DescriptorType::eSampledImage, 1,
-                          vk::ShaderStageFlagBits::eFragment);
-  }
-
+  std::array bindings = {uboLayoutBinding, textureLayoutBinding, samplerLayoutBinding};
   const vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings);
 
   mDescriptorSetLayout =
       CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createDescriptorSetLayoutUnique(layoutInfo),
                         "Failed to create unique descriptorsetlayout: ");
 }
-bool Shader2DLayer::CreateGraphicsPipeline() {
+void Shader2DLayer::CreateGraphicsPipeline() {
   auto& device = mVulkanCtx.GetVulkanDevice();
 
-  auto logger = spdlog::get("engine");
   ShaderCompiler compiler;
 
   // compile shaders
   // TODO: Use a pipeline cache to speed up pipeline creation
   std::vector<char> vertexSpv;
-  if (!compiler.CompileShader(mVertexSource, vertexSpv, "vs_6_0")) {
-    logger->info("Compilation of Vertex shader %s failed", mVertexSource);
-    return false;
-  }
+  if (!compiler.CompileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
+    Engine::Abort("Failed to compile vertex shader");
 
   std::vector<char> pixelSpv;
-  if (!compiler.CompileShader(mPixelSource, pixelSpv, "ps_6_0")) {
-    logger->info("Compilation of Pixel shader %s failed", mPixelSource);
-    return false;
-  }
+  if (!compiler.CompileShader(mShaderPaths[mCurrentShaderIndex], pixelSpv, "ps_6_0"))
+    Engine::Abort("Failed to compile pixel shader");
 
 
   auto vertShaderModule = CreateShaderModule(device.get(), vertexSpv);
@@ -395,12 +366,11 @@ bool Shader2DLayer::CreateGraphicsPipeline() {
   vk::PipelineInputAssemblyStateCreateInfo inputAssembly({}, vk::PrimitiveTopology::eTriangleList,
                                                          VK_FALSE);
 
-  vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(mVulkanCtx.GetSwapchainExtent().width),
-                        static_cast<float>(mVulkanCtx.GetSwapchainExtent().height), 0.0f, 1.0f);
-
-  // TODO: Should this be dynamic? STUDY: Dynamic vs hard-coded scissor extent
-  vk::Rect2D scissor({0, 0}, mVulkanCtx.GetSwapchainExtent());
-  vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
+  // Dynamic viewport/scissor
+  vk::PipelineViewportStateCreateInfo viewportState({}, 1, nullptr, 1, nullptr);
+  std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport,
+                                                 vk::DynamicState::eScissor};
+  vk::PipelineDynamicStateCreateInfo dynamicState({}, dynamicStates);
 
   // draw solid triangles,
   // TODO: Discard backfacing triangles when not in debug mode (eBack + ECW)
@@ -412,8 +382,6 @@ bool Shader2DLayer::CreateGraphicsPipeline() {
   vk::PipelineMultisampleStateCreateInfo multisampling({}, vk::SampleCountFlagBits::e1, VK_FALSE);
 
   // NOTE: We dont need blending for this layer
-  // TODO: Check if eDontCare is appropriate for store ops if you don't need the attachment content
-  // later
   vk::PipelineColorBlendAttachmentState colorBlendAttachment(VK_FALSE);
   colorBlendAttachment.colorWriteMask =
       vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -429,36 +397,12 @@ bool Shader2DLayer::CreateGraphicsPipeline() {
 
   vk::GraphicsPipelineCreateInfo pipelineInfo(
       {}, shaderStages, &vertexInputInfo, &inputAssembly, nullptr, &viewportState, &rasterizer,
-      &multisampling, nullptr, &colorBlending, nullptr, *mPipelineLayout, *mRenderPass, 0);
+      &multisampling, nullptr, &colorBlending, &dynamicState, *mPipelineLayout, *mCompatibleRenderPass, 0);
 
   auto result = device->createGraphicsPipelineUnique(nullptr, pipelineInfo);
   if (result.result != vk::Result::eSuccess) {
     // TODO: Figure out how we do errors and wrap our own errors
-    logger->error("Failed to create grapchis pipeline");
-    return false;
+    Engine::Abort("Failed to create graphics pipeline");
   }
   mPipeline = std::move(result.value);
-  return true;
-}
-void Shader2DLayer::CreateFramebuffers() {
-  mFramebuffers.clear();
-  const auto& imageViews = mVulkanCtx.GetSwapchainImageViews();
-  const auto& extent = mVulkanCtx.GetSwapchainExtent();
-
-  for (const auto& view : imageViews) {
-    vk::ImageView attachments[] = {*view};
-    vk::FramebufferCreateInfo framebufferInfo({}, *mRenderPass, attachments, extent.width,
-                                              extent.height, 1);
-    mFramebuffers.push_back(
-        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createFramebufferUnique(framebufferInfo),
-                          "Failed to create unique framebuffer: "));
-  }
-}
-void Shader2DLayer::CreateCommandBuffers() {
-  vk::CommandBufferAllocateInfo allocInfo(mVulkanCtx.GetCommandPool(),
-                                          vk::CommandBufferLevel::ePrimary,
-                                          mVulkanCtx.GetMaxFramesInFlight());
-  mCommandBuffers =
-      CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo),
-                        "Failed to allocate unique commandbuffers");
 }

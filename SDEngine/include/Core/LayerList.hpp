@@ -8,69 +8,70 @@ class LayerList
 
 {
 public:
-  using Container = std::list<std::unique_ptr<Layer>>;
+  using iterator = std::vector<std::unique_ptr<Layer>>::iterator;
+  using const_iterator = std::vector<std::unique_ptr<Layer>>::const_iterator;
+
+  iterator begin() { return mLayers.begin(); }
+  iterator end() { return mLayers.end(); }
+  [[nodiscard]] const_iterator begin() const { return mLayers.begin(); }
+  [[nodiscard]] const_iterator end() const { return mLayers.end(); }
 
   ~LayerList() {
     std::ranges::for_each(mLayers, [](const auto& layer) { layer->OnDetach(); });
   }
 
-  // TODO: possibly a fixed update could be nice in the future aswell
   void Update(const float dt) const {
     std::ranges::for_each(mLayers, [dt](const auto& layer) {
       if (layer->IsActive())
         layer->OnUpdate(dt);
     });
   }
-  void Render() const {
-    std::ranges::for_each(mLayers, [](const auto& layer) {
-      if (layer->IsActive())
-        layer->OnRender();
-    });
-  }
 
-  void HandleEvent(InputEvent& e) {
+  void OnEvent(Event& e) {
     for (auto it = mLayers.rbegin(); it != mLayers.rend(); ++it) {
       if ((*it)->IsActive()) {
         (*it)->OnEvent(e);
-        if (e.Handled)
+        if (e.isHandled)
           break;
       }
     }
   }
 
   template<IsLayer T, typename... Args>
-  void CreateAndAttachTop(Args&&... args) {
+  T& PushLayer(Args&&... args) {
     auto layer = std::make_unique<T>(std::forward<Args>(args)...);
-    T& ref = *layer;
+    T* ptr = layer.get();
+
     mLayers.emplace_back(std::move(layer));
-    ref.OnAttach();
+    ptr->OnAttach();
+
+    return *ptr;
   }
 
   template<IsLayer T, typename... Args>
-  void CreateAndAttachBottom(Args&&... args) {
+  T& PushBottom(Args&&... args) {
     auto layer = std::make_unique<T>(std::forward<Args>(args)...);
-    T& ref = *layer;
-    mLayers.emplace_front(std::move(layer));
-    ref.OnAttach();
+    T* ptr = layer.get();
+
+    // Vector specific: insert at begin
+    mLayers.insert(mLayers.begin(), std::move(layer));
+    ptr->OnAttach();
+
+    return *ptr;
   }
+
   template<IsLayer T>
-  void AttachTop(std::unique_ptr<T> layer) {
-    T& ref = *layer;
+  T& AttachLayer(std::unique_ptr<T> layer) {
+    T* ptr = layer.get();
     mLayers.emplace_back(std::move(layer));
-    ref.OnAttach();
+    ptr->OnAttach();
+    return *ptr;
   }
-
   template<IsLayer T>
-  void AttachBottom(std::unique_ptr<T> layer) {
-    T& ref = *layer;
-    mLayers.emplace_front(std::move(layer));
-    ref.OnAttach();
-  }
-
-  template<IsLayer T>
-  T* GetRef() {
-    for (auto it = mLayers.begin(); it != mLayers.end(); ++it) {
-      if (auto p = dynamic_cast<T*>(it->get())) {
+  T* Get() {
+    for (auto& layer : mLayers) {
+      // dynamic_cast is safe here, but ensuring T is final/sealed helps compiler optimization
+      if (auto p = dynamic_cast<T*>(layer.get())) {
         return p;
       }
     }
@@ -78,18 +79,24 @@ public:
   }
 
   template<IsLayer T>
-  std::unique_ptr<T> DetachFirst() {
-    for (auto it = mLayers.begin(); it != mLayers.end(); ++it) {
-      if (auto* p = dynamic_cast<T*>(it->get())) {
-        (*it)->OnDetach();
+  std::unique_ptr<T> PopLayer() {
+    auto it = std::find_if(mLayers.begin(), mLayers.end(),
+                           [](const auto& l) { return dynamic_cast<T*>(l.get()) != nullptr; });
 
-        std::unique_ptr<Layer> base = std::move(*it);
-        it = mLayers.erase(it);
+    if (it != mLayers.end()) {
+      (*it)->OnDetach();
 
-        return std::unique_ptr<T>(static_cast<T*>(base.release()));
-      }
+      std::unique_ptr<T> result(static_cast<T*>(it->release()));
+      mLayers.erase(it);
+      return result;
     }
     return nullptr;
+  }
+
+  void Clear() {
+    for (auto& layer : mLayers)
+      layer->OnDetach();
+    mLayers.clear();
   }
 
   void OnSwapchainRecreated() {
@@ -99,30 +106,15 @@ public:
     });
   }
 
-  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
-    std::ranges::for_each(mLayers, [imageIndex, currentFrame](const auto& layer) {
+  void OnRender(vk::CommandBuffer& cmd) const {
+    std::ranges::for_each(mLayers, [&cmd](const auto& layer) {
       if (layer->IsActive())
-        layer->RecordCommands(imageIndex, currentFrame);
+        layer->OnRender(cmd);
     });
   }
 
-  std::vector<vk::CommandBuffer> GetCommandBuffers(uint32_t currentFrame) {
-    std::vector<vk::CommandBuffer> commandBuffers;
-
-    std::ranges::for_each(mLayers, [&](const auto& layer) {
-      if (layer->IsActive()) {
-        auto cb = layer->GetCommandBuffer(currentFrame);
-        if (cb != nullptr) {
-          commandBuffers.emplace_back(std::move(cb));
-        }
-      }
-    });
-
-    return commandBuffers;
-  }
+  int OnEvent(int _cpp_par_);
 
 private:
-  // TODO: Consider using a vector if random access or cache locality becomes important, though list
-  // is fine for now given the low count of layers.
-  Container mLayers;
+  std::vector<std::unique_ptr<Layer>> mLayers{};
 };

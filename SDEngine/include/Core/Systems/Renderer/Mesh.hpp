@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Core/VulkanConfig.hpp"
 #include <memory>
+
+#include "../../Vulkan/VulkanConfig.hpp"
 
 // TODO: This is a very basic mesh abstraction. A more complete version would also handle
 // index buffers, different vertex layouts, and potentially skinning/animation data.

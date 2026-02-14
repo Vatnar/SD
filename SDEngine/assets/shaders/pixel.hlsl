@@ -1,5 +1,5 @@
-Texture2D t_Texture : register(t2);
-SamplerState s_Sampler : register(s1);
+Texture2D t_Texture : register(t1);
+SamplerState s_Sampler : register(s2);
 
 struct VS_OUTPUT
 {

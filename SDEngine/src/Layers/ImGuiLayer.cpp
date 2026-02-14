@@ -3,8 +3,8 @@
 #include "Utils/Utils.hpp"
 
 
-ImGuiLayer::ImGuiLayer(VulkanContext& vulkanCtx, Window& window) :
-  mVulkanCtx(vulkanCtx), mWindow(window) {
+ImGuiLayer::ImGuiLayer(Scene& scene, VulkanContext& vulkanCtx, Window& window) :
+  Layer(scene), mVulkanCtx(vulkanCtx), mWindow(window) {
 }
 
 ImGuiLayer::~ImGuiLayer() = default;
@@ -22,7 +22,8 @@ void ImGuiLayer::OnAttach() {
   ImGui_ImplGlfw_InitForVulkan(mWindow.GetNativeHandle(), true);
 
   {
-    // TODO: This descriptor pool is huge and may be wasteful. Consider a more dynamic or specialized pool for ImGui.
+    // TODO: This descriptor pool is huge and may be wasteful. Consider a more dynamic or
+    // specialized pool for ImGui.
     vk::DescriptorPoolSize pool_sizes[] = {
         {             vk::DescriptorType::eSampler, 1000},
         {vk::DescriptorType::eCombinedImageSampler, 1000},
@@ -44,27 +45,7 @@ void ImGuiLayer::OnAttach() {
                           "Failed to create unique descriptor pool");
   }
 
-  {
-    // TODO: This render pass is specific to ImGui. Consider making it more generic or using dynamic rendering.
-    vk::AttachmentDescription attachment(
-        {}, mVulkanCtx.GetSurfaceFormat().format, vk::SampleCountFlagBits::e1,
-        vk::AttachmentLoadOp::eLoad, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
-        vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::ePresentSrcKHR);
-
-    vk::AttachmentReference color_attachment(0, vk::ImageLayout::eColorAttachmentOptimal);
-    vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1,
-                                   &color_attachment);
-
-    vk::SubpassDependency dependency(
-        VK_SUBPASS_EXTERNAL, 0, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits::eColorAttachmentOutput,
-        vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eColorAttachmentWrite);
-
-    vk::RenderPassCreateInfo info({}, 1, &attachment, 1, &subpass, 1, &dependency);
-    mRenderPass = CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(info),
-                                    "Failed to create unique render pass: ");
-  }
+  CreateCompatibleRenderPass();
 
   ImGui_ImplVulkan_InitInfo init_info{};
   init_info.Instance = *mVulkanCtx.GetInstance();
@@ -73,38 +54,23 @@ void ImGuiLayer::OnAttach() {
   init_info.QueueFamily = mVulkanCtx.GetGraphicsFamilyIndex();
   init_info.Queue = mVulkanCtx.GetGraphicsQueue();
   init_info.DescriptorPool = *mDescriptorPool;
-  init_info.PipelineInfoMain.RenderPass = *mRenderPass;
-  init_info.MinImageCount = 2;
-  init_info.ImageCount = 2;
+  init_info.PipelineInfoMain.RenderPass = *mCompatibleRenderPass;
+  init_info.MinImageCount = 2; // TODO: Query sync interval/min image count
+  init_info.ImageCount = MAX_FRAMES_IN_FLIGHT; // This should match swapchain image count
+  init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   ImGui_ImplVulkan_Init(&init_info);
 
-  {
-    // TODO: ImGuiLayer should probably have its own command pool if it's meant to be self-contained.
-    vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                                       mVulkanCtx.GetGraphicsFamilyIndex());
-    mCommandPool =
-        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createCommandPoolUnique(poolInfo),
-                          "Failed to create unique command pool");
 
-    vk::CommandBufferAllocateInfo allocInfo(*mCommandPool, vk::CommandBufferLevel::ePrimary,
-                                            mVulkanCtx.GetMaxFramesInFlight());
-    mCommandBuffers =
-        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->allocateCommandBuffersUnique(allocInfo),
-                          "Failed to allocate unique command buffer: ");
-  }
+  // Upload fonts (this records commands to the queue)
 
-  CreateSwapchainResources();
 }
 
 void ImGuiLayer::OnDetach() {
   CheckVulkanRes(mVulkanCtx.GetVulkanDevice()->waitIdle(), "Failed to wait for vulkan device ");
-  DestroySwapchainResources();
-  mCommandBuffers.clear();
-  mCommandPool.reset();
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
-  mRenderPass.reset();
+  mCompatibleRenderPass.reset();
   mDescriptorPool.reset();
 }
 
@@ -115,55 +81,50 @@ void ImGuiLayer::Begin() {
 }
 
 
-void ImGuiLayer::RecordCommands(uint32_t imageIndex, uint32_t currentFrame) {
+void ImGuiLayer::OnUpdate(float dt) {
+  Begin();
+}
+
+void ImGuiLayer::OnRender(vk::CommandBuffer& cmd) {
   ImGui::Render();
-
-  auto& cmdBuffer = mCommandBuffers[currentFrame];
-  CheckVulkanRes(cmdBuffer->reset(), "Failed to reset commandbuffer");
-  CheckVulkanRes(
-      cmdBuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit)),
-      "Failed to begin commandbuffer");
-
-  std::array<vk::ClearValue, 1> clearValues = {
-      vk::ClearColorValue{std::array<float, 4>{0.1f, 0.1f, 0.1f, 1.0f}}};
-
-  vk::RenderPassBeginInfo rpInfo(*mRenderPass, *mFramebuffers[imageIndex],
-                                 {
-                                     {0, 0},
-                                     mVulkanCtx.GetSwapchainExtent()
-  },
-                                 static_cast<uint32_t>(clearValues.size()), clearValues.data());
-
-  cmdBuffer->beginRenderPass(rpInfo, vk::SubpassContents::eInline);
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *cmdBuffer);
-  cmdBuffer->endRenderPass();
-  CheckVulkanRes(cmdBuffer->end(), "Failed to end commandbuffer");
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 }
 
 void ImGuiLayer::End() {
+  // Traditionally End() might call Render(), but since we render in OnRender (inside renderpass), we do it there.
 }
 
 
 void ImGuiLayer::OnSwapchainRecreated() {
   CheckVulkanRes(mVulkanCtx.GetVulkanDevice()->waitIdle(), "Failed to wait for vulkan device");
-  DestroySwapchainResources();
-  CreateSwapchainResources();
+  // ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount); // If count changed
+  // RenderPass might need to be compatible still.
+  // Since we use dynamic rendering or compatible render pass, if format changes, we might need to update.
+  // ImGui_ImplVulkan_Init caches the RenderPass. If the swapchain format changes, the RenderPass passed to Init
+  // might become incompatible if ImGui relies on it for pipeline creation.
+  // WE should probably re-init ImGui_ImplVulkan or at least check if we need to.
+  // For now, assuming format doesn't change often or remains compatible (B8G8R8A8_SRGB usually).
 }
 
-void ImGuiLayer::CreateSwapchainResources() {
-  const auto& swapchainExtent = mVulkanCtx.GetSwapchainExtent();
-  const auto& imageViews = mVulkanCtx.GetSwapchainImageViews();
+void ImGuiLayer::CreateCompatibleRenderPass() {
+  // TODO: This render pass is specific to ImGui. Consider making it more generic or using dynamic
+  // rendering.
+  vk::AttachmentDescription attachment(
+      {}, mVulkanCtx.GetSurfaceFormat().format, vk::SampleCountFlagBits::e1,
+      vk::AttachmentLoadOp::eLoad, vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
+      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eColorAttachmentOptimal,
+      vk::ImageLayout::ePresentSrcKHR);
 
-  for (const auto& view : imageViews) {
-    vk::ImageView attachments[] = {*view};
-    vk::FramebufferCreateInfo fbInfo({}, *mRenderPass, 1, attachments, swapchainExtent.width,
-                                     swapchainExtent.height, 1);
-    mFramebuffers.push_back(
-        CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createFramebufferUnique(fbInfo),
-                          "Failed to create unique Framebuffer: "));
-  }
-}
+  vk::AttachmentReference color_attachment(0, vk::ImageLayout::eColorAttachmentOptimal);
+  vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1,
+                                 &color_attachment);
 
-void ImGuiLayer::DestroySwapchainResources() {
-  mFramebuffers.clear();
+  vk::SubpassDependency dependency(
+      VK_SUBPASS_EXTERNAL, 0, vk::PipelineStageFlagBits::eColorAttachmentOutput,
+      vk::PipelineStageFlagBits::eColorAttachmentOutput,
+      vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eColorAttachmentWrite);
+
+  vk::RenderPassCreateInfo info({}, 1, &attachment, 1, &subpass, 1, &dependency);
+  mCompatibleRenderPass = CheckVulkanResVal(mVulkanCtx.GetVulkanDevice()->createRenderPassUnique(info),
+                                  "Failed to create unique render pass: ");
 }

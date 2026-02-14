@@ -7,13 +7,19 @@
 #include <spdlog/spdlog.h>
 #include <stb_image.h>
 
-#include "Core/VulkanConfig.hpp"
+#include "../Core/Vulkan/VulkanConfig.hpp"
 
 /**
  * @file Utils.hpp
  * @brief Utilities for the engine.
  */
 
+namespace Utils::Math {
+consteval size_t log2_int(std::unsigned_integral auto n) {
+  // log2(n) = bit_width(n) - 1
+  return n == 0 ? 0 : std::bit_width(n) - 1;
+}
+} // namespace Utils::Math
 /**
  * @namespace  Engine
  * @brief Namespace for Engine intrinsic things

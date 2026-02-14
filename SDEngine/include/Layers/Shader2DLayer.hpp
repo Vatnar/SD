@@ -1,86 +1,65 @@
 #pragma once
-#include <Renderer/Vertex.hpp>
 #include <VLA/Matrix.hpp>
 
-#include "Core/Events/InputEvent.hpp"
 #include "Core/Layer.hpp"
 #include "Core/ShaderCompiler.hpp"
-#include "Core/VulkanConfig.hpp"
-#include "Core/VulkanContext.hpp"
+#include "Core/Vulkan/VulkanConfig.hpp"
+#include "Core/Vulkan/VulkanContext.hpp"
+#include "Core/Vulkan/VulkanWindow.hpp"
 #include "Utils/Utils.hpp"
 
 class Shader2DLayer : public Layer {
 public:
-  // For general 2D shader we dont need all of these
   struct ViewProjection {
     VLA::Matrix4x4f proj;
     VLA::Matrix4x4f view;
     VLA::Matrix4x4f model;
   };
 
-  // TODO: Generalize textures, loading and vertices.
+  struct Vertex {
+    float position[3];
+    float texCoord[2];
 
+    static vk::VertexInputBindingDescription getBindingDescription();
 
-  explicit Shader2DLayer(VulkanContext& vulkanCtx,
-                         const std::vector<std::string>& texturePaths = {}) :
-    mVulkanCtx(vulkanCtx), mTexturePaths(texturePaths), mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
+    static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions();
+  };
 
+  Shader2DLayer(Scene& scene, VulkanContext& vulkanCtx, VulkanWindow& window,
+                const std::vector<std::string>& texturePaths);
 
-  [[nodiscard]] vk::CommandBuffer GetCommandBuffer(uint32_t currentFrame) override;
-
-  std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
-  CreateStagingBuffer(vk::UniqueDevice& device, vk::PhysicalDevice& physicalDevice,
-                      const std::vector<Vertex>& vertices, vk::DeviceSize bufferSize);
 
   void OnAttach() override;
 
   void OnDetach() override;
 
   void UpdateUniformBuffer(uint32_t currentImage) const;
+  void OnRender(vk::CommandBuffer& cmd) override;
 
-  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) override;
-
-  void OnRender() override {}
-
-  void OnEvent(InputEvent& e) override;
+  void OnEvent(Event& e) override;
 
   void OnSwapchainRecreated() override;
 
-  void OnUpdate(float dt) override;
-
-  // shaders
-  void SetVertexSource(const std::string_view& vertexSource) {
-    mVertexSource = vertexSource;
-    mNewShaderSource = true;
-  }
-  void SetPixelSource(const std::string_view& pixelSource) {
-    mPixelSource = pixelSource;
-    mNewShaderSource = true;
-  }
-
 private:
-  void CreateRenderPass();
+  void CreateCompatibleRenderPass();
 
   void CreateDescriptorSetLayout();
 
-  bool CreateGraphicsPipeline();
+  void CreateGraphicsPipeline();
 
-  void CreateFramebuffers();
-
-  void CreateCommandBuffers();
 
   VulkanContext& mVulkanCtx;
+  VulkanWindow& mWindow;
+  std::vector<std::string> mTexturePaths;
 
-  vk::UniqueRenderPass mRenderPass;
+  vk::UniqueRenderPass mCompatibleRenderPass;
+
   vk::UniqueDescriptorSetLayout mDescriptorSetLayout;
   vk::UniquePipelineLayout mPipelineLayout;
   vk::UniquePipeline mPipeline;
-  std::vector<vk::UniqueFramebuffer> mFramebuffers;
 
   vk::UniqueDescriptorPool mDescriptorPool;
   std::vector<vk::DescriptorSet> mDescriptorSets;
-
-  std::vector<vk::UniqueCommandBuffer> mCommandBuffers;
 
   vk::UniqueBuffer mVertexBuffer;
   vk::UniqueDeviceMemory mVertexBufferMemory;
@@ -89,19 +68,11 @@ private:
   std::vector<vk::UniqueDeviceMemory> mUniformBuffersMemory;
   std::vector<void*> mUniformBuffersMapped;
 
-  // Textures
-  std::vector<Texture> mTextures;
-  std::vector<std::string> mTexturePaths;
-
+  Texture mTexture;
   vk::UniqueSampler mSampler;
 
-  // Shaders
-  std::string mVertexSource = "assets/shaders/vertex.hlsl";
-  std::string mPixelSource = "assets/shaders/pixel.hlsl";
-  std::filesystem::file_time_type mLastWriteVertex = {};
-  std::filesystem::file_time_type mLastWritePixel = {};
-
-  bool mNewShaderSource = false;
+  std::vector<std::string> mShaderPaths = {"assets/shaders/pixel.hlsl", "assets/shaders/changeTestPixel.hlsl"};
+  uint32_t mCurrentShaderIndex = 0;
 
   std::array<float, 4> mClearColor{};
 };

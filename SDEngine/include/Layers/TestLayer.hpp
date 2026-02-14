@@ -1,11 +1,11 @@
 #pragma once
 #include <VLA/Matrix.hpp>
 
-#include "Core/Events/InputEvent.hpp"
 #include "Core/Layer.hpp"
 #include "Core/ShaderCompiler.hpp"
-#include "Core/VulkanConfig.hpp"
-#include "Core/VulkanContext.hpp"
+#include "Core/Vulkan/VulkanConfig.hpp"
+#include "Core/Vulkan/VulkanContext.hpp"
+#include "Core/Vulkan/VulkanWindow.hpp"
 #include "Utils/Utils.hpp"
 
 class TestLayer : public Layer {
@@ -25,11 +25,9 @@ public:
     static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions();
   };
 
-  explicit TestLayer(VulkanContext& vulkanCtx) :
-    mVulkanCtx(vulkanCtx), mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
+  TestLayer(Scene& scene, VulkanContext& vulkanCtx, VulkanWindow& window) :
+    Layer(scene), mVulkanCtx(vulkanCtx), mWindow(window), mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
 
-
-  [[nodiscard]] vk::CommandBuffer GetCommandBuffer(uint32_t currentFrame) override;
 
   void OnAttach() override;
 
@@ -37,36 +35,31 @@ public:
 
   void UpdateUniformBuffer(uint32_t currentImage) const;
 
-  void RecordCommands(uint32_t imageIndex, uint32_t currentFrame) override;
-  void OnRender() override {}
+  void OnRender(vk::CommandBuffer& cmd) override;
 
-  void OnEvent(InputEvent& e) override;
+  void OnEvent(Event& e) override;
 
   void OnSwapchainRecreated() override;
 
 private:
-  void CreateRenderPass();
+  void CreateCompatibleRenderPass();
 
   void CreateDescriptorSetLayout();
 
   void CreateGraphicsPipeline();
 
-  void CreateFramebuffers();
-
-  void CreateCommandBuffers();
 
   VulkanContext& mVulkanCtx;
+  VulkanWindow& mWindow;
 
-  vk::UniqueRenderPass mRenderPass;
+  vk::UniqueRenderPass mCompatibleRenderPass;
+
   vk::UniqueDescriptorSetLayout mDescriptorSetLayout;
   vk::UniquePipelineLayout mPipelineLayout;
   vk::UniquePipeline mPipeline;
-  std::vector<vk::UniqueFramebuffer> mFramebuffers;
 
   vk::UniqueDescriptorPool mDescriptorPool;
   std::vector<vk::DescriptorSet> mDescriptorSets;
-
-  std::vector<vk::UniqueCommandBuffer> mCommandBuffers;
 
   vk::UniqueBuffer mVertexBuffer;
   vk::UniqueDeviceMemory mVertexBufferMemory;
