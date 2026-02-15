@@ -21,17 +21,47 @@ inline bool Entity::operator==(const Entity other) const {
 }
 
 
+template<typename T>
+
+struct ComponentTraits {
+  static constexpr const char* Name = "Unknown";
+};
+#define REGISTER_SD_COMPONENT(Type)                  \
+  template<>                                         \
+  struct ComponentTraits<Type> {                     \
+    static constexpr const char* Name = "SD_" #Type; \
+  }
+
+#define REGISTER_COMPONENT(Type)               \
+  template<>                                   \
+  struct ComponentTraits<Type> {               \
+    static constexpr const char* Name = #Type; \
+  };
+
 consteval size_t log2_int(std::unsigned_integral auto n) {
   // log2(n) = bit_width(n) - 1
   return n == 0 ? 0 : std::bit_width(n) - 1;
 }
+
+struct ComponentDebugInfo {
+  const char* name;
+  void* data;
+};
+
+class SparseEntitySetBase {
+public:
+  virtual ~SparseEntitySetBase() = default;
+  virtual bool Remove(Entity entity) = 0;
+
+  virtual std::optional<ComponentDebugInfo> GetDebugInfo(Entity e) = 0;
+};
 
 /**
  * Sparse -> Dense set for enitities.
  * @tparam T Data associated, for instance component structs
  */
 template<typename T>
-class SparseEntitySet {
+class SparseEntitySet : public SparseEntitySetBase {
   static constexpr size_t PAGE_SIZE = 1024;
   static constexpr size_t SHIFT = log2_int(PAGE_SIZE);
   static constexpr size_t MASK = PAGE_SIZE - 1;
@@ -55,7 +85,7 @@ public:
     }
 
     sparse[page][offset] = denseEntities.size(); // end
-    denseData.emplace_back(std::forward<Args>(args)...);
+    denseData.push_back(T{std::forward<Args>(args)...});
     denseEntities.push_back(entity);
   }
 
@@ -65,24 +95,40 @@ public:
    * @param entity
    * @return true if successfully removed, false, if it doesnt exist
    */
-  bool Remove(Entity entity) {
+  bool Remove(Entity entity) override {
     const size_t page = entity.index >> SHIFT;
     const size_t offset = entity.index & MASK;
 
-    if (!sparse[page]) {
-      return false;
-    }
-    auto denseIdx = sparse[page][offset];
-    if (!denseIdx) {
-      return false;
-    }
+    if (page >= sparse.size() || !sparse[page])
+      return false; // out of bounds
 
-    // move last element, to deleted elements location
-    denseEntities[denseIdx] = denseEntities.back();
-    denseData[denseIdx] = denseData.back();
+    size_t denseIdx = sparse[page][offset];
+    if (denseIdx == std::numeric_limits<size_t>::max())
+      return false; // doesnt exist
 
+    if (denseEntities[denseIdx] != entity)
+      return false; // wrong generation
+
+    // move, last to removed pos
+    size_t lastIdx = denseEntities.size() - 1;
+    Entity lastEntity = denseEntities[lastIdx];
+
+    denseData[denseIdx] = std::move(denseData[lastIdx]);
+    denseEntities[denseIdx] = lastEntity;
+
+    // update sparse index
+    const size_t lastPage = lastEntity.index >> SHIFT;
+    const size_t lastOffset = lastEntity.index & MASK;
+    sparse[lastPage][lastOffset] = denseIdx;
+
+    // free index
+    sparse[page][offset] = std::numeric_limits<size_t>::max();
+
+    // remove duplicated last
+    denseData.pop_back();
     denseEntities.pop_back();
-    sparse.pop_back();
+
+
     return true;
   }
 
@@ -110,6 +156,13 @@ public:
 
     return &denseData[denseIdx];
   }
+  std::optional<ComponentDebugInfo> GetDebugInfo(Entity e) override {
+    T* ptr = Get(e);
+    if (!ptr)
+      return std::nullopt;
+
+    return ComponentDebugInfo{ComponentTraits<T>::Name, ptr};
+  }
 
   T* operator[](const Entity idx) { return Get(idx); }
 };
@@ -118,7 +171,7 @@ public:
 struct ComponentIdGenerator {
   static inline size_t counter = 0;
 
-  template<typename>
+  template<typename T>
   static size_t GetComponentTypeID() {
     static const size_t id = counter++;
     return id;
@@ -134,33 +187,42 @@ public:
     if (idx >= mGenerations.size()) {
       mGenerations.resize(idx + 1, 0);
     }
-    return Entity{idx, mGenerations[idx]};
+    Entity e = {idx, mGenerations[idx]};
+
+    if (!mEntityMasks.Get(e))
+      mEntityMasks.Add(e, ComponentMask{});
+    else
+      mEntityMasks.Get(e)->reset();
+
+    return e;
   }
 
   template<typename T, typename... Args>
-  void AddComponent(Entity e, Args&&... args) {
+  T* AddComponent(Entity e, Args&&... args) {
     size_t typeId = ComponentIdGenerator::GetComponentTypeID<T>();
 
     if (typeId >= mComponentPools.size())
       mComponentPools.resize(typeId + 1);
     if (!mComponentPools[typeId])
       mComponentPools[typeId] = std::make_unique<SparseEntitySet<T>>();
-    // add data
-    static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get())
-        ->Add(e, std::forward<Args>(args)...);
 
-    // shouldnt fail
+    // add data
+    auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
+    pool->Add(e, std::forward<Args>(args)...);
+
     mEntityMasks[e]->set(typeId);
+    return pool->Get(e);
   }
 
   template<typename T>
-  std::unique_ptr<T> TryGetComponent(Entity e) {
+  T* TryGetComponent(Entity e) {
     size_t typeId = ComponentIdGenerator::GetComponentTypeID<T>();
     if (!mComponentPools[typeId])
       return nullptr;
     if (!mEntityMasks[e]->test(typeId))
       return nullptr;
-    return mComponentPools[typeId].get().Get(e);
+    auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
+    return pool->Get(e);
   }
 
   void Destroy(const Entity e) {
@@ -168,19 +230,36 @@ public:
       return;
 
 
+    // TODO: Ranges?
     ComponentMask* mask = mEntityMasks[e];
     assert(mask);
+
     for (size_t i = 0; i < mask->size(); ++i) {
       if (mask->test(i)) {
-        mComponentPools[i]->remove(e);
+        if (mComponentPools[i])
+          mComponentPools[i]->Remove(e);
       }
     }
     mask->reset();
     mGenerations[e.index]++;
     mFreeList.push_back(e.index);
   }
+  [[nodiscard]] std::vector<ComponentDebugInfo> GetAllComponentNames(Entity e) const {
+    std::vector<ComponentDebugInfo> components;
+    if (!IsAlive(e))
+      return {};
+    for (auto& pool : mComponentPools) {
+      if (!pool)
+        continue;
 
-  bool IsAlive(const Entity e) const { return mGenerations[e.index] == e.generation; }
+      if (auto info = pool->GetDebugInfo(e)) {
+        components.push_back(info.value());
+      }
+    }
+    return components;
+  }
+
+  [[nodiscard]] bool IsAlive(const Entity e) const { return mGenerations[e.index] == e.generation; }
 
 private:
   uint32_t PopFreeList() {
@@ -194,7 +273,7 @@ private:
   // Components, etc
   // TODO: Set these to pointers of where the sparsenetity sets are actually stored, (in the
   //  systems)
-  std::vector<std::unique_ptr<SparseEntitySet>> mComponentPools;
+  std::vector<std::unique_ptr<SparseEntitySetBase>> mComponentPools;
   // TODO: make resizable
   using ComponentMask = std::bitset<64>;
   SparseEntitySet<ComponentMask> mEntityMasks;
