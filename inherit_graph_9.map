@@ -1,0 +1,15 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" href="$structInputEvent.html" title=" " alt="" coords="5,129,97,155"/>
+<area shape="rect" id="Node000001" href="$structCursorEvent.html" title=" " alt="" coords="176,5,277,31"/>
+<area shape="poly" id="edge3_Node000000_Node000001" title=" " alt="" coords="67,116,100,77,144,40,175,26,177,31,147,44,103,81,71,120"/>
+<area shape="rect" id="Node000002" href="$structKeyPressedEvent.html" title=" " alt="" coords="159,55,294,80"/>
+<area shape="poly" id="edge4_Node000000_Node000002" title=" " alt="" coords="84,120,144,89,176,78,178,83,146,94,86,125"/>
+<area shape="rect" id="Node000003" href="$structKeyReleasedEvent.html" title=" " alt="" coords="155,104,298,129"/>
+<area shape="poly" id="edge5_Node000000_Node000003" title=" " alt="" coords="110,131,155,124,156,130,111,136"/>
+<area shape="rect" id="Node000004" href="$structMousePressedEvent.html" title=" " alt="" coords="150,153,303,179"/>
+<area shape="poly" id="edge6_Node000000_Node000004" title=" " alt="" coords="111,147,150,153,150,158,110,153"/>
+<area shape="rect" id="Node000005" href="$structMouseReleasedEvent.html" title=" " alt="" coords="145,203,308,228"/>
+<area shape="poly" id="edge7_Node000000_Node000005" title=" " alt="" coords="88,159,146,188,181,200,180,205,144,192,85,164"/>
+<area shape="rect" id="Node000006" href="$structScrollEvent.html" title=" " alt="" coords="179,252,274,277"/>
+<area shape="poly" id="edge8_Node000000_Node000006" title=" " alt="" coords="72,164,104,202,147,237,180,252,178,257,144,242,100,205,68,167"/>
+</map>

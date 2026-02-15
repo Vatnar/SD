@@ -1,0 +1,21 @@
+<map id="SDEngine/include/Utils/Utils.hpp" name="SDEngine/include/Utils/Utils.hpp">
+<area shape="rect" id="Node000001" title="Utilities for the engine." alt="" coords="333,5,502,45"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,93,88,119"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="333,47,102,96,101,90,332,42"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="112,93,203,119"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="356,48,209,92,208,87,354,43"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="227,93,307,119"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="382,48,303,89,300,84,380,43"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="331,93,389,119"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="406,47,379,84,375,80,401,44"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="414,93,538,119"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="434,44,461,80,457,84,429,47"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="562,93,686,119"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="468,43,582,86,580,91,466,48"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="710,93,813,119"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="500,43,698,88,697,93,499,48"/>
+<area shape="rect" id="Node000009" href="$VulkanConfig_8hpp.html" title=" " alt="" coords="837,93,1005,119"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="503,37,835,89,834,94,502,42"/>
+<area shape="rect" id="Node000010" title=" " alt="" coords="851,167,991,192"/>
+<area shape="poly" id="edge9_Node000009_Node000010" title=" " alt="" coords="924,119,924,153,919,153,919,119"/>
+</map>

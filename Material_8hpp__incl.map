@@ -1,0 +1,22 @@
+<map id="SDEngine/include/Renderer/Material.hpp" name="SDEngine/include/Renderer/Material.hpp">
+<area shape="rect" id="Node000001" title=" " alt="" coords="322,5,521,45"/>
+<area shape="rect" id="Node000002" href="$Shader_8hpp.html" title=" " alt="" coords="5,93,163,119"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="341,48,147,93,146,88,340,43"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="229,167,307,192"/>
+<area shape="poly" id="edge9_Node000001_Node000005" title=" " alt="" coords="414,47,393,83,363,121,335,144,305,162,303,158,332,139,359,117,389,80,410,44"/>
+<area shape="rect" id="Node000006" href="$Texture_8hpp.html" title=" " alt="" coords="187,93,349,119"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="386,48,304,89,301,85,383,43"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="425,93,487,119"/>
+<area shape="poly" id="edge8_Node000001_Node000007" title=" " alt="" coords="432,44,448,79,443,82,427,47"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="512,93,563,119"/>
+<area shape="poly" id="edge10_Node000001_Node000008" title=" " alt="" coords="451,43,510,83,507,88,448,48"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="587,93,645,119"/>
+<area shape="poly" id="edge11_Node000001_Node000009" title=" " alt="" coords="469,43,576,86,574,91,467,48"/>
+<area shape="rect" id="Node000003" href="$VulkanConfig_8hpp.html" title=" " alt="" coords="19,167,187,192"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="90,118,99,153,94,154,85,120"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="115,116,226,159,224,164,113,121"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="33,240,173,265"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="105,192,105,226,100,226,100,192"/>
+<area shape="poly" id="edge7_Node000006_Node000003" title=" " alt="" coords="242,121,143,164,141,159,240,116"/>
+<area shape="poly" id="edge6_Node000006_Node000005" title=" " alt="" coords="271,119,271,153,265,153,265,119"/>
+</map>

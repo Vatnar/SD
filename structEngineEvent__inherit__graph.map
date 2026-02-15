@@ -1,0 +1,7 @@
+<map id="EngineEvent" name="EngineEvent">
+<area shape="rect" id="Node000001" title=" " alt="" coords="153,5,256,31"/>
+<area shape="rect" id="Node000002" href="$structSwapchainOutOfDateEvent.html" title=" " alt="" coords="5,79,204,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="179,41,123,81,119,76,176,36"/>
+<area shape="rect" id="Node000003" href="$structWindowResizeEvent.html" title=" " alt="" coords="227,79,382,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="233,36,290,76,287,81,230,41"/>
+</map>
