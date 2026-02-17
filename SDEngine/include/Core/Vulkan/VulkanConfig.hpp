@@ -1,8 +1,14 @@
 #pragma once
 
+#ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#endif
+#ifndef VULKAN_HPP_USE_STD_EXPECTED
 #define VULKAN_HPP_USE_STD_EXPECTED 1
+#endif
+#ifndef VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_EXCEPTIONS 1
+#endif
 #include <vulkan/vulkan.hpp>
 
 // TODO: NAMESPACE PACKAGED?

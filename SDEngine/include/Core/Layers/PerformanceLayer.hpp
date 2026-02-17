@@ -1,22 +1,23 @@
 #pragma once
 #include <chrono>
 #include <spdlog/spdlog.h>
-// TODO: Only works on x86, need some backup if not on x86
-// TODO: Use std::chrono or platform-independent high-resolution timer instead of __rdtsc for
-// portability
 #include <x86intrin.h>
 
 #include "Core/Layer.hpp"
 
+/**
+ * Non-visual layer that checks performance every frame. Only for x86.
+ */
+namespace SD {
 class PerformanceLayer : public Layer {
 public:
-  explicit PerformanceLayer(Scene& scene) : Layer(scene) { mLastCycles = __rdtsc(); }
+  explicit PerformanceLayer() : Layer("Performance layer") { mLastCycles = __rdtsc(); }
 
-  void OnUpdate(float dt) override {
+  void OnUpdate(const float dt) override {
     mFrameCount++;
     mTimeAccumulator += dt;
 
-    uint64_t currentCycles = __rdtsc();
+    u64 currentCycles = __rdtsc();
     if (mLastCycles != 0) {
       mCycleAccumulator += (currentCycles - mLastCycles);
     }
@@ -53,13 +54,14 @@ public:
   }
 
 private:
-  uint32_t mFrameCount = 0;
+  u32 mFrameCount = 0;
   float mTimeAccumulator = 0.0f;
-  uint64_t mCycleAccumulator = 0;
-  uint64_t mLastCycles = 0;
+  u64 mCycleAccumulator = 0;
+  u64 mLastCycles = 0;
 
   float mSleepTimeAccumulator = 0;
-  uint64_t mSleepCycleAccumulator = 0;
-  uint64_t mSleepStartCycles = 0;
+  u64 mSleepCycleAccumulator = 0;
+  u64 mSleepStartCycles = 0;
   std::chrono::time_point<std::chrono::high_resolution_clock> mSleepStartTime;
 };
+} // namespace SD

@@ -17,11 +17,11 @@ public:
  */
 template<typename T>
 class SparseEntitySet : public SparseEntitySetBase {
-  static constexpr size_t PAGE_SIZE = 1024;
-  static constexpr size_t SHIFT = SD::Math::log2_int(PAGE_SIZE);
-  static constexpr size_t MASK = PAGE_SIZE - 1;
+  static constexpr usize PAGE_SIZE = 1024;
+  static constexpr usize SHIFT = SD::Math::log2_int(PAGE_SIZE);
+  static constexpr usize MASK = PAGE_SIZE - 1;
 
-  std::vector<std::unique_ptr<size_t[]>> sparse;
+  std::vector<std::unique_ptr<usize[]>> sparse;
   std::vector<T> denseData;
   std::vector<Entity> denseEntities;
 
@@ -50,7 +50,7 @@ public:
   T* operator[](const Entity idx) { return Get(idx); }
   [[nodiscard]] const std::vector<Entity>& GetDenseEntities() const { return denseEntities; }
 
-  [[nodiscard]] size_t Size() const { return denseEntities.size(); }
+  [[nodiscard]] usize Size() const { return denseEntities.size(); }
 };
 
 #include "impl/SparseEntitySet.inl"

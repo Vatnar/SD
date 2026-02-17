@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "Core/GlfwContext.hpp"
-#include "Core/LayerList.hpp"
 #include "Core/Window.hpp"
 #include "VulkanConfig.hpp"
 
@@ -29,10 +28,10 @@ public:
   vk::PhysicalDeviceVulkan12Features& GetFeatures12();
   vk::PhysicalDeviceVulkan13Features& GetFeatures13();
 
-  [[nodiscard]] uint32_t GetGraphicsFamilyIndex() const;
+  [[nodiscard]] u32 GetGraphicsFamilyIndex() const;
   [[nodiscard]] vk::Queue GetGraphicsQueue() const;
   [[nodiscard]] vk::SurfaceFormatKHR GetSurfaceFormat() const { return mSurfaceFormat; }
-  // TODO: Minimize these raw getters. Instead, provide higher-level functions that perform actions
+  bool IsInitialized() { return mInstance.get() && mVulkanDevice && mPhysDev; }
 
 
 private:
@@ -48,7 +47,7 @@ private:
   vk::UniqueDevice mVulkanDevice;
 
   vk::Queue mGraphicsQueue;
-  uint32_t mGraphicsFamilyIndex{};
+  u32 mGraphicsFamilyIndex{};
   vk::SurfaceFormatKHR mSurfaceFormat;
 
 

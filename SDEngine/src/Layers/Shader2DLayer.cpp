@@ -15,8 +15,8 @@ CreateBuffer2(const vk::Device& device, const vk::PhysicalDevice& physicalDevice
   vk::MemoryRequirements memRequirements = device.getBufferMemoryRequirements(*buffer);
 
   vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
-  uint32_t memoryTypeIndex = -1;
-  for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+  u32 memoryTypeIndex = -1;
+  for (u32 i = 0; i < memProperties.memoryTypeCount; i++) {
     if ((memRequirements.memoryTypeBits & (1 << i)) &&
         (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
       memoryTypeIndex = i;
@@ -107,7 +107,7 @@ void Shader2DLayer::OnAttach() {
 
   void* data = CheckVulkanResVal(device->mapMemory(*stagingBufferMemory, 0, bufferSize),
                                  "Failed to map memory: ");
-  memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
+  memcpy(data, vertices.data(), static_cast<usize>(bufferSize));
   device->unmapMemory(*stagingBufferMemory);
 
   // Vertex buffer
@@ -128,7 +128,7 @@ void Shader2DLayer::OnAttach() {
     Abort(res.error());
   }
 
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (usize i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vk::DeviceSize vpBufferSize = sizeof(ViewProjection);
     auto [ub, ubMem] = CreateBuffer2(
         device.get(), physicalDevice, vpBufferSize, vk::BufferUsageFlagBits::eUniformBuffer,
@@ -141,13 +141,12 @@ void Shader2DLayer::OnAttach() {
   }
 
   vk::DescriptorPoolSize poolSizes[] = {
-      {vk::DescriptorType::eUniformBuffer, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
-      { vk::DescriptorType::eSampledImage, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
-      {      vk::DescriptorType::eSampler, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)}
+      {vk::DescriptorType::eUniformBuffer, static_cast<u32>(MAX_FRAMES_IN_FLIGHT)},
+      { vk::DescriptorType::eSampledImage, static_cast<u32>(MAX_FRAMES_IN_FLIGHT)},
+      {      vk::DescriptorType::eSampler, static_cast<u32>(MAX_FRAMES_IN_FLIGHT)}
   };
 
-  vk::DescriptorPoolCreateInfo poolInfo({}, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT), 3,
-                                        poolSizes);
+  vk::DescriptorPoolCreateInfo poolInfo({}, static_cast<u32>(MAX_FRAMES_IN_FLIGHT), 3, poolSizes);
   mDescriptorPool = CheckVulkanResVal(device->createDescriptorPoolUnique(poolInfo),
                                       "Failed to create unique descriptor pool");
 
@@ -164,7 +163,7 @@ void Shader2DLayer::OnAttach() {
   mSampler = CheckVulkanResVal(device->createSamplerUnique(samplerCreateInfo),
                                "Failed to create unique sampler");
 
-  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+  for (usize i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     vk::DescriptorBufferInfo bufferInfo(*mUniformBuffers[i], 0, sizeof(ViewProjection));
     vk::DescriptorImageInfo textureInfo({}, *mTexture.imageView,
                                         vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -200,7 +199,7 @@ void Shader2DLayer::OnDetach() {
   auto& device = mVulkanCtx.GetVulkanDevice();
   CheckVulkanRes(device->waitIdle(), "Failed to wait for device to idle");
 }
-void Shader2DLayer::UpdateUniformBuffer(uint32_t currentImage) const {
+void Shader2DLayer::UpdateUniformBuffer(u32 currentImage) const {
   ViewProjection vp{};
   std::ranges::fill(vp.proj, 0.0f);
   std::ranges::fill(vp.model, 0.0f);
@@ -240,9 +239,9 @@ void Shader2DLayer::UpdateUniformBuffer(uint32_t currentImage) const {
 
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
-void Shader2DLayer::OnRender(vk::CommandBuffer& cmd) {
+void Shader2DLayer::OnRender(vk::CommandBuffer cmd) {
   // Hack: calculate frame index
-  static uint32_t frameIndex = 0;
+  static u32 frameIndex = 0;
   frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
   UpdateUniformBuffer(frameIndex);
 

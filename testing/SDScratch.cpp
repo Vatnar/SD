@@ -1,214 +1,176 @@
-#include <Core/ECS/Entity.hpp>
-#include <format>
-#include <sstream>
-
-#include "../SDEngine/include/Core/Vulkan/VulkanContext.hpp"
-#include "Core/ECS/Component.hpp"
-#include "Core/ECS/EntityManager.hpp"
-#include "Core/Events/app/AppEvents.hpp"
-#include "Core/Events/window/KeyboardEvents.hpp"
-#include "Core/Events/window/WindowEvents.hpp"
-#include "Core/GlfwContext.hpp"
-#include "Core/Logging.hpp"
-#include "Core/Scene.hpp"
-#include "Core/Systems/Renderer/Material.hpp"
-#include "Core/Systems/Renderer/Mesh.hpp"
-#include "Core/Vulkan/VulkanRenderer.hpp"
-#include "Core/Vulkan/VulkanWindow.hpp"
-#include "Core/Window.hpp"
-#include "Layers/DebugInfoLayer.hpp"
-#include "Layers/ImGuiLayer.hpp"
-#include "Layers/PerformanceLayer.hpp"
-#include "Layers/Shader2DLayer.hpp"
-#include "VLA/Matrix.hpp"
+#include "Application.hpp"
+#include "Core/SceneView.hpp"
+#include "Entrypoint.hpp"
 
 
-// struct StaticMeshRef {
-//   std::shared_ptr<Mesh> mesh;
-// };
-// REGISTER_SD_COMPONENT(StaticMeshRef);
-//
-// struct MaterialRef {
-//   std::shared_ptr<Material> material;
-// };
-// REGISTER_SD_COMPONENT(MaterialRef);
-//
-// struct Transform {
-//   VLA::Matrix4x4f transform;
-// };
-// REGISTER_SD_COMPONENT(Transform);
-//
-// struct RigidBody {
-//   VLA::Vector3f velocity;
-//   VLA::Vector3f acceleration;
-//   VLA::Vector3f force;
-//   VLA::Vector3f moment;
-// };
-// REGISTER_SD_COMPONENT(RigidBody)
-//
-// struct Tag {
-//   const char* tag = "hey";
-// };
-// REGISTER_SD_COMPONENT(Tag)
-//
-;
-
-
-class Application {
-  GlfwContext mGlfwCtx;
-  VulkanContext mVulkanCtx;
-  VulkanRenderer mRenderer;
-
-  std::unique_ptr<Scene> mGameScene{};
-  std::unique_ptr<Scene> mEditorScene{};
-
-  std::vector<std::unique_ptr<Window>> mWindows{};
-  Window* mMainWindow;
-  std::vector<std::unique_ptr<VulkanWindow>> mVulkanWindows{};
-
-  // App events
-  EventManager mAppEventManager{};
-  LayerList mNonVisualLayers{};
-
-
-  bool mRunning = true;
-
+class UpdateTimingsLayer : public SD::Layer {
 public:
-  Application() :
-    mVulkanCtx(mGlfwCtx), mRenderer(mVulkanCtx), mMainWindow(nullptr), mVulkanWindows(),
-    mAppEventManager(), mNonVisualLayers() {
-    auto window = WindowBuilder().SetTitle("SDEngine").SetSize(1280, 720).Build();
-
-    mVulkanCtx.Init(*window);
-
-    auto vw = std::make_unique<VulkanWindow>(*window, mVulkanCtx);
-    mVulkanWindows.push_back(std::move(vw));
-
-    mWindows.push_back(std::move(window));
-    mMainWindow = mWindows.front().get();
-
-    // Scenes, TODO: make it possible to run these, while reloading layers
-    mGameScene = std::make_unique<Scene>();
-
-    // Layers
-    std::vector<std::string> textures = {"assets/textures/CreateNoteInteraction.png",
-                                         "assets/textures/example.jpg"};
-
-    // Note: Passing *mVulkanWindows.front() (which is the unique_ptr content)
-    mMainWindow->LayerStack.PushLayer<Shader2DLayer>(*mGameScene, mVulkanCtx,
-                                                     *mVulkanWindows.front(), textures);
-
-    // dont need a window, just prints to terminal
-    mNonVisualLayers.PushLayer<PerformanceLayer>(*mGameScene);
+  UpdateTimingsLayer() : Layer("UpdateTimings"), mPrevFixed(0), mPrevUpdate(0) {}
 
 
-    mMainWindow->LayerStack.PushLayer<DebugInfoLayer>(*mGameScene);
-    mMainWindow->LayerStack.PushLayer<ImGuiLayer>(*mGameScene, mVulkanCtx, *mMainWindow);
-  }
+  void OnUpdate(float dt) override {
+    mUpdateCount++;
+    mTimer += dt;
 
-  ~Application() = default;
-
-  void RenderWindow(Window& window, VulkanWindow& vw) {
-    if (vw.IsMinimized())
-      return;
-
-    // 1. Process Window Events (including Resize)
-    for (auto& e : window.GetEventManager()) {
-      EventDispatcher dispatcher(*e);
-
-      dispatcher.Dispatch<WindowResizeEvent>([&](const WindowResizeEvent& event) {
-        vw.Resize(event.width, event.height);
-        return false; // pass to layers too
-      });
-      dispatcher.Dispatch<WindowCloseEvent>([&](const WindowCloseEvent& ev) {
-        if (&window == mMainWindow) {
-          mRunning = false;
-        }
-        return false;
-      });
-
-      // propagate events
-      window.LayerStack.OnEvent(*e);
-    }
-    window.GetEventManager().Clear();
-
-    // 2. Handle Resize (Immediate)
-    if (vw.IsFramebufferResized()) {
-      vw.RecreateSwapchain(window.LayerStack);
-      vw.ResetFramebufferResized();
-    }
-
-    if (!mRunning)
-      return;
-
-    // 3. Acquire Image
-    auto& frameSync = vw.GetFrameSync();
-    auto [acquireResult, imageIndex] = vw.GetVulkanImages(frameSync.imageAcquired);
-
-    if (acquireResult == vk::Result::eErrorOutOfDateKHR) {
-      vw.RecreateSwapchain(window.LayerStack);
-      return;
-    }
-
-    // 4. ImGui Begin
-    if (auto* imguiLayer = window.LayerStack.Get<ImGuiLayer>()) {
-      imguiLayer->Begin();
-    }
-
-    // 5. Update Layers
-    for (auto& layer : window.LayerStack) {
-      if (dynamic_cast<ImGuiLayer*>(layer.get()))
-        continue;
-      layer->OnUpdate(0.016f);
-    }
-
-    // 6. Record & Submit
-    vk::CommandBuffer cmd = mRenderer.BeginFrame(vw);
-    for (auto& layer : window.LayerStack) {
-      layer->OnRender(cmd);
-    }
-    vk::Result presentRes = mRenderer.EndFrame(vw); // Submit & Present
-
-    if (presentRes == vk::Result::eErrorOutOfDateKHR || presentRes == vk::Result::eSuboptimalKHR) {
-      vw.RecreateSwapchain(window.LayerStack);
+    if (mTimer >= 1.0f) {
+      mPrevFixed = mFixedUpdateCount;
+      mPrevUpdate = mUpdateCount;
+      mFixedUpdateCount = 0;
+      mUpdateCount = 0;
+      mTimer = 0.0f;
     }
   }
 
-  void Run() {
-    while (mRunning) {
-      glfwPollEvents();
+  void OnFixedUpdate(double fixedDelta) override {
+    mFixedUpdateCount++;
 
-      for (auto& e : mAppEventManager) {
-        OnAppEvent(*e);
-      }
-      mAppEventManager.Clear();
+    mPhysicsTime += fixedDelta;
+  }
+  void OnGuiRender() override {
+    ImGui::Begin("Timings");
+    if (ImGui::BeginTable("Timings", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
+      ImGui::TableSetupColumn("Metric", ImGuiTableColumnFlags_WidthFixed);
+      ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+      ImGui::Text("Fixed Updates");
+      ImGui::TableNextColumn();
+      ImGui::Text("%4d (60 Hz)", mPrevFixed);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+      ImGui::Text("Frame Rate");
+      ImGui::TableNextColumn();
+      ImGui::Text("%4d FPS", mPrevUpdate);
 
-      for (auto& layer : mNonVisualLayers) {
-        layer->OnUpdate(0.016f); // TODO: DeltaTime // fixed dt
-      }
-
-      // Process Windows
-      for (size_t i = 0; i < mWindows.size(); ++i) {
-        RenderWindow(*mWindows[i], *mVulkanWindows[i]);
-      }
+      ImGui::EndTable();
     }
+    ImGui::End();
   }
 
-  void OnAppEvent(Event& e) {
-    EventDispatcher dispatcher(e);
+private:
+  float mTimer = 0.0f;
+  int mUpdateCount = 0;
+  int mFixedUpdateCount = 0;
 
-    dispatcher.Dispatch<AppTerminateEvent>([this](AppTerminateEvent&) {
-      mRunning = false;
-      return true;
-    });
+  int mPrevFixed;
+  int mPrevUpdate;
 
-    mNonVisualLayers.OnEvent(e);
+  double mPhysicsTime = 0.0;
+};
+
+
+class GameLayer : public SD::Layer {
+public:
+  using Layer::Layer;
+  void OnGuiRender() override {
+    ImGui::Text("--- Game View ---");
+    if (mScene) {
+      ImGui::Text("Scene connected.");
+      if (ImGui::Button("Spawn Entity")) {
+        mScene->GetEntityManager().Create();
+      }
+    }
   }
 };
 
-int main() {
-  init_logging();
+class DebugLayer : public SD::Layer {
+public:
+  using Layer::Layer;
+  void OnGuiRender() override {
+    ImGui::Text("--- Debug View ---");
+    if (mScene) {
+      auto& em = mScene->GetEntityManager();
+      ImGui::Text("Monitoring shared Scene...");
+      ImGui::Separator();
+      ImGui::Text("Count: %d", em.GetEntityCount());
+    }
+  }
+};
+class RectangleLayer : public SD::Layer {
+public:
+  using Layer::Layer;
+  void OnRender(vk::CommandBuffer cmd) override {}
+  void OnGuiRender() override {
+    ImGui::Text("Rectangle Viewport (Vulkan Drawing)");
+    ImGui::Text("Size: %.0f x %.0f", ImGui::GetContentRegionAvail().x,
+                ImGui::GetContentRegionAvail().y);
 
-  Application app;
-  app.Run();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImVec2 p1 = ImVec2(p0.x + 100, p0.y + 100);
+    draw_list->AddRectFilled(p0, p1, IM_COL32(255, 0, 0, 255));
+    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Vulkan-backed Rect");
+  }
+};
+
+class GuiTest : public SD::Layer {
+public:
+  explicit GuiTest(SD::Scene* anotherScene) :
+    Layer("Sandbox Controls"), mAnotherScene(anotherScene) {}
+
+  void OnGuiRender() override {
+    ImGui::Begin("Workspace Manager");
+    if (ImGui::Button("Toggle Game View")) {
+      auto& app = SD::Application::Get();
+      if (auto id = app.GetViewId("Game View"))
+        app.RemoveView(id.value());
+      else {
+        auto view = app.CreateView<SD::View>("Game View").value();
+        app.PushLayerToView<GameLayer>(view, "GameLogic", mScene);
+      }
+    }
+    if (ImGui::Button("Toggle Game2 View")) {
+      auto& app = SD::Application::Get();
+      if (app.GetView("Game2 View"))
+        app.RemoveView("Game2 View");
+      else {
+        auto view = app.CreateView<SD::View>("Game2 View").value();
+        app.PushLayerToView<GameLayer>(view, "GameLogic", mAnotherScene);
+      }
+    }
+    if (ImGui::Button("Toggle Debug View")) {
+      auto& app = SD::Application::Get();
+      if (app.GetView("Debug View")) {
+        app.RemoveView("Debug View");
+      } else {
+        auto view = app.CreateView<SD::View>("Debug View").value();
+        app.PushLayerToView<DebugLayer>(view, "Debug View", mScene);
+      }
+    }
+    if (ImGui::Button("Toggle Debug2 View")) {
+      auto& app = SD::Application::Get();
+      if (app.GetView("Debug2 View"))
+        app.RemoveView("Debug2 View");
+      else {
+        auto view = app.CreateView<SD::View>("Debug2 View").value();
+        app.PushLayerToView<DebugLayer>(view, "Debug view", mAnotherScene);
+      }
+    }
+    ImGui::End();
+  }
+
+private:
+  SD::Scene* mAnotherScene;
+  int mSceneCount = 0;
+};
+
+class SandboxApp : public SD::Application {
+public:
+  SandboxApp() :
+    Application({"Sandbox", 1280, 720}), mSharedScene(std::make_unique<SD::Scene>()),
+    mAnotherScene(std::make_unique<SD::Scene>()) {
+    PushGlobalLayer<UpdateTimingsLayer>();
+
+    SD::WindowId mainWin = 0;
+    auto& ctrl = PushViewLayer<GuiTest>(mainWin, mAnotherScene.get());
+    ctrl.SetScene(mSharedScene.get());
+  }
+
+private:
+  std::unique_ptr<SD::Scene> mSharedScene;
+  std::unique_ptr<SD::Scene> mAnotherScene;
+};
+
+SD::Application* CreateApplication() {
+  return new SandboxApp();
 }

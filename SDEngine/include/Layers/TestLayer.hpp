@@ -6,6 +6,7 @@
 #include "Core/Vulkan/VulkanConfig.hpp"
 #include "Core/Vulkan/VulkanContext.hpp"
 #include "Core/Vulkan/VulkanWindow.hpp"
+#include "Core/types.hpp"
 #include "Utils/Utils.hpp"
 
 // TODO: REMOVE
@@ -35,7 +36,7 @@ public:
 
   void OnDetach() override;
 
-  void UpdateUniformBuffer(uint32_t currentImage) const;
+  void UpdateUniformBuffer(u32 currentImage) const;
 
   void OnRender(vk::CommandBuffer& cmd) override;
 

@@ -78,7 +78,7 @@ vk::PhysicalDeviceVulkan13Features& VulkanContext::GetFeatures13() {
   return mFeatures13;
 }
 
-uint32_t VulkanContext::GetGraphicsFamilyIndex() const {
+u32 VulkanContext::GetGraphicsFamilyIndex() const {
   return mGraphicsFamilyIndex;
 }
 vk::Queue VulkanContext::GetGraphicsQueue() const {
@@ -105,9 +105,9 @@ vk::UniqueInstance VulkanContext::CreateVulkanApplicationInstance() {
 }
 void VulkanContext::SetupQueues(vk::SurfaceKHR surface) {
   auto queueFamilies = mPhysDev.getQueueFamilyProperties();
-  uint32_t graphicsFamilyIndex = UINT32_MAX;
+  u32 graphicsFamilyIndex = UINT32_MAX;
 
-  for (uint32_t i = 0; i < queueFamilies.size(); ++i) {
+  for (u32 i = 0; i < queueFamilies.size(); ++i) {
     if ((queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) ==
         vk::QueueFlagBits::eGraphics) {
       vk::Bool32 supportsPresent = vk::False;

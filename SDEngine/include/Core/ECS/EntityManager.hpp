@@ -21,7 +21,7 @@ public:
   struct Iterator {
     EntityManager& manager;
     const std::vector<Entity>* entities;
-    size_t index;
+    usize index;
 
     using iterator_category = std::forward_iterator_tag;
     using value_type = std::tuple<Entity, Components&...>;
@@ -29,7 +29,7 @@ public:
     using pointer = void;
     using reference = value_type;
 
-    Iterator(EntityManager& em, const std::vector<Entity>* denseEntities, size_t idx);
+    Iterator(EntityManager& em, const std::vector<Entity>* denseEntities, usize idx);
     Iterator& operator++();
 
     bool operator==(const Iterator& other) const {
@@ -53,7 +53,7 @@ public:
 
 private:
   template<typename Component>
-  void CheckSize(size_t& minSize);
+  void CheckSize(usize& minSize);
 };
 
 
@@ -83,6 +83,7 @@ public:
   [[nodiscard]] std::vector<ComponentDebugInfo> GetAllComponentInfo(Entity e) const;
 
   [[nodiscard]] bool IsAlive(Entity e) const;
+  int GetEntityCount() { return mEntityMasks.Size(); }
 
 
   template<typename T>
@@ -118,9 +119,9 @@ public:
 
 
 private:
-  uint32_t PopFreeList();
-  std::vector<uint32_t> mGenerations;
-  std::vector<uint32_t> mFreeList;
+  u32 PopFreeList();
+  std::vector<u32> mGenerations;
+  std::vector<u32> mFreeList;
 
   std::vector<std::unique_ptr<SparseEntitySetBase>> mComponentPools;
   // TODO: make resizable

@@ -35,8 +35,8 @@ public:
 
   void OnDetach() override;
 
-  void UpdateUniformBuffer(uint32_t currentImage) const;
-  void OnRender(vk::CommandBuffer& cmd) override;
+  void UpdateUniformBuffer(u32 currentImage) const;
+  void OnRender(vk::CommandBuffer cmd) override;
 
   void OnEvent(Event& e) override;
 
@@ -75,7 +75,7 @@ private:
 
   std::vector<std::string> mShaderPaths = {"assets/shaders/pixel.hlsl",
                                            "assets/shaders/changeTestPixel.hlsl"};
-  uint32_t mCurrentShaderIndex = 0;
+  u32 mCurrentShaderIndex = 0;
 
   std::array<float, 4> mClearColor{};
 };

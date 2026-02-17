@@ -1,8 +1,10 @@
 #pragma once
 #include <cstddef>
 
+#include "Core/types.hpp"
+
 namespace SD {
-static consteval size_t BIT(size_t idx) {
+static consteval usize BIT(usize idx) {
   return 1ULL << idx;
 }
 
@@ -20,7 +22,7 @@ enum class EventType {
   /* mousebutton*/ MousePressed, MouseReleased,
   // clang-format on
 };
-enum EventCategory : uint16_t {
+enum EventCategory : u16 {
   None = 0,
   EventCategoryEngine = BIT(0),
   EventCategoryApplication = BIT(1), // For application specifics
@@ -32,7 +34,7 @@ enum EventCategory : uint16_t {
   EventCategoryController = BIT(7),
 };
 inline EventCategory operator|(const EventCategory a, const EventCategory b) {
-  return static_cast<EventCategory>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
+  return static_cast<EventCategory>(static_cast<u16>(a) | static_cast<u16>(b));
 }
 
 class Event {

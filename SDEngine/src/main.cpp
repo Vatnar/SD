@@ -2,7 +2,7 @@
 #include "Core/Logging.hpp"
 
 int main() {
-  SD::init_logging();
+  SD::Log::Init();
 
   SD::Application app;
   app.Run();

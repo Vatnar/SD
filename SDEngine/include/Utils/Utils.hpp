@@ -8,6 +8,7 @@
 #include <stb_image.h>
 
 #include "../Core/Vulkan/VulkanConfig.hpp"
+#include "Core/types.hpp"
 
 /**
  * @file Utils.hpp
@@ -15,7 +16,7 @@
  */
 
 namespace SD::Math {
-consteval size_t log2_int(std::unsigned_integral auto n) {
+consteval usize log2_int(std::unsigned_integral auto n) {
   // log2(n) = bit_width(n) - 1
   return n == 0 ? 0 : std::bit_width(n) - 1;
 }
@@ -51,12 +52,21 @@ inline void CheckVulkanRes(vk::Result result, std::string_view message,
 }
 
 template<typename T>
-T CheckVulkanResVal(vk::ResultValue<T>&& result, std::string_view message,
-                    std::source_location loc = std::source_location::current()) {
-  CheckVulkanRes(result.result, message, loc);
-
-  // NOTE: We need to use an explicit move here to guarantee no calling of deleted constructors
-  return std::move(result.value);
+auto CheckVulkanResVal(T&& result, std::string_view message,
+                       std::source_location loc = std::source_location::current()) {
+  // Try to detect if it's a vk::ResultValue or something like std::expected
+  if constexpr (requires { result.result; }) {
+    CheckVulkanRes(result.result, message, loc);
+    return std::move(result.value);
+  } else if constexpr (requires { result.has_value(); }) {
+    if (!result.has_value()) {
+      CheckVulkanRes(result.error(), message, loc);
+    }
+    return std::move(result.value());
+  } else {
+    // Fallback or assume it's already a value (though this shouldn't happen with this name)
+    return std::forward<T>(result);
+  }
 }
 
 

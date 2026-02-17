@@ -8,7 +8,7 @@
 #define ENGINE_LOG_LEVEL_CRITICAL 5
 #define ENGINE_LOG_LEVEL_OFF 6
 
-namespace SD {
+namespace SD::Log {
 enum class LogLevel {
   Trace = ENGINE_LOG_LEVEL_TRACE,
   Debug = ENGINE_LOG_LEVEL_DEBUG,
@@ -32,5 +32,5 @@ bool constexpr should_log(LogLevel level) {
 /**
  * @brief Initializes asynchronous logging
  */
-void init_logging();
-} // namespace SD
+void Init();
+} // namespace SD::Log

@@ -9,6 +9,12 @@ class LayerList
 
 {
 public:
+  LayerList() = default;
+  LayerList(const LayerList&) = delete;
+  LayerList& operator=(const LayerList&) = delete;
+
+  LayerList(LayerList&&) noexcept = default;
+  LayerList& operator=(LayerList&&) noexcept = default;
   using iterator = std::vector<std::unique_ptr<Layer>>::iterator;
   using const_iterator = std::vector<std::unique_ptr<Layer>>::const_iterator;
 
@@ -25,6 +31,18 @@ public:
     std::ranges::for_each(mLayers, [dt](const auto& layer) {
       if (layer->IsActive())
         layer->OnUpdate(dt);
+    });
+  }
+  void OnFixedUpdate(double dt) const {
+    std::ranges::for_each(mLayers, [dt](const auto& layer) {
+      if (layer->IsActive())
+        layer->OnFixedUpdate(dt);
+    });
+  }
+  void GuiRender() {
+    std::ranges::for_each(mLayers, [](const auto& layer) {
+      if (layer->IsActive())
+        layer->OnGuiRender();
     });
   }
 

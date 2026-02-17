@@ -31,7 +31,10 @@ public:
 
 class KeyTypedEvent : public Event {
 public:
-  // TODO: what we want here
+  unsigned int keyCode{};
+
+  explicit KeyTypedEvent(unsigned int keycode) : keyCode(keycode) {}
+
   EVENT_CLASS_TYPE(KeyTyped)
   EVENT_CLASS_CATEGORY(KeyCategory)
 };

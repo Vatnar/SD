@@ -22,8 +22,8 @@ struct ComponentIdGenerator {
   ComponentIdGenerator& operator=(const ComponentIdGenerator&) = delete;
 
 private:
-  static inline size_t counter = 0;
-  static size_t Next() { return counter++; }
+  static inline usize counter = 0;
+  static usize Next() { return counter++; }
   template<typename T>
   friend struct ComponentTraits;
 };
@@ -45,12 +45,12 @@ struct ComponentTraits {
  * @details Needs to be run to use a component with ECS
  * @param Type struct type
  */
-#define REGISTER_SD_COMPONENT(Type)                                       \
-  template<>                                                              \
-  struct ComponentTraits<Type> {                                          \
-    static constexpr bool IsRegistered = true;                            \
-    static constexpr const char* Name = "SD_" #Type;                      \
-    static inline const size_t Id = detail::ComponentIdGenerator::Next(); \
+#define REGISTER_SD_COMPONENT(Type)                                      \
+  template<>                                                             \
+  struct ComponentTraits<Type> {                                         \
+    static constexpr bool IsRegistered = true;                           \
+    static constexpr const char* Name = "SD_" #Type;                     \
+    static inline const usize Id = detail::ComponentIdGenerator::Next(); \
   };
 
 /**
@@ -58,16 +58,16 @@ struct ComponentTraits {
  * @details Needs to be run to use a component with ECS
  * @param Type struct type
  */
-#define REGISTER_COMPONENT(Type)                                          \
-  template<>                                                              \
-  struct ComponentTraits<Type> {                                          \
-    static constexpr bool IsRegistered = true;                            \
-    static constexpr const char* Name = #Type;                            \
-    static inline const size_t Id = detail::ComponentIdGenerator::Next(); \
+#define REGISTER_COMPONENT(Type)                                         \
+  template<>                                                             \
+  struct ComponentTraits<Type> {                                         \
+    static constexpr bool IsRegistered = true;                           \
+    static constexpr const char* Name = #Type;                           \
+    static inline const usize Id = detail::ComponentIdGenerator::Next(); \
   };
 
 struct ComponentDebugInfo {
-  size_t id;
+  usize id;
   const char* name;
   void* data;
 };

@@ -1,11 +1,11 @@
 #include "Core/Logging.hpp"
 
-#include "Core/Base.hpp"
 #include "spdlog/async.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
-namespace SD {
-void init_logging() {
+
+namespace SD::Log {
+void Init() {
   spdlog::init_thread_pool(8192, 1);
 
   std::vector<spdlog::sink_ptr> sinks;
@@ -15,8 +15,6 @@ void init_logging() {
   auto engine = std::make_shared<spdlog::async_logger>("engine", sinks.begin(), sinks.end(),
                                                        spdlog::thread_pool(),
                                                        spdlog::async_overflow_policy::block);
-  SD_DISABLE_WARNING_PUSH
-  SD_DISABLE_WARNING("-Wunreachable-code")
   switch (cLOG_LEVEL) {
     case LogLevel::Trace:
       engine->set_level(spdlog::level::trace);
@@ -42,11 +40,10 @@ void init_logging() {
     default:
       engine->set_level(spdlog::level::info);
   }
-  SD_DISABLE_WARNING_POP
 
   engine->flush_on(spdlog::level::warn);
 
 
   spdlog::register_logger(engine);
 }
-} // namespace SD
+} // namespace SD::Log

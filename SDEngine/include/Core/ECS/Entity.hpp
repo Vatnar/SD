@@ -1,11 +1,11 @@
 #pragma once
-#include <cstdint>
+#include "Core/types.hpp"
 
 
 namespace SD {
 struct Entity {
-  uint32_t index;
-  uint32_t generation;
+  u32 index;
+  u32 generation;
 
   bool operator==(Entity other) const {
     return index == other.index && generation == other.generation;

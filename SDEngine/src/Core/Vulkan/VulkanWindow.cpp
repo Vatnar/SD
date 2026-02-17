@@ -32,7 +32,7 @@ VulkanWindow::VulkanWindow(Window& mWindow, VulkanContext& vulkanContext) :
 }
 VulkanWindow::~VulkanWindow() {
   // Use raw call to avoid Vulkan-Hpp assertions during shutdown
-  mDevice.waitIdle();
+  (void)mDevice.waitIdle();
 
   mFramebuffers.clear();
   mSwapchainImageViews.clear();
@@ -41,8 +41,8 @@ VulkanWindow::~VulkanWindow() {
 }
 
 void VulkanWindow::RecreateSwapchain(LayerList& layers) {
-  uint32_t oldWidth = mSwapchainExtent.width;
-  uint32_t oldHeight = mSwapchainExtent.height;
+  u32 oldWidth = mSwapchainExtent.width;
+  u32 oldHeight = mSwapchainExtent.height;
 
   auto [fbWidth, fbHeight] = mWindow.GetFramebufferSize();
 
@@ -53,12 +53,12 @@ void VulkanWindow::RecreateSwapchain(LayerList& layers) {
   }
   mIsMinimized = false;
 
-  if (static_cast<uint32_t>(fbWidth) == oldWidth && static_cast<uint32_t>(fbHeight) == oldHeight) {
+  if (static_cast<u32>(fbWidth) == oldWidth && static_cast<u32>(fbHeight) == oldHeight) {
     // Already correct size
     return;
   }
 
-  mDevice.waitIdle();
+  (void)mDevice.waitIdle();
 
   mFramebuffers.clear();
   mSwapchainImageViews.clear();
@@ -74,7 +74,7 @@ const Window& VulkanWindow::GetWindow() const {
 FrameSync& VulkanWindow::GetFrameSync() {
   return mFrameSyncs[CurrentFrame];
 }
-SwapchainSync& VulkanWindow::GetSwapchainSync(const uint32_t imageIndex) {
+SwapchainSync& VulkanWindow::GetSwapchainSync(const u32 imageIndex) {
   return mSwapchainSyncs[imageIndex];
 }
 vk::UniqueSwapchainKHR& VulkanWindow::GetSwapchain() {
@@ -103,16 +103,19 @@ vk::RenderPass VulkanWindow::GetRenderPass() const {
   return *mRenderPass;
 }
 
-vk::ResultValue<uint32_t> VulkanWindow::GetVulkanImages(vk::UniqueSemaphore& imageAcquired) {
-  uint32_t imageIndex;
+std::expected<u32, vk::Result> VulkanWindow::GetVulkanImages(vk::UniqueSemaphore& imageAcquired) {
+  u32 imageIndex;
   vk::Result res =
       mDevice.acquireNextImageKHR(*mSwapchain, UINT64_MAX, *imageAcquired, nullptr, &imageIndex);
 
   CurrentImageIndex = imageIndex;
-  return {res, imageIndex};
+  if (res == vk::Result::eSuccess || res == vk::Result::eSuboptimalKHR) {
+    return imageIndex;
+  }
+  return std::unexpected(res);
 }
 
-vk::Result VulkanWindow::PresentImage(uint32_t imageIndex) {
+vk::Result VulkanWindow::PresentImage(u32 imageIndex) {
   vk::PresentInfoKHR presentInfo{};
   presentInfo.setWaitSemaphores(*mSwapchainSyncs[imageIndex].renderComplete);
   presentInfo.setSwapchainCount(1);
@@ -157,13 +160,13 @@ void VulkanWindow::CreateSwapchain() {
   if (caps.currentExtent.width != UINT32_MAX) {
     mSwapchainExtent = caps.currentExtent;
   } else {
-    mSwapchainExtent.width = std::clamp(static_cast<uint32_t>(windowWidth),
-                                        caps.minImageExtent.width, caps.maxImageExtent.width);
-    mSwapchainExtent.height = std::clamp(static_cast<uint32_t>(windowHeight),
-                                         caps.minImageExtent.height, caps.maxImageExtent.height);
+    mSwapchainExtent.width = std::clamp(static_cast<u32>(windowWidth), caps.minImageExtent.width,
+                                        caps.maxImageExtent.width);
+    mSwapchainExtent.height = std::clamp(static_cast<u32>(windowHeight), caps.minImageExtent.height,
+                                         caps.maxImageExtent.height);
   }
 
-  uint32_t desiredImageCount = caps.minImageCount + 1;
+  u32 desiredImageCount = caps.minImageCount + 1;
   if (caps.maxImageCount > 0 && desiredImageCount > caps.maxImageCount)
     desiredImageCount = caps.maxImageCount;
 
@@ -277,7 +280,7 @@ void VulkanWindow::CreateSwapchainDependentResources() {
 void VulkanWindow::CreateFramebuffers() {
   mFramebuffers.resize(mSwapchainImageViews.size());
 
-  for (size_t i = 0; i < mSwapchainImageViews.size(); i++) {
+  for (usize i = 0; i < mSwapchainImageViews.size(); i++) {
     vk::ImageView attachments[] = {*mSwapchainImageViews[i]};
 
     vk::FramebufferCreateInfo framebufferInfo{};

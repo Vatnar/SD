@@ -8,10 +8,7 @@
 #include "Utils/Utils.hpp"
 
 
-namespace SD {
-// TODO: Maybe we want a builder pattern instead of window desc.
-// TODO: also this repeats a buinch of shit
-Window::Window(int width, int height, const std::string& title) {
+SD::Window::Window(int width, int height, const std::string& title) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
   mHandle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
@@ -35,9 +32,11 @@ Window::Window(int width, int height, const std::string& title) {
   glfwSetMouseButtonCallback(mHandle, DispatchMouseButton);
   glfwSetWindowCloseCallback(mHandle, DispatchClose);
   glfwSetWindowRefreshCallback(mHandle, DispatchRefresh);
+  glfwSetCharCallback(mHandle, DispatchChar);
 }
 
-Window::Window(const WindowDesc& desc) {
+
+SD::Window::Window(const WindowDesc& desc) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
   mHandle = glfwCreateWindow(desc.width, desc.height, desc.title, nullptr, nullptr);
@@ -90,6 +89,9 @@ Window::Window(const WindowDesc& desc) {
         break;
     }
   };
+  CharCallback DefaultCharCallback = [this](unsigned int keycode) {
+    mWindowEventManager.PushEvent<KeyTypedEvent>(keycode);
+  };
 
   mResizeCallback = desc.resizeCallback ? desc.resizeCallback : DefaultResizeCallback;
   mKeyCallback = desc.keyCallback ? desc.keyCallback : DefaultKeyCallback;
@@ -98,6 +100,7 @@ Window::Window(const WindowDesc& desc) {
   mMouseButtonCallback = desc.mouseButtonCallback ? desc.mouseButtonCallback : DefaultMouseCallback;
   mRefreshCallback = desc.refreshCallback ? desc.refreshCallback : []() {
   };
+  mCharCallback = desc.charCallback ? desc.charCallback : DefaultCharCallback;
 
   glfwSetWindowSizeCallback(mHandle, DispatchResize);
   glfwSetFramebufferSizeCallback(mHandle, DispatchResize);
@@ -107,19 +110,20 @@ Window::Window(const WindowDesc& desc) {
   glfwSetMouseButtonCallback(mHandle, DispatchMouseButton);
   glfwSetWindowCloseCallback(mHandle, DispatchClose);
   glfwSetWindowRefreshCallback(mHandle, DispatchRefresh);
+  glfwSetCharCallback(mHandle, DispatchChar);
 }
 
-Window::~Window() {
+SD::Window::~Window() {
   if (mHandle)
     glfwDestroyWindow(mHandle);
 }
 
-std::pair<int, int> Window::GetWindowSize() const {
+std::pair<int, int> SD::Window::GetWindowSize() const {
   int w = 0, h = 0;
   glfwGetWindowSize(mHandle, &w, &h);
   return {w, h};
 }
-std::pair<int, int> Window::GetFramebufferSize() const {
+std::pair<int, int> SD::Window::GetFramebufferSize() const {
   int w{0}, h{0};
   glfwGetFramebufferSize(mHandle, &w, &h);
   return {w, h};
@@ -127,8 +131,8 @@ std::pair<int, int> Window::GetFramebufferSize() const {
 
 
 vk::UniqueSurfaceKHR
-Window::CreateWindowSurface(vk::UniqueInstance& instance,
-                            const VkAllocationCallbacks* allocationCallback) const {
+SD::Window::CreateWindowSurface(vk::UniqueInstance& instance,
+                                const VkAllocationCallbacks* allocationCallback) const {
   VkSurfaceKHR surface;
   auto res = glfwCreateWindowSurface(*instance, mHandle, allocationCallback, &surface);
   if (res != VK_SUCCESS) {
@@ -137,84 +141,92 @@ Window::CreateWindowSurface(vk::UniqueInstance& instance,
   }
   return vk::UniqueSurfaceKHR{surface, *instance};
 }
-void Window::DispatchResize(GLFWwindow* window, int width, int height) {
+void SD::Window::DispatchResize(GLFWwindow* window, int width, int height) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
       self && self->mResizeCallback)
     self->mResizeCallback(width, height);
 }
-void Window::DispatchClose(GLFWwindow* window) {
+void SD::Window::DispatchClose(GLFWwindow* window) {
   if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window))) {
     self->mWindowEventManager.PushEvent<WindowCloseEvent>();
     glfwSetWindowShouldClose(window, GLFW_FALSE);
   }
 }
-void Window::DispatchKey(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void SD::Window::DispatchKey(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
       self && self->mKeyCallback)
     self->mKeyCallback(key, scancode, action, mods);
 }
-void Window::DispatchScroll(GLFWwindow* window, double xOffset, double yOffset) {
+void SD::Window::DispatchScroll(GLFWwindow* window, double xOffset, double yOffset) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
       self && self->mScrollCallback)
     self->mScrollCallback(xOffset, yOffset);
 }
-void Window::DispatchCursor(GLFWwindow* window, double xPos, double yPos) {
+void SD::Window::DispatchCursor(GLFWwindow* window, double xPos, double yPos) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
       self && self->mCursorCallback)
     self->mCursorCallback(xPos, yPos);
 }
-void Window::DispatchMouseButton(GLFWwindow* window, int button, int action, int mods) {
+void SD::Window::DispatchMouseButton(GLFWwindow* window, int button, int action, int mods) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
       self && self->mMouseButtonCallback)
     self->mMouseButtonCallback(button, action, mods);
 }
-void Window::DispatchRefresh(GLFWwindow* window) {
+void SD::Window::DispatchRefresh(GLFWwindow* window) {
   if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
       self && self->mRefreshCallback)
     self->mRefreshCallback();
 }
-WindowBuilder& WindowBuilder::SetTitle(const char* title) {
+void SD::Window::DispatchChar(GLFWwindow* window, unsigned int keycode) {
+  if (const auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
+      self && self->mCharCallback)
+    self->mCharCallback(keycode);
+}
+SD::WindowBuilder& SD::WindowBuilder::SetTitle(const char* title) {
   mDesc.title = title;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetSize(const int width, const int height) {
+SD::WindowBuilder& SD::WindowBuilder::SetSize(const int width, const int height) {
   mDesc.width = width;
   mDesc.height = height;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetWidth(const int width) {
+SD::WindowBuilder& SD::WindowBuilder::SetWidth(const int width) {
   mDesc.width = width;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetHeight(const int height) {
+auto SD::WindowBuilder::SetHeight(const int height) -> SD::WindowBuilder& {
   mDesc.height = height;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetResizeCallback(const ResizeCallback& callback) {
+SD::WindowBuilder& SD::WindowBuilder::SetResizeCallback(const ResizeCallback& callback) {
   mDesc.resizeCallback = callback;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetKeyCallback(const KeyCallback& callback) {
+SD::WindowBuilder& SD::WindowBuilder::SetKeyCallback(const KeyCallback& callback) {
   mDesc.keyCallback = callback;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetScrollCallback(const ScrollCallback& callback) {
+SD::WindowBuilder& SD::WindowBuilder::SetScrollCallback(const ScrollCallback& callback) {
   mDesc.scrollCallback = callback;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetCursorCallback(const CursorCallback& callback) {
+SD::WindowBuilder& SD::WindowBuilder::SetCursorCallback(const CursorCallback& callback) {
   mDesc.cursorCallback = callback;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetMouseButtonCallback(const MouseButtonCallback& callback) {
+SD::WindowBuilder& SD::WindowBuilder::SetMouseButtonCallback(const MouseButtonCallback& callback) {
   mDesc.mouseButtonCallback = callback;
   return *this;
 }
-WindowBuilder& WindowBuilder::SetRefreshCallback(const RefreshCallback& callback) {
+SD::WindowBuilder& SD::WindowBuilder::SetRefreshCallback(const RefreshCallback& callback) {
   mDesc.refreshCallback = callback;
   return *this;
 }
-std::unique_ptr<Window> WindowBuilder::Build() const {
+SD::WindowBuilder& SD::WindowBuilder::SetCharCallback(const CharCallback& callback) {
+  mDesc.charCallback = callback;
+  return *this;
+}
+std::unique_ptr<SD::Window> SD::WindowBuilder::Build() const {
   return std::make_unique<Window>(mDesc);
 }
-} // namespace SD

@@ -42,7 +42,7 @@ public:
 
   [[nodiscard]] vk::RenderPass GetRenderPass() const;
 
-  vk::ResultValue<uint32_t> GetVulkanImages(vk::UniqueSemaphore& imageAcquired);
+  std::expected<uint32_t, vk::Result> GetVulkanImages(vk::UniqueSemaphore& imageAcquired);
   vk::Result PresentImage(uint32_t imageIndex);
 
   void RebuildPerImageSync();
@@ -56,6 +56,7 @@ public:
   void ResetFramebufferResized() { mFramebufferResized = false; }
 
   vk::CommandBuffer GetCurrentCommandBuffer() const { return *mCommandBuffers[CurrentFrame]; }
+  VulkanContext& GetVulkanContext() { return mVulkanCtx; }
 
 private:
   void CreateSwapchain();

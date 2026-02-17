@@ -15,6 +15,8 @@ using ScrollCallback = std::function<void(double, double)>;
 using CursorCallback = std::function<void(double, double)>;
 using MouseButtonCallback = std::function<void(int, int, int)>;
 using RefreshCallback = std::function<void()>;
+using CharCallback = std::function<void(unsigned int)>;
+
 
 class Window;
 struct WindowDesc {
@@ -28,6 +30,7 @@ struct WindowDesc {
   CursorCallback cursorCallback{nullptr};
   MouseButtonCallback mouseButtonCallback{nullptr};
   RefreshCallback refreshCallback{nullptr};
+  CharCallback charCallback{nullptr};
 };
 
 
@@ -57,6 +60,7 @@ public:
     mMouseButtonCallback = callback;
   }
   void SetRefreshCallback(const RefreshCallback& callback) { mRefreshCallback = callback; }
+  void SetCharCallback(const CharCallback& callback) { mCharCallback = callback; }
 
   [[nodiscard]] GLFWwindow* GetNativeHandle() const { return mHandle; }
   [[nodiscard]] std::pair<int, int> GetWindowSize() const;
@@ -78,6 +82,7 @@ private:
   CursorCallback mCursorCallback;
   MouseButtonCallback mMouseButtonCallback;
   RefreshCallback mRefreshCallback;
+  CharCallback mCharCallback;
 
   EventManager mWindowEventManager;
 
@@ -89,6 +94,7 @@ private:
   static void DispatchCursor(GLFWwindow* window, double xPos, double yPos);
   static void DispatchMouseButton(GLFWwindow* window, int button, int action, int mods);
   static void DispatchRefresh(GLFWwindow* window);
+  static void DispatchChar(GLFWwindow* window, unsigned int keycode);
 };
 
 class WindowBuilder {
@@ -105,6 +111,7 @@ public:
   WindowBuilder& SetCursorCallback(const CursorCallback& callback);
   WindowBuilder& SetMouseButtonCallback(const MouseButtonCallback& callback);
   WindowBuilder& SetRefreshCallback(const RefreshCallback& callback);
+  WindowBuilder& SetCharCallback(const CharCallback& callback);
 
   [[nodiscard]] std::unique_ptr<Window> Build() const;
 

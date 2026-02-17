@@ -11,15 +11,12 @@ set_target_properties(stb PROPERTIES DISABLE_PRECOMPILE_HEADERS ON)
 set(ENGINE_SOURCES
         src/Core/Vulkan/VulkanContext.cpp
         src/Core/Window.cpp
-        src/Core/Layer.cpp
-        src/Layers/ImGuiLayer.cpp
-        src/Layers/TestLayer.cpp
-        src/Layers/Shader2DLayer.cpp
-        src/Systems/Renderer/Vertex.cpp
+        src/Core/Layers/SDImGuiContext.cpp
         src/Core/Logging.cpp
-        include/Core/Base.hpp
         src/Core/Vulkan/VulkanRenderer.cpp
         src/Core/Vulkan/VulkanWindow.cpp
+        src/Core/Vulkan/VulkanFramebuffer.cpp
+        src/Core/SDImGuiViewport.cpp
         src/Application.cpp
 )
 
@@ -72,6 +69,9 @@ target_precompile_headers(SDEngineLib PRIVATE
 
 target_compile_definitions(SDEngineLib PUBLIC
         SPDLOG_COMPILED_LIB
+        VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
+        VULKAN_HPP_USE_STD_EXPECTED=1
+        VULKAN_HPP_NO_EXCEPTIONS=1
         # Debug-only definitions
         $<$<CONFIG:Debug>:ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_TRACE>
         $<$<CONFIG:Debug>:_DEBUG>

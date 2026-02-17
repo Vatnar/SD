@@ -1,12 +1,12 @@
 template<typename... Components>
 ViewImpl<Components...>::ViewImpl(EntityManager& manager) : mManager(manager) {
-  size_t minSize = std::numeric_limits<size_t>::max();
+  usize minSize = std::numeric_limits<usize>::max();
 
   (CheckSize<Components>(minSize), ...);
 }
 template<typename... Components>
 ViewImpl<Components...>::Iterator::Iterator(EntityManager& em,
-                                            const std::vector<Entity>* denseEntities, size_t idx) :
+                                            const std::vector<Entity>* denseEntities, usize idx) :
   manager(em), entities(denseEntities), index(idx) {
   if (index < entities->size() && !IsValid()) {
     Next();
@@ -46,7 +46,7 @@ typename ViewImpl<Components...>::Iterator ViewImpl<Components...>::end() {
 }
 template<typename... Components>
 template<typename Component>
-void ViewImpl<Components...>::CheckSize(size_t& minSize) {
+void ViewImpl<Components...>::CheckSize(usize& minSize) {
   if (!mManager.HasComponentPool<Component>()) {
     minSize = 0;
     mSmallestPool = nullptr;
@@ -65,7 +65,7 @@ template<typename T, typename... Args>
 T* EntityManager::AddComponent(Entity e, Args&&... args) {
   static_assert(ComponentTraits<T>::IsRegistered,
                 "Error: Component type is not registered, register it");
-  const size_t typeId = ComponentTraits<T>::Id;
+  const usize typeId = ComponentTraits<T>::Id;
 
 
   if (typeId >= mComponentPools.size())
@@ -89,7 +89,7 @@ T* EntityManager::TryGetComponent(Entity e) {
   static_assert(ComponentTraits<T>::IsRegistered,
                 "Error: Component type is not registered, register it");
 
-  size_t typeId = ComponentTraits<T>::Id;
+  usize typeId = ComponentTraits<T>::Id;
   if (typeId >= mComponentPools.size() || !mComponentPools[typeId] ||
       !mEntityMasks[e]->test(typeId))
     return nullptr;
@@ -99,7 +99,7 @@ T* EntityManager::TryGetComponent(Entity e) {
 }
 template<typename T>
 T& EntityManager::GetComponent(Entity e) {
-  size_t typeId = ComponentTraits<T>::Id;
+  usize typeId = ComponentTraits<T>::Id;
   assert(HasComponent<T>(e) && "Entity doesnt have component");
 
   auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
@@ -111,7 +111,7 @@ bool EntityManager::TryRemoveComponent(Entity e) {
   static_assert(ComponentTraits<T>::IsRegistered,
                 "Error: Can't remove component type that isn't registered");
 
-  size_t typeId = ComponentTraits<T>::Id;
+  usize typeId = ComponentTraits<T>::Id;
   if (typeId >= mComponentPools.size() || !mComponentPools[typeId] ||
       !mEntityMasks[e]->test(typeId))
     return false;
@@ -158,7 +158,7 @@ std::tuple<const Components&...> EntityManager::GetComponentGroup(Entity e) cons
 template<typename T>
 SparseEntitySet<T>* EntityManager::GetComponentPool() {
   static_assert(ComponentTraits<T>::IsRegistered != false, "Unregistered Component");
-  const size_t typeId = ComponentTraits<T>::Id;
+  const usize typeId = ComponentTraits<T>::Id;
   if (typeId >= mComponentPools.size() || !mComponentPools[typeId])
     return nullptr;
 
@@ -167,7 +167,7 @@ SparseEntitySet<T>* EntityManager::GetComponentPool() {
 template<typename T>
 bool EntityManager::HasComponentPool() {
   static_assert(ComponentTraits<T>::IsRegistered != false, "Unregistered Component");
-  const size_t typeId = ComponentTraits<T>::Id;
+  const usize typeId = ComponentTraits<T>::Id;
   return typeId < mComponentPools.size() && mComponentPools[typeId];
 }
 inline Entity EntityManager::Create() {
@@ -190,7 +190,7 @@ inline void EntityManager::Destroy(const Entity e) {
   ComponentMask* mask = mEntityMasks[e];
   assert(mask);
 
-  for (size_t i = 0; i < mask->size(); ++i) {
+  for (usize i = 0; i < mask->size(); ++i) {
     if (mask->test(i)) {
       if (mComponentPools[i])
         mComponentPools[i]->Remove(e);

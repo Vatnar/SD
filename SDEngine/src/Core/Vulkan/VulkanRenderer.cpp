@@ -6,7 +6,7 @@ namespace SD {
 VulkanRenderer::VulkanRenderer(VulkanContext& ctx) : ctx{ctx} {
 }
 
-vk::CommandBuffer VulkanRenderer::BeginFrame(VulkanWindow& vw) {
+vk::CommandBuffer VulkanRenderer::BeginCommandBuffer(VulkanWindow& vw) {
   auto& device = ctx.GetVulkanDevice();
   auto& frameSync = vw.GetFrameSync();
 
@@ -15,19 +15,19 @@ vk::CommandBuffer VulkanRenderer::BeginFrame(VulkanWindow& vw) {
                  "Failed to wait for fences");
 
   auto cmd = vw.GetCurrentCommandBuffer();
-
-  // 1. Begin Command Buffer
-  // TODO: Check if we need to reset explicitly if the pool was created with ResetCommandBuffer
-  // flag, which implies individual buffer reset.
   cmd.reset();
   vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  cmd.begin(beginInfo);
+  (void)cmd.begin(beginInfo);
+
+  return cmd;
+}
+
+void VulkanRenderer::BeginRenderPass(VulkanWindow& vw) {
+  auto cmd = vw.GetCurrentCommandBuffer();
 
   // 2. Begin Render Pass
   std::array<vk::ClearValue, 1> clearValues{};
-  clearValues[0].color = vk::ClearColorValue{
-      std::array<float, 4>{0.1f, 0.1f, 0.1f, 1.0f}
-  };
+  clearValues[0].color = vk::ClearColorValue{mClearColor};
 
   vk::RenderPassBeginInfo renderPassInfo(vw.GetRenderPass(),
                                          *vw.GetFramebuffers()[vw.CurrentImageIndex],
@@ -46,7 +46,11 @@ vk::CommandBuffer VulkanRenderer::BeginFrame(VulkanWindow& vw) {
 
   vk::Rect2D scissor({0, 0}, vw.GetSwapchainExtent());
   cmd.setScissor(0, 1, &scissor);
+}
 
+vk::CommandBuffer VulkanRenderer::BeginFrame(VulkanWindow& vw) {
+  auto cmd = BeginCommandBuffer(vw);
+  BeginRenderPass(vw);
   return cmd;
 }
 
@@ -57,7 +61,7 @@ vk::Result VulkanRenderer::EndFrame(VulkanWindow& vw) {
   cmd.endRenderPass();
 
   // 2. End Command Buffer
-  cmd.end();
+  (void)cmd.end();
 
   // 3. Submit
   vk::SubmitInfo submitInfo{};
@@ -77,7 +81,7 @@ vk::Result VulkanRenderer::EndFrame(VulkanWindow& vw) {
 
   // Reset fence before submission
   auto& device = ctx.GetVulkanDevice();
-  device->resetFences(*vw.GetFrameSync().inFlight);
+  (void)device->resetFences(*vw.GetFrameSync().inFlight);
 
 
   // Submit

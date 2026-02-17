@@ -1,18 +1,18 @@
 template<typename T>
 template<typename... Args>
 void SparseEntitySet<T>::Add(Entity entity, Args&&... args) {
-  const size_t page = entity.index >> SHIFT;
-  const size_t offset = entity.index & MASK;
+  const usize page = entity.index >> SHIFT;
+  const usize offset = entity.index & MASK;
 
   if (page >= sparse.size())
     sparse.resize(page + 1);
   if (!sparse[page]) {
-    sparse[page] = std::make_unique<size_t[]>(PAGE_SIZE);
-    std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<size_t>::max());
+    sparse[page] = std::make_unique<usize[]>(PAGE_SIZE);
+    std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<usize>::max());
   }
 
-  size_t denseIdx = sparse[page][offset];
-  if (denseIdx != std::numeric_limits<size_t>::max()) {
+  usize denseIdx = sparse[page][offset];
+  if (denseIdx != std::numeric_limits<usize>::max()) {
     denseData[denseIdx] = T{std::forward<Args>(args)...};
     denseEntities[denseIdx] = entity;
   } else {
@@ -23,33 +23,33 @@ void SparseEntitySet<T>::Add(Entity entity, Args&&... args) {
 }
 template<typename T>
 bool SparseEntitySet<T>::Remove(Entity entity) {
-  const size_t page = entity.index >> SHIFT;
-  const size_t offset = entity.index & MASK;
+  const usize page = entity.index >> SHIFT;
+  const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
     return false; // out of bounds
 
-  size_t denseIdx = sparse[page][offset];
-  if (denseIdx == std::numeric_limits<size_t>::max())
+  usize denseIdx = sparse[page][offset];
+  if (denseIdx == std::numeric_limits<usize>::max())
     return false; // doesnt exist
 
   if (denseEntities[denseIdx] != entity)
     return false; // wrong generation
 
   // move, last to removed pos
-  size_t lastIdx = denseEntities.size() - 1;
+  usize lastIdx = denseEntities.size() - 1;
   Entity lastEntity = denseEntities[lastIdx];
 
   denseData[denseIdx] = std::move(denseData[lastIdx]);
   denseEntities[denseIdx] = lastEntity;
 
   // update sparse index
-  const size_t lastPage = lastEntity.index >> SHIFT;
-  const size_t lastOffset = lastEntity.index & MASK;
+  const usize lastPage = lastEntity.index >> SHIFT;
+  const usize lastOffset = lastEntity.index & MASK;
   sparse[lastPage][lastOffset] = denseIdx;
 
   // free index
-  sparse[page][offset] = std::numeric_limits<size_t>::max();
+  sparse[page][offset] = std::numeric_limits<usize>::max();
 
   // remove duplicated last
   denseData.pop_back();
@@ -60,15 +60,15 @@ bool SparseEntitySet<T>::Remove(Entity entity) {
 }
 template<typename T>
 T* SparseEntitySet<T>::Get(Entity entity) {
-  const size_t page = entity.index >> SHIFT;
-  const size_t offset = entity.index & MASK;
+  const usize page = entity.index >> SHIFT;
+  const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
     return nullptr;
 
-  size_t denseIdx = sparse[page][offset];
+  usize denseIdx = sparse[page][offset];
 
-  if (denseIdx == std::numeric_limits<size_t>::max())
+  if (denseIdx == std::numeric_limits<usize>::max())
     return nullptr; // cant get something that doesnt have data in this component.
 
   // Check if the entity is still alive
@@ -80,15 +80,15 @@ T* SparseEntitySet<T>::Get(Entity entity) {
 }
 template<typename T>
 const T* SparseEntitySet<T>::Get(const Entity entity) const {
-  const size_t page = entity.index >> SHIFT;
-  const size_t offset = entity.index & MASK;
+  const usize page = entity.index >> SHIFT;
+  const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
     return nullptr;
 
-  size_t denseIdx = sparse[page][offset];
+  usize denseIdx = sparse[page][offset];
 
-  if (denseIdx == std::numeric_limits<size_t>::max())
+  if (denseIdx == std::numeric_limits<usize>::max())
     return nullptr;
 
   if (denseEntities[denseIdx] != entity)
