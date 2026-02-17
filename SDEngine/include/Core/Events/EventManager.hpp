@@ -6,6 +6,7 @@
 
 #include "Event.hpp"
 
+namespace SD {
 class EventManager {
 public:
   EventManager() { mEvents.reserve(64); }
@@ -74,3 +75,4 @@ public:
 private:
   Event& mEvent;
 };
+} // namespace SD

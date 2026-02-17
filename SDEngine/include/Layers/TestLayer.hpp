@@ -8,6 +8,8 @@
 #include "Core/Vulkan/VulkanWindow.hpp"
 #include "Utils/Utils.hpp"
 
+// TODO: REMOVE
+using namespace SD;
 class TestLayer : public Layer {
 public:
   struct ViewProjection {

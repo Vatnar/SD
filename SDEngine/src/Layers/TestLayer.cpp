@@ -1,4 +1,5 @@
 #include "Layers/TestLayer.hpp"
+
 #include "Core/Events/window/KeyboardEvents.hpp"
 #include "Core/Events/window/MouseEvents.hpp"
 
@@ -40,7 +41,7 @@ void TestLayer::OnAttach() {
   if (textureResult) {
     mTexture = std::move(textureResult.value());
   } else {
-    Engine::Abort(textureResult.error());
+    Abort(textureResult.error());
   }
 
   const std::vector<Vertex> vertices = {
@@ -72,13 +73,14 @@ void TestLayer::OnAttach() {
   mVertexBuffer = std::move(vb);
   mVertexBufferMemory = std::move(vbMem);
 
-  auto res = SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
-    vk::BufferCopy copyRegion(0, 0, bufferSize);
-    cmdBuffer.copyBuffer(*stagingBuffer, *mVertexBuffer, copyRegion);
-  });
+  auto res =
+      SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
+        vk::BufferCopy copyRegion(0, 0, bufferSize);
+        cmdBuffer.copyBuffer(*stagingBuffer, *mVertexBuffer, copyRegion);
+      });
 
   if (!res) {
-      Engine::Abort(res.error());
+    Abort(res.error());
   }
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -94,21 +96,18 @@ void TestLayer::OnAttach() {
   }
 
   vk::DescriptorPoolSize poolSizes[] = {
-      {vk::DescriptorType::eUniformBuffer,
-       static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)                                    },
+      {vk::DescriptorType::eUniformBuffer, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
       { vk::DescriptorType::eSampledImage, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
       {      vk::DescriptorType::eSampler, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)}
   };
 
-  vk::DescriptorPoolCreateInfo poolInfo(
-      {}, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT), 3, poolSizes);
+  vk::DescriptorPoolCreateInfo poolInfo({}, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT), 3,
+                                        poolSizes);
   mDescriptorPool = CheckVulkanResVal(device->createDescriptorPoolUnique(poolInfo),
                                       "Failed to create unique descriptor pool");
 
-  std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT,
-                                               *mDescriptorSetLayout);
-  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, MAX_FRAMES_IN_FLIGHT,
-                                          layouts.data());
+  std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *mDescriptorSetLayout);
+  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, MAX_FRAMES_IN_FLIGHT, layouts.data());
   mDescriptorSets = CheckVulkanResVal(device->allocateDescriptorSets(allocInfo),
                                       "Failed to allocate descriptor sets: ");
 
@@ -288,11 +287,11 @@ void TestLayer::CreateGraphicsPipeline() {
   // TODO: Use a pipeline cache to speed up pipeline creation
   std::vector<char> vertexSpv;
   if (!compiler.CompileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
-    Engine::Abort("Failed to compile vertex shader");
+    Abort("Failed to compile vertex shader");
 
   std::vector<char> pixelSpv;
   if (!compiler.CompileShader("assets/shaders/pixel.hlsl", pixelSpv, "ps_6_0"))
-    Engine::Abort("Failed to compile pixel shader");
+    Abort("Failed to compile pixel shader");
 
 
   auto vertShaderModule = CreateShaderModule(device.get(), vertexSpv);
@@ -345,14 +344,15 @@ void TestLayer::CreateGraphicsPipeline() {
   mPipelineLayout = CheckVulkanResVal(device->createPipelineLayoutUnique(pipelineLayoutInfo),
                                       "Failed to create pipeline-layout unique: ");
 
-  vk::GraphicsPipelineCreateInfo pipelineInfo(
-      {}, shaderStages, &vertexInputInfo, &inputAssembly, nullptr, &viewportState, &rasterizer,
-      &multisampling, nullptr, &colorBlending, &dynamicState, *mPipelineLayout, *mCompatibleRenderPass, 0);
+  vk::GraphicsPipelineCreateInfo pipelineInfo({}, shaderStages, &vertexInputInfo, &inputAssembly,
+                                              nullptr, &viewportState, &rasterizer, &multisampling,
+                                              nullptr, &colorBlending, &dynamicState,
+                                              *mPipelineLayout, *mCompatibleRenderPass, 0);
 
   auto result = device->createGraphicsPipelineUnique(nullptr, pipelineInfo);
   if (result.result != vk::Result::eSuccess) {
     // TODO: Figure out how we do errors and wrap our own errors
-    Engine::Abort("Failed to create graphics pipeline");
+    Abort("Failed to create graphics pipeline");
   }
   mPipeline = std::move(result.value);
 }

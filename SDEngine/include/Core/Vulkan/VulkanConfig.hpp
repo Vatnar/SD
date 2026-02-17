@@ -6,4 +6,6 @@
 #include <vulkan/vulkan.hpp>
 
 // TODO: NAMESPACE PACKAGED?
+namespace SD {
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+}

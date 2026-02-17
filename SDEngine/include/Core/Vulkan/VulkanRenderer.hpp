@@ -3,6 +3,7 @@
 #include "VulkanContext.hpp"
 #include "VulkanWindow.hpp"
 
+namespace SD {
 class VulkanRenderer {
 public:
   explicit VulkanRenderer(VulkanContext& ctx);
@@ -13,3 +14,4 @@ public:
 private:
   VulkanContext& ctx;
 };
+} // namespace SD

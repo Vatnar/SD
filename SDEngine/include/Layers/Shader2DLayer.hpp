@@ -8,6 +8,8 @@
 #include "Core/Vulkan/VulkanWindow.hpp"
 #include "Utils/Utils.hpp"
 
+// TODO: REMOVE
+using namespace SD;
 class Shader2DLayer : public Layer {
 public:
   struct ViewProjection {
@@ -71,7 +73,8 @@ private:
   Texture mTexture;
   vk::UniqueSampler mSampler;
 
-  std::vector<std::string> mShaderPaths = {"assets/shaders/pixel.hlsl", "assets/shaders/changeTestPixel.hlsl"};
+  std::vector<std::string> mShaderPaths = {"assets/shaders/pixel.hlsl",
+                                           "assets/shaders/changeTestPixel.hlsl"};
   uint32_t mCurrentShaderIndex = 0;
 
   std::array<float, 4> mClearColor{};

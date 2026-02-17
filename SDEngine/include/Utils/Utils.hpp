@@ -14,17 +14,17 @@
  * @brief Utilities for the engine.
  */
 
-namespace Utils::Math {
+namespace SD::Math {
 consteval size_t log2_int(std::unsigned_integral auto n) {
   // log2(n) = bit_width(n) - 1
   return n == 0 ? 0 : std::bit_width(n) - 1;
 }
-} // namespace Utils::Math
+} // namespace SD::Math
 /**
  * @namespace  Engine
  * @brief Namespace for Engine intrinsic things
  */
-namespace Engine {
+namespace SD {
 
 /**
  * Terminates the engine and prints following fatal message
@@ -39,7 +39,6 @@ namespace Engine {
   }
   std::exit(EXIT_FAILURE);
 }
-} // namespace Engine
 
 
 inline void CheckVulkanRes(vk::Result result, std::string_view message,
@@ -47,7 +46,7 @@ inline void CheckVulkanRes(vk::Result result, std::string_view message,
   if (result != vk::Result::eSuccess) {
     auto p =
         std::format("{}:{} {}: {}", loc.file_name(), loc.line(), message, vk::to_string(result));
-    Engine::Abort(p);
+    Abort(p);
   }
 }
 
@@ -120,7 +119,7 @@ inline uint32_t FindMemoryType(const vk::PhysicalDevice& physicalDevice, uint32_
       return i;
     }
   }
-  Engine::Abort("failed to find suitable memory type!");
+  Abort("failed to find suitable memory type!");
 }
 
 
@@ -214,7 +213,7 @@ inline void TransitionImageLayout(const vk::CommandBuffer& cmdBuffer, const vk::
     sourceStage = vk::PipelineStageFlagBits::eTransfer;
     destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
   } else {
-    Engine::Abort("unsupported layout transition!");
+    Abort("unsupported layout transition!");
   }
 
   cmdBuffer.pipelineBarrier(sourceStage, destinationStage, {}, nullptr, nullptr, barrier);
@@ -291,3 +290,4 @@ inline vk::UniqueShaderModule CreateShaderModule(const vk::Device& device,
   return CheckVulkanResVal(device.createShaderModuleUnique(createInfo),
                            "Failed to create unique shaderModule: ");
 }
+} // namespace SD

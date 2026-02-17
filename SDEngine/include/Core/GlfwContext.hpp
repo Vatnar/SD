@@ -4,6 +4,7 @@
 
 #include "Utils/Utils.hpp"
 
+namespace SD {
 using GlfwErrorCallback = std::function<void(int, const char*)>;
 
 /**
@@ -23,7 +24,7 @@ public:
 
 
     if (glfwInit() == false) {
-      Engine::Abort("Failed to initialise GLFW");
+      Abort("Failed to initialise GLFW");
     }
   }
 
@@ -58,3 +59,4 @@ private:
     sErrorCallback(errorCode, description);
   }
 };
+} // namespace SD

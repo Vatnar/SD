@@ -3,6 +3,7 @@
 #include <fstream>
 #include <vector>
 
+namespace SD {
 /**
  * Reads a file from given path
  * @param filename
@@ -24,3 +25,4 @@ inline std::expected<std::vector<char>, std::unexpect_t> readFile(const std::str
 
   return buffer;
 }
+} // namespace SD

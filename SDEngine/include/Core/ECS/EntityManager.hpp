@@ -9,6 +9,7 @@
 #include "SparseEntitySet.hpp"
 
 
+namespace SD {
 class EntityManager;
 template<typename... Components>
 class ViewImpl {
@@ -128,3 +129,4 @@ private:
 };
 
 #include "impl/EntityManager.inl"
+} // namespace SD

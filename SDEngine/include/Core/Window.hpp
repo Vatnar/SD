@@ -8,6 +8,7 @@
 #include "LayerList.hpp"
 #include "Vulkan/VulkanConfig.hpp"
 
+namespace SD {
 using ResizeCallback = std::function<void(int, int)>;
 using KeyCallback = std::function<void(int, int, int, int)>;
 using ScrollCallback = std::function<void(double, double)>;
@@ -110,3 +111,4 @@ public:
 private:
   WindowDesc mDesc;
 };
+} // namespace SD

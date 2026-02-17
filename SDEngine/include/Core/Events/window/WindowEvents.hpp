@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Events/Event.hpp"
+namespace SD {
 class WindowResizeEvent : public Event {
 public:
   int width{}, height{};
@@ -22,3 +23,4 @@ public:
   EVENT_CLASS_TYPE(WindowClose)
   EVENT_CLASS_CATEGORY(EventCategoryWindow)
 };
+} // namespace SD

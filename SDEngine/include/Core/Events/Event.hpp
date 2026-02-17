@@ -1,7 +1,8 @@
 #pragma once
 #include <cstddef>
 
-consteval size_t BIT(size_t idx) {
+namespace SD {
+static consteval size_t BIT(size_t idx) {
   return 1ULL << idx;
 }
 
@@ -62,3 +63,4 @@ public:
   virtual int GetCategoryFlags() const override { \
     return category;                              \
   }
+} // namespace SD

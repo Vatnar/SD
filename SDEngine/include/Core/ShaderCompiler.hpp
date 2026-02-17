@@ -14,13 +14,14 @@ using Microsoft::WRL::ComPtr;
 #include <dxc/WinAdapter.h>
 #endif
 
+namespace SD {
 class ShaderCompiler {
 public:
   ShaderCompiler() {
     if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils))))
-      Engine::Abort("Failed to create DXC Utils");
+      Abort("Failed to create DXC Utils");
     if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler))))
-      Engine::Abort("Failed to create DXC Compiler");
+      Abort("Failed to create DXC Compiler");
   }
 
   // TODO: Add caching mechanism to avoid recompiling shaders if source hasn't changed
@@ -104,3 +105,4 @@ private:
 };
 inline CComPtr<IDxcUtils> g_dxcUtils;
 inline CComPtr<IDxcCompiler3> g_dxcCompiler;
+} // namespace SD

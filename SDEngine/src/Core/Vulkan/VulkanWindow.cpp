@@ -4,7 +4,7 @@
 #include "Core/Window.hpp"
 #include "Utils/Utils.hpp"
 
-
+namespace SD {
 VulkanWindow::VulkanWindow(Window& mWindow, VulkanContext& vulkanContext) :
   mVulkanCtx(vulkanContext), mDevice(vulkanContext.GetVulkanDevice().get()), mWindow(mWindow),
   mIsMinimized(false), mFrameSyncs(false) {
@@ -45,7 +45,7 @@ void VulkanWindow::RecreateSwapchain(LayerList& layers) {
   uint32_t oldHeight = mSwapchainExtent.height;
 
   auto [fbWidth, fbHeight] = mWindow.GetFramebufferSize();
-  
+
   // Handle minimization or zero size
   if (fbWidth == 0 || fbHeight == 0) {
     mIsMinimized = true;
@@ -314,3 +314,4 @@ void VulkanWindow::CreateCommandPool() {
 vk::CommandPool VulkanWindow::GetCommandPool() const {
   return *mCommandPool;
 }
+} // namespace SD

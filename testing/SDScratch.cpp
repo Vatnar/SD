@@ -94,8 +94,9 @@ public:
     std::vector<std::string> textures = {"assets/textures/CreateNoteInteraction.png",
                                          "assets/textures/example.jpg"};
 
-      // Note: Passing *mVulkanWindows.front() (which is the unique_ptr content)
-      mMainWindow->LayerStack.PushLayer<Shader2DLayer>(*mGameScene, mVulkanCtx, *mVulkanWindows.front(), textures);
+    // Note: Passing *mVulkanWindows.front() (which is the unique_ptr content)
+    mMainWindow->LayerStack.PushLayer<Shader2DLayer>(*mGameScene, mVulkanCtx,
+                                                     *mVulkanWindows.front(), textures);
 
     // dont need a window, just prints to terminal
     mNonVisualLayers.PushLayer<PerformanceLayer>(*mGameScene);
@@ -103,17 +104,6 @@ public:
 
     mMainWindow->LayerStack.PushLayer<DebugInfoLayer>(*mGameScene);
     mMainWindow->LayerStack.PushLayer<ImGuiLayer>(*mGameScene, mVulkanCtx, *mMainWindow);
-
-    for (auto& window : mWindows) {
-      window->SetRefreshCallback([this, w = window.get()]() {
-        for (size_t i = 0; i < mWindows.size(); ++i) {
-          if (mWindows[i].get() == w) {
-            RenderWindow(*mWindows[i], *mVulkanWindows[i]);
-            break;
-          }
-        }
-      });
-    }
   }
 
   ~Application() = default;
@@ -172,9 +162,6 @@ public:
       layer->OnUpdate(0.016f);
     }
 
-    if (!mRunning)
-      return;
-
     // 6. Record & Submit
     vk::CommandBuffer cmd = mRenderer.BeginFrame(vw);
     for (auto& layer : window.LayerStack) {
@@ -210,7 +197,7 @@ public:
   void OnAppEvent(Event& e) {
     EventDispatcher dispatcher(e);
 
-    dispatcher.Dispatch<AppTerminateEvent>([this](AppTerminateEvent& event) {
+    dispatcher.Dispatch<AppTerminateEvent>([this](AppTerminateEvent&) {
       mRunning = false;
       return true;
     });

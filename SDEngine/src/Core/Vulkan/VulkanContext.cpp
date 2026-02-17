@@ -5,11 +5,11 @@
 #include "Core/GlfwContext.hpp"
 #include "Core/LayerList.hpp"
 
-
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+namespace SD {
 class LayerList;
 
 // NOTE: Take in window, since we need it for some initial values, but not to store
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 VulkanContext::VulkanContext(const GlfwContext& glfwCtx) : mGlfwCtx(glfwCtx) {
   static vk::detail::DynamicLoader dl;
   auto vkGetInstanceProcAddr =
@@ -123,7 +123,7 @@ void VulkanContext::SetupQueues(vk::SurfaceKHR surface) {
   }
 
   if (graphicsFamilyIndex == UINT32_MAX) {
-    Engine::Abort("No queue family supports both graphics and present capabilities");
+    Abort("No queue family supports both graphics and present capabilities");
   }
 
   mGraphicsFamilyIndex = graphicsFamilyIndex;
@@ -145,7 +145,7 @@ void VulkanContext::SetupDeviceExtensions() {
 
   auto requireExt = [&](const char* name) {
     if (!supports(name))
-      Engine::Abort("Required device extension missing: " + std::string(name));
+      Abort("Required device extension missing: " + std::string(name));
     mDeviceExts.push_back(name);
   };
 
@@ -162,3 +162,4 @@ void VulkanContext::CreateVulkanDevice() {
       CheckVulkanResVal(mPhysDev.createDeviceUnique(devInfo), "Failed to create unique device: ");
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*mInstance, mVulkanDevice.get());
 }
+} // namespace SD

@@ -20,6 +20,7 @@ set(ENGINE_SOURCES
         include/Core/Base.hpp
         src/Core/Vulkan/VulkanRenderer.cpp
         src/Core/Vulkan/VulkanWindow.cpp
+        src/Application.cpp
 )
 
 file(GLOB_RECURSE ECS_IMPL_headers "include/Core/ECS/impl/*.inl")

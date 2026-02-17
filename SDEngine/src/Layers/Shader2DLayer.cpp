@@ -1,11 +1,12 @@
 #include "Layers/Shader2DLayer.hpp"
+
 #include "Core/Events/window/KeyboardEvents.hpp"
 #include "Core/Events/window/MouseEvents.hpp"
 
 
 std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
-CreateBuffer2(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, vk::DeviceSize size,
-              vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+CreateBuffer2(const vk::Device& device, const vk::PhysicalDevice& physicalDevice,
+              vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
   vk::BufferCreateInfo bufferInfo({}, size, usage, vk::SharingMode::eExclusive);
 
   vk::UniqueBuffer buffer =
@@ -23,7 +24,7 @@ CreateBuffer2(const vk::Device& device, const vk::PhysicalDevice& physicalDevice
     }
   }
   if (memoryTypeIndex == -1) {
-    Engine::Abort("failed to find suitable memory type!");
+    Abort("failed to find suitable memory type!");
   }
 
   vk::MemoryAllocateInfo allocInfo(memRequirements.size, memoryTypeIndex);
@@ -31,7 +32,8 @@ CreateBuffer2(const vk::Device& device, const vk::PhysicalDevice& physicalDevice
   vk::UniqueDeviceMemory bufferMemory =
       CheckVulkanResVal(device.allocateMemoryUnique(allocInfo), "Failed to allocate unique memory");
 
-  CheckVulkanRes(device.bindBufferMemory(*buffer, *bufferMemory, 0), "Failed to bind buffer memory");
+  CheckVulkanRes(device.bindBufferMemory(*buffer, *bufferMemory, 0),
+                 "Failed to bind buffer memory");
 
   return {std::move(buffer), std::move(bufferMemory)};
 }
@@ -43,7 +45,8 @@ vk::VertexInputBindingDescription Shader2DLayer::Vertex::getBindingDescription()
   bindingDescription.inputRate = vk::VertexInputRate::eVertex;
   return bindingDescription;
 }
-std::array<vk::VertexInputAttributeDescription, 2> Shader2DLayer::Vertex::getAttributeDescriptions() {
+std::array<vk::VertexInputAttributeDescription, 2>
+Shader2DLayer::Vertex::getAttributeDescriptions() {
   std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions{};
 
   attributeDescriptions[0].binding = 0;
@@ -62,7 +65,8 @@ std::array<vk::VertexInputAttributeDescription, 2> Shader2DLayer::Vertex::getAtt
 Shader2DLayer::Shader2DLayer(Scene& scene, VulkanContext& vulkanCtx, VulkanWindow& window,
                              const std::vector<std::string>& texturePaths) :
   Layer(scene), mVulkanCtx(vulkanCtx), mWindow(window), mTexturePaths(texturePaths),
-  mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {}
+  mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {
+}
 
 
 void Shader2DLayer::OnAttach() {
@@ -76,13 +80,13 @@ void Shader2DLayer::OnAttach() {
   CreateGraphicsPipeline();
 
   // Load texture (using the first path for now)
-  std::string texturePath = mTexturePaths.empty() ? "assets/textures/example.jpg" : mTexturePaths[0];
-  auto textureResult = CreateTexture(device.get(), physicalDevice, queue, commandPool,
-                                     texturePath);
+  std::string texturePath =
+      mTexturePaths.empty() ? "assets/textures/example.jpg" : mTexturePaths[0];
+  auto textureResult = CreateTexture(device.get(), physicalDevice, queue, commandPool, texturePath);
   if (textureResult) {
     mTexture = std::move(textureResult.value());
   } else {
-    Engine::Abort(textureResult.error());
+    Abort(textureResult.error());
   }
 
   const std::vector<Vertex> vertices = {
@@ -109,18 +113,19 @@ void Shader2DLayer::OnAttach() {
   // Vertex buffer
   auto [vb, vbMem] =
       CreateBuffer2(device.get(), physicalDevice, bufferSize,
-                   vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
-                   vk::MemoryPropertyFlagBits::eDeviceLocal);
+                    vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal);
   mVertexBuffer = std::move(vb);
   mVertexBufferMemory = std::move(vbMem);
 
-  auto res = SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
-    vk::BufferCopy copyRegion(0, 0, bufferSize);
-    cmdBuffer.copyBuffer(*stagingBuffer, *mVertexBuffer, copyRegion);
-  });
+  auto res =
+      SingleTimeCommand(device.get(), queue, commandPool, [&](const vk::CommandBuffer& cmdBuffer) {
+        vk::BufferCopy copyRegion(0, 0, bufferSize);
+        cmdBuffer.copyBuffer(*stagingBuffer, *mVertexBuffer, copyRegion);
+      });
 
   if (!res) {
-      Engine::Abort(res.error());
+    Abort(res.error());
   }
 
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -136,21 +141,18 @@ void Shader2DLayer::OnAttach() {
   }
 
   vk::DescriptorPoolSize poolSizes[] = {
-      {vk::DescriptorType::eUniformBuffer,
-       static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)                                    },
+      {vk::DescriptorType::eUniformBuffer, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
       { vk::DescriptorType::eSampledImage, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)},
       {      vk::DescriptorType::eSampler, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)}
   };
 
-  vk::DescriptorPoolCreateInfo poolInfo(
-      {}, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT), 3, poolSizes);
+  vk::DescriptorPoolCreateInfo poolInfo({}, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT), 3,
+                                        poolSizes);
   mDescriptorPool = CheckVulkanResVal(device->createDescriptorPoolUnique(poolInfo),
                                       "Failed to create unique descriptor pool");
 
-  std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT,
-                                               *mDescriptorSetLayout);
-  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, MAX_FRAMES_IN_FLIGHT,
-                                          layouts.data());
+  std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *mDescriptorSetLayout);
+  vk::DescriptorSetAllocateInfo allocInfo(*mDescriptorPool, MAX_FRAMES_IN_FLIGHT, layouts.data());
   mDescriptorSets = CheckVulkanResVal(device->allocateDescriptorSets(allocInfo),
                                       "Failed to allocate descriptor sets: ");
 
@@ -284,7 +286,8 @@ void Shader2DLayer::OnEvent(Event& e) {
         CreateGraphicsPipeline();
         e.isHandled = true;
       } else if (key.key == GLFW_KEY_LEFT && !key.repeat) {
-        mCurrentShaderIndex = (mCurrentShaderIndex == 0) ? mShaderPaths.size() - 1 : mCurrentShaderIndex - 1;
+        mCurrentShaderIndex =
+            (mCurrentShaderIndex == 0) ? mShaderPaths.size() - 1 : mCurrentShaderIndex - 1;
         CreateGraphicsPipeline();
         e.isHandled = true;
       }
@@ -338,11 +341,11 @@ void Shader2DLayer::CreateGraphicsPipeline() {
   // TODO: Use a pipeline cache to speed up pipeline creation
   std::vector<char> vertexSpv;
   if (!compiler.CompileShader("assets/shaders/vertex.hlsl", vertexSpv, "vs_6_0"))
-    Engine::Abort("Failed to compile vertex shader");
+    Abort("Failed to compile vertex shader");
 
   std::vector<char> pixelSpv;
   if (!compiler.CompileShader(mShaderPaths[mCurrentShaderIndex], pixelSpv, "ps_6_0"))
-    Engine::Abort("Failed to compile pixel shader");
+    Abort("Failed to compile pixel shader");
 
 
   auto vertShaderModule = CreateShaderModule(device.get(), vertexSpv);
@@ -395,14 +398,15 @@ void Shader2DLayer::CreateGraphicsPipeline() {
   mPipelineLayout = CheckVulkanResVal(device->createPipelineLayoutUnique(pipelineLayoutInfo),
                                       "Failed to create pipeline-layout unique: ");
 
-  vk::GraphicsPipelineCreateInfo pipelineInfo(
-      {}, shaderStages, &vertexInputInfo, &inputAssembly, nullptr, &viewportState, &rasterizer,
-      &multisampling, nullptr, &colorBlending, &dynamicState, *mPipelineLayout, *mCompatibleRenderPass, 0);
+  vk::GraphicsPipelineCreateInfo pipelineInfo({}, shaderStages, &vertexInputInfo, &inputAssembly,
+                                              nullptr, &viewportState, &rasterizer, &multisampling,
+                                              nullptr, &colorBlending, &dynamicState,
+                                              *mPipelineLayout, *mCompatibleRenderPass, 0);
 
   auto result = device->createGraphicsPipelineUnique(nullptr, pipelineInfo);
   if (result.result != vk::Result::eSuccess) {
     // TODO: Figure out how we do errors and wrap our own errors
-    Engine::Abort("Failed to create graphics pipeline");
+    Abort("Failed to create graphics pipeline");
   }
   mPipeline = std::move(result.value);
 }

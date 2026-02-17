@@ -1,6 +1,8 @@
 #include "Core/Vulkan/VulkanRenderer.hpp"
+
 #include <vector>
 
+namespace SD {
 VulkanRenderer::VulkanRenderer(VulkanContext& ctx) : ctx{ctx} {
 }
 
@@ -10,24 +12,30 @@ vk::CommandBuffer VulkanRenderer::BeginFrame(VulkanWindow& vw) {
 
   // Wait for previous frame to finish on GPU
   CheckVulkanRes(device->waitForFences(1, &*frameSync.inFlight, true, UINT64_MAX),
-                "Failed to wait for fences");
+                 "Failed to wait for fences");
 
   auto cmd = vw.GetCurrentCommandBuffer();
 
   // 1. Begin Command Buffer
-  // TODO: Check if we need to reset explicitly if the pool was created with ResetCommandBuffer flag,
-  // which implies individual buffer reset.
+  // TODO: Check if we need to reset explicitly if the pool was created with ResetCommandBuffer
+  // flag, which implies individual buffer reset.
   cmd.reset();
   vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
   cmd.begin(beginInfo);
 
   // 2. Begin Render Pass
   std::array<vk::ClearValue, 1> clearValues{};
-  clearValues[0].color = vk::ClearColorValue{std::array<float, 4>{0.1f, 0.1f, 0.1f, 1.0f}};
+  clearValues[0].color = vk::ClearColorValue{
+      std::array<float, 4>{0.1f, 0.1f, 0.1f, 1.0f}
+  };
 
-  vk::RenderPassBeginInfo renderPassInfo(
-      vw.GetRenderPass(), *vw.GetFramebuffers()[vw.CurrentImageIndex],
-      {{0, 0}, vw.GetSwapchainExtent()}, clearValues);
+  vk::RenderPassBeginInfo renderPassInfo(vw.GetRenderPass(),
+                                         *vw.GetFramebuffers()[vw.CurrentImageIndex],
+                                         {
+                                             {0, 0},
+                                             vw.GetSwapchainExtent()
+  },
+                                         clearValues);
 
   cmd.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 
@@ -86,3 +94,5 @@ vk::Result VulkanRenderer::EndFrame(VulkanWindow& vw) {
 
   return res;
 }
+
+} // namespace SD

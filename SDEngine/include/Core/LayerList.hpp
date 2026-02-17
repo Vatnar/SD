@@ -4,6 +4,7 @@
 
 #include "Core/Layer.hpp"
 
+namespace SD {
 class LayerList
 
 {
@@ -118,3 +119,4 @@ public:
 private:
   std::vector<std::unique_ptr<Layer>> mLayers{};
 };
+} // namespace SD

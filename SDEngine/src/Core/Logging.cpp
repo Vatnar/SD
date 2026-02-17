@@ -4,6 +4,7 @@
 #include "spdlog/async.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
+namespace SD {
 void init_logging() {
   spdlog::init_thread_pool(8192, 1);
 
@@ -48,3 +49,4 @@ void init_logging() {
 
   spdlog::register_logger(engine);
 }
+} // namespace SD

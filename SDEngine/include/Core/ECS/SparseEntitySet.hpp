@@ -2,6 +2,7 @@
 #include "Entity.hpp"
 #include "Utils/Utils.hpp"
 
+namespace SD {
 class SparseEntitySetBase {
 public:
   virtual ~SparseEntitySetBase() = default;
@@ -17,7 +18,7 @@ public:
 template<typename T>
 class SparseEntitySet : public SparseEntitySetBase {
   static constexpr size_t PAGE_SIZE = 1024;
-  static constexpr size_t SHIFT = Utils::Math::log2_int(PAGE_SIZE);
+  static constexpr size_t SHIFT = SD::Math::log2_int(PAGE_SIZE);
   static constexpr size_t MASK = PAGE_SIZE - 1;
 
   std::vector<std::unique_ptr<size_t[]>> sparse;
@@ -53,3 +54,4 @@ public:
 };
 
 #include "impl/SparseEntitySet.inl"
+} // namespace SD

@@ -8,6 +8,7 @@
 #include "Utils/Utils.hpp"
 
 
+namespace SD {
 // TODO: Maybe we want a builder pattern instead of window desc.
 // TODO: also this repeats a buinch of shit
 Window::Window(int width, int height, const std::string& title) {
@@ -19,7 +20,7 @@ Window::Window(int width, int height, const std::string& title) {
     glfwGetError(&error);
     if (const auto logger = spdlog::get("engine"))
       logger->error("Failed to create GLFW window with error: ", error);
-    Engine::Abort("Failed to create GLFW window");
+    Abort("Failed to create GLFW window");
   }
 
   glfwSetWindowUserPointer(mHandle, this);
@@ -45,7 +46,7 @@ Window::Window(const WindowDesc& desc) {
     glfwGetError(&error);
     if (const auto logger = spdlog::get("engine"))
       logger->error("Failed to create GLFW window with error: ", error);
-    Engine::Abort("Failed to create GLFW window");
+    Abort("Failed to create GLFW window");
   }
   glfwSetWindowUserPointer(mHandle, this);
 
@@ -95,7 +96,8 @@ Window::Window(const WindowDesc& desc) {
   mScrollCallback = desc.scrollCallback ? desc.scrollCallback : DefaultScrollCallback;
   mCursorCallback = desc.cursorCallback ? desc.cursorCallback : DefaultCursorCallback;
   mMouseButtonCallback = desc.mouseButtonCallback ? desc.mouseButtonCallback : DefaultMouseCallback;
-  mRefreshCallback = desc.refreshCallback ? desc.refreshCallback : []() {};
+  mRefreshCallback = desc.refreshCallback ? desc.refreshCallback : []() {
+  };
 
   glfwSetWindowSizeCallback(mHandle, DispatchResize);
   glfwSetFramebufferSizeCallback(mHandle, DispatchResize);
@@ -131,7 +133,7 @@ Window::CreateWindowSurface(vk::UniqueInstance& instance,
   auto res = glfwCreateWindowSurface(*instance, mHandle, allocationCallback, &surface);
   if (res != VK_SUCCESS) {
     // TODO: Maybe give this info to caller
-    Engine::Abort("Failed to create window surface");
+    Abort("Failed to create window surface");
   }
   return vk::UniqueSurfaceKHR{surface, *instance};
 }
@@ -215,3 +217,4 @@ WindowBuilder& WindowBuilder::SetRefreshCallback(const RefreshCallback& callback
 std::unique_ptr<Window> WindowBuilder::Build() const {
   return std::make_unique<Window>(mDesc);
 }
+} // namespace SD

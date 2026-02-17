@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Events/Event.hpp"
 
+namespace SD {
 static inline auto MouseCategory = EventCategoryWindow | EventCategoryInput | EventCategoryMouse;
 
 class MousePressedEvent : public Event {
@@ -43,3 +44,4 @@ public:
   EVENT_CLASS_TYPE(MouseMoved)
   EVENT_CLASS_CATEGORY(MouseCategory)
 };
+} // namespace SD

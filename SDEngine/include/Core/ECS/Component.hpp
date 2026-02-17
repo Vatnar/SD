@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <tuple>
 
+namespace SD {
 template<typename... Ts>
 struct ComponentGroup {};
 
@@ -24,7 +25,7 @@ private:
   static inline size_t counter = 0;
   static size_t Next() { return counter++; }
   template<typename T>
-  friend struct ::ComponentTraits;
+  friend struct ComponentTraits;
 };
 
 } // namespace detail
@@ -70,3 +71,4 @@ struct ComponentDebugInfo {
   const char* name;
   void* data;
 };
+} // namespace SD

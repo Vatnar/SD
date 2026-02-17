@@ -7,7 +7,7 @@
 #include "Core/Window.hpp"
 #include "VulkanConfig.hpp"
 
-
+namespace SD {
 // TODO: This class is doing too much. Consider splitting it into smaller, more focused classes
 // (e.g., Device, Swapchain, PipelineManager)
 /**
@@ -57,3 +57,4 @@ private:
   vk::PhysicalDeviceVulkan12Features mFeatures12;
   vk::PhysicalDeviceVulkan13Features mFeatures13;
 };
+} // namespace SD

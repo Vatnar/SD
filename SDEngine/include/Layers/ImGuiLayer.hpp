@@ -6,6 +6,8 @@
 #include "Core/Layer.hpp"
 #include "Core/Vulkan/VulkanContext.hpp"
 
+// TODO: remove usnig namespace
+using namespace SD;
 class ImGuiLayer : public Layer {
 public:
   ImGuiLayer(Scene& scene, VulkanContext& vulkanCtx, Window& window);

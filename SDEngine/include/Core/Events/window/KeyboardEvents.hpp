@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Events/Event.hpp"
 
+namespace SD {
 inline auto KeyCategory = EventCategoryWindow | EventCategoryInput | EventCategoryKeyboard;
 class KeyPressedEvent : public Event {
 public:
@@ -34,3 +35,4 @@ public:
   EVENT_CLASS_TYPE(KeyTyped)
   EVENT_CLASS_CATEGORY(KeyCategory)
 };
+} // namespace SD

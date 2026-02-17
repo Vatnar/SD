@@ -1,12 +1,11 @@
 #pragma once
-#include <concepts>
-#include <cstdint>
 
 #include "Events/Event.hpp"
 #include "Scene.hpp"
 #include "Vulkan/VulkanConfig.hpp"
 
 
+namespace SD {
 class Layer;
 template<typename T> concept IsLayer = std::is_base_of_v<Layer, T>;
 
@@ -34,3 +33,4 @@ protected:
   bool mActive{true};
   Scene& mActiveScene;
 };
+} // namespace SD

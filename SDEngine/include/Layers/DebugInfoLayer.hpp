@@ -4,12 +4,14 @@
 #include <string>
 #include <vector>
 
-#include "Core/Layer.hpp"
 #include "Core/Events/window/KeyboardEvents.hpp"
 #include "Core/Events/window/MouseEvents.hpp"
+#include "Core/Layer.hpp"
 
 // TODO: Consider making this a more generic "DebugUI" layer that can display various debug
 // information, not just input
+// TODO: REMOVE
+using namespace SD;
 class DebugInfoLayer : public Layer {
 public:
   DebugInfoLayer(Scene& scene) : Layer(scene) {};

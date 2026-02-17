@@ -5,6 +5,7 @@
 #include "Core/Window.hpp"
 #include "VulkanContext.hpp"
 
+namespace SD {
 // TODO: Consider creating a "FrameData" struct to hold all per-frame resources (semaphores, fences,
 // command buffers, etc.)
 struct FrameSync {
@@ -95,3 +96,4 @@ private:
   bool mIsMinimized{};
   bool mFramebufferResized{};
 };
+} // namespace SD
