@@ -1,12 +1,4 @@
-# SCRATCH
 include(FetchContent)
-add_executable(SDScratch
-        SDScratch.cpp
-)
-target_link_libraries(SDScratch PRIVATE
-        SDEngineLib
-)
-
 # TESTING
 FetchContent_Declare(
         googletest

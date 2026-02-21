@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'SDEngine/**'
+      - '../../SD/**'
       - 'include/**'
       - 'docs/**'
       - '.github/workflows/docs.yml'

@@ -14,7 +14,19 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(vendor)
-add_subdirectory(SDEngine)
+add_subdirectory(SD)
+
 add_subdirectory(testing)
+
+add_subdirectory(SandboxApp)
+
+
+install(TARGETS HotReloadApp SandboxApp
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION bin)
+
+install(DIRECTORY "${SD_SOURCE_DIR}/engine_assets" DESTINATION bin/assets/engine)
+install(DIRECTORY "${SandboxApp_SOURCE_DIR}/assets" DESTINATION bin/assets/)
