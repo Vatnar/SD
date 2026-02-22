@@ -36,6 +36,7 @@ set(ENGINE_SOURCES
         src/Core/ViewManager.cpp
         src/Core/Vulkan/ShaderLibrary.cpp
         src/Core/View.cpp
+        src/RuntimeStateManager.cpp
 )
 
 add_library(SD SHARED ${ENGINE_SOURCES} ${ECS_IMPL_headers})

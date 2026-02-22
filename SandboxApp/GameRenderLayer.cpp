@@ -6,12 +6,17 @@
 #include "VLA/Matrix.hpp"
 #include "imgui.h"
 
+static int sLoadCount = 0;
+
 GameRenderLayer::GameRenderLayer(const std::string& name, SD::Scene* scene, VkPipeline pipeline,
-                                 VkPipeline mWireframePipeline, VkPipelineLayout layout) :
-  RenderStage(name, scene), mPipeline(pipeline), mWireframePipeline(mWireframePipeline),
+                                 VkPipeline wireframePipeline, VkPipelineLayout layout) :
+  RenderStage(name, scene), mPipeline(pipeline), mWireframePipeline(wireframePipeline),
   mLayout(layout) {
 }
+
 void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
+  static int version = 0;
+  fprintf(stderr, "VERSION %d - OnRender called\n", ++version);
   VkPipeline activePipe =
       (mView->GetRenderMode() == SD::RenderMode::Wireframe) ? mWireframePipeline : mPipeline;
   // BUG: Crash here SEGFAULT
@@ -72,7 +77,7 @@ void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
   bool inside = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 
   for (auto [entity, transform, renderable] : mScene->em.View<SD::Transform, SD::Renderable>()) {
-    if ((renderable.viewMask & (1u << mViewId)) == 0 || renderable.renderStage != mStageId)
+    if ((renderable.viewMask & 1u << mViewId) == 0 || renderable.renderStage != mStageId)
       continue;
 
     Push push;
@@ -82,7 +87,7 @@ void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
     if (inside) {
       push.color[0] = 1.0f;
       push.color[1] = 1.0f;
-      push.color[2] = 0.0f;
+      push.color[2] = 1.0f;
     }
 
     vkCmdPushConstants(cmd, mLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Push), &push);

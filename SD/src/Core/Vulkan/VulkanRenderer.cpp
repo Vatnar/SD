@@ -3,16 +3,26 @@
 #include "Application.hpp"
 #include <GLFW/glfw3.h>
 
+#include "Utils/Utils.hpp"
+
 namespace SD {
 VulkanRenderer::VulkanRenderer(VulkanContext& ctx) : ctx{ctx} {
+  SD_ASSERT(ctx.GetVulkanDevice(), "VulkanContext must have valid device");
   mDevice = ctx.GetVulkanDevice().get();
   mShaders = std::make_unique<ShaderLibrary>(mDevice);
   mPipelines = std::make_unique<PipelineFactory>(mDevice, *mShaders);
 }
 
 vk::CommandBuffer VulkanRenderer::BeginCommandBuffer(VulkanWindow& vw) {
+  SD_ASSERT(ctx.GetVulkanDevice(), "Vulkan device must be valid");
+  SD_ASSERT(vw.GetSwapchain(), "Swapchain must be valid");
+  SD_ASSERT(vw.GetCurrentCommandBuffer(), "Command buffer must be allocated");
+  SD_ASSERT(vw.CurrentFrame < MAX_FRAMES_IN_FLIGHT, "Frame index out of bounds");
+
   auto& device = ctx.GetVulkanDevice();
   auto& frameSync = vw.GetFrameSync();
+
+  SD_ASSERT(frameSync.inFlight, "In-flight fence must be valid");
 
   // Wait for previous frame to finish on GPU (track wait time)
   double waitStart = glfwGetTime();
@@ -30,6 +40,11 @@ vk::CommandBuffer VulkanRenderer::BeginCommandBuffer(VulkanWindow& vw) {
 }
 
 void VulkanRenderer::BeginRenderPass(VulkanWindow& vw) {
+  SD_ASSERT(vw.GetSwapchain(), "Swapchain must be valid");
+  SD_ASSERT(vw.GetRenderPass(), "Render pass must be valid");
+  SD_ASSERT(!vw.GetFramebuffers().empty(), "Framebuffers must not be empty");
+  SD_ASSERT(vw.CurrentImageIndex < vw.GetFramebuffers().size(), "Image index out of bounds");
+
   auto cmd = vw.GetCurrentCommandBuffer();
 
   std::array<vk::ClearValue, 1> clearValues{};
@@ -60,6 +75,9 @@ vk::CommandBuffer VulkanRenderer::BeginFrame(VulkanWindow& vw) {
 }
 
 vk::Result VulkanRenderer::EndFrame(VulkanWindow& vw) {
+  SD_ASSERT(vw.GetSwapchain(), "Swapchain must be valid");
+  SD_ASSERT(vw.CurrentImageIndex < vw.GetSwapchainImages().size(), "Image index out of bounds");
+
   auto cmd = vw.GetCurrentCommandBuffer();
 
   cmd.endRenderPass();
@@ -81,6 +99,7 @@ vk::Result VulkanRenderer::EndFrame(VulkanWindow& vw) {
   submitInfo.setPSignalSemaphores(signalSemaphores);
 
   auto& device = ctx.GetVulkanDevice();
+  SD_ASSERT(device, "Device must be valid");
   (void)device->resetFences(*vw.GetFrameSync().inFlight);
 
   auto err = ctx.GetGraphicsQueue().submit(1, &submitInfo, *vw.GetFrameSync().inFlight);

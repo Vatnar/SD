@@ -6,11 +6,13 @@
 #include "Core/GlfwContext.hpp"
 #include "Core/LayerList.hpp"
 #include "Core/SDImGuiContext.hpp"
+#include "Core/Scene.hpp"
 #include "Core/View.hpp"
 #include "Core/ViewManager.hpp"
 #include "Core/Vulkan/VulkanContext.hpp"
 #include "Core/Vulkan/VulkanRenderer.hpp"
 #include "Core/WindowManager.hpp"
+#include "GameContext.hpp"
 #include "RuntimeStateManager.hpp"
 
 namespace SD {
@@ -28,6 +30,8 @@ public:
   virtual ~Application();
 
   void Run(std::atomic<bool>* externalStop);
+  void Frame();  // Single frame - for external hot reload loop
+  bool IsRunning() const { return mRunning; }
   void Close() { mRunning = false; }
   void OnAppEvent(Event& e);
 
@@ -90,7 +94,18 @@ public:
   const std::unordered_map<ViewId, std::unique_ptr<View>>& GetViews() const {
     return mViewManager->GetViews();
   }
+
+  // Scene management
+  Scene* CreateScene(const std::string& name);
+  Scene* GetScene(const std::string& name);
   std::vector<Scene*> GetScenes();
+
+  // Game Context (for hot reload)
+  void SetGameContext(GameContext* ctx);
+  void SetGameHandle(void* handle) { mGameHandle = handle; }
+  GameContext* GetGameContext() const { return mGameContext; }
+  void ClearGameLayers();
+  void ReloadGame();
 
   // Hot Reload
   void SetHotReloadEnabled(bool enabled) { mHotReloadEnabled = enabled; }
@@ -126,6 +141,10 @@ private:
 
   LayerList mGlobalLayers;
   EventManager mAppEventManager;
+
+  std::vector<std::unique_ptr<Scene>> mScenes;
+  GameContext* mGameContext = nullptr;
+  void* mGameHandle = nullptr;
 
   FrameTimer mTimer;
   RuntimeStateManager* mStateManager;

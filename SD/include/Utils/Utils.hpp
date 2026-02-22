@@ -36,8 +36,15 @@ namespace SD {
       SD::Abort();                                               \
     }                                                            \
   } while (0)
-
 #endif
+
+#define SD_ASSERT(x, ...)                                                      \
+  do {                                                                        \
+    if (!(x)) {                                                               \
+      SD::Log::Error("ASSERT {}:{} {}", __FILE__, __LINE__, #x);              \
+      SD::Abort();                                                            \
+    }                                                                         \
+  } while (0)
 
 
 inline std::expected<void, std::string>

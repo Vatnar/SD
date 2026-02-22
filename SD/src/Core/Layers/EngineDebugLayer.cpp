@@ -1,13 +1,15 @@
 #include "Core/Layers/EngineDebugLayer.hpp"
+
 #include <imgui.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/fmt/fmt.h>
+#include <spdlog/spdlog.h>
 
 #include "Core/ECS/Components.hpp"
 #include "Core/Events/window/KeyboardEvents.hpp"
 #include "Core/Events/window/MouseEvents.hpp"
 #include "Core/Logging.hpp"
 #include "Core/View.hpp"
+#include "Utils/Utils.hpp"
 
 namespace SD {
 
@@ -75,7 +77,9 @@ void EngineDebugLayer::OnEvent(Event& e) {
           detail = fmt::format("Offset: {:.1f}, {:.1f}", me.xOffset, me.yOffset);
           break;
         }
-        default: detail = "Generic Event"; break;
+        default:
+          detail = "Generic Event";
+          break;
       }
       logger->trace("Event: {} [{}]", e.GetName(), detail);
     }
@@ -181,7 +185,8 @@ void EngineDebugLayer::OnGuiRender() {
         if (ImGui::Begin("##ContextOverlay", nullptr,
                          ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar |
                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+                             ImGuiWindowFlags_AlwaysAutoResize |
+                             ImGuiWindowFlags_NoSavedSettings)) {
           float ndcX = ((mousePos.x - regionPos.x) / regionExtent.x) * 2.0f - 1.0f;
           float ndcY = ((mousePos.y - regionPos.y) / regionExtent.y) * 2.0f - 1.0f;
           ImGui::Text("View: %s", view->GetName().c_str());
@@ -277,6 +282,8 @@ void EngineDebugLayer::DisplayECSInspector() {
     return;
   }
 
+  SD_ASSERT(mSelectedScene, "Selected scene must be valid");
+
   for (auto [entity, transform] : mSelectedScene->em.View<Transform>()) {
     std::string label = "Entity " + std::to_string(entity.index);
     if (auto* name = mSelectedScene->em.TryGetComponent<DebugName>(entity)) {
@@ -326,13 +333,26 @@ void EngineDebugLayer::DisplayEventLog() {
   for (const auto& log : history) {
     ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     switch (log.level) {
-      case Log::LogLevel::Trace: color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f); break;
-      case Log::LogLevel::Debug: color = ImVec4(0.0f, 0.8f, 1.0f, 1.0f); break;
-      case Log::LogLevel::Info:  color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); break;
-      case Log::LogLevel::Warn:  color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); break;
-      case Log::LogLevel::Error: color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); break;
-      case Log::LogLevel::Critical: color = ImVec4(1.0f, 0.0f, 1.0f, 1.0f); break;
-      default: break;
+      case Log::LogLevel::Trace:
+        color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        break;
+      case Log::LogLevel::Debug:
+        color = ImVec4(0.0f, 0.8f, 1.0f, 1.0f);
+        break;
+      case Log::LogLevel::Info:
+        color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+        break;
+      case Log::LogLevel::Warn:
+        color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+        break;
+      case Log::LogLevel::Error:
+        color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        break;
+      case Log::LogLevel::Critical:
+        color = ImVec4(1.0f, 0.0f, 1.0f, 1.0f);
+        break;
+      default:
+        break;
     }
     ImGui::TextColored(color, "%s", log.message.c_str());
   }

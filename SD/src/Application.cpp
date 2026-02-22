@@ -1,5 +1,7 @@
 #include "Application.hpp"
 
+#include <dlfcn.h>
+#include <filesystem>
 #include <ranges>
 
 #include "Core/Events/app/AppEvents.hpp"
@@ -80,7 +82,7 @@ Application::Application(const ApplicationSpecification& spec, RuntimeStateManag
   mImGuiCtx->Init(window, vw);
   ImVec4 clearColor = ApplyTheme();
 
-  const char* fontPath = "assets/fonts/Inter_18pt-Regular.ttf";
+  const char* fontPath = "assets/engine/fonts/Inter_18pt-Regular.ttf";
   if (std::filesystem::exists(fontPath)) {
     ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath, 15.0f);
   } else {
@@ -100,78 +102,84 @@ Application::~Application() {
   mWindowManager.reset();
 }
 
-void Application::Run(std::atomic<bool>* externalStop = nullptr) {
-  while (mRunning && !externalStop->load(std::memory_order_acquire)) {
-    mTimer.Begin();
-    glfwPollEvents();
-    mTimer.BeginWork();
+void Application::Frame() {
+  mTimer.Begin();
+  glfwPollEvents();
+  mTimer.BeginWork();
 
-    float dt = mTimer.GetFrameTime();
+  float dt = mTimer.GetFrameTime();
 
-    // 1. Events
-    for (auto& e : mAppEventManager) {
-      OnAppEvent(*e);
+  // 1. Events
+  for (auto& e : mAppEventManager) {
+    OnAppEvent(*e);
+  }
+  mAppEventManager.Clear();
+
+  // 2. Fixed Update
+  while (mTimer.ConsumeFixedStep()) {
+    for (auto& layer : mGlobalLayers)
+      layer->OnFixedUpdate(mTimer.GetFixedTimeStep());
+  }
+
+  // 3. ImGui Frame
+  mImGuiCtx->BeginFrame();
+  mImGuiCtx->BeginDockSpace(mSpec.name);
+
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("File")) {
+      if (ImGui::MenuItem("Exit", "Alt+F4"))
+        mRunning = false;
+      ImGui::EndMenu();
     }
-    mAppEventManager.Clear();
+    mGlobalLayers.OnImGuiMenuBar();
+    for (auto& [id, data] : mWindowManager->GetWindows())
+      data.viewLayers.OnImGuiMenuBar();
+    for (auto& [id, view] : mViewManager->GetViews())
+      view->GetLayers().OnImGuiMenuBar();
+    ImGui::EndMainMenuBar();
+  }
 
-    // 2. Fixed Update
-    while (mTimer.ConsumeFixedStep()) {
-      for (auto& layer : mGlobalLayers)
-        layer->OnFixedUpdate(mTimer.GetFixedTimeStep());
-    }
+  // 4. Update
+  for (auto& layer : mGlobalLayers) {
+    layer->OnUpdate(dt);
+    layer->OnGuiRender();
+  }
 
-    // 3. ImGui Frame
-    mImGuiCtx->BeginFrame();
-    mImGuiCtx->BeginDockSpace(mSpec.name);
+  mWindowManager->UpdateWindows(dt);
+  mViewManager->UpdateViews(dt);
 
-    if (ImGui::BeginMainMenuBar()) {
-      if (ImGui::BeginMenu("File")) {
-        if (ImGui::MenuItem("Exit", "Alt+F4"))
-          mRunning = false;
-        ImGui::EndMenu();
-      }
-      mGlobalLayers.OnImGuiMenuBar();
-      for (auto& [id, data] : mWindowManager->GetWindows())
-        data.viewLayers.OnImGuiMenuBar();
-      for (auto& [id, view] : mViewManager->GetViews())
-        view->GetLayers().OnImGuiMenuBar();
-      ImGui::EndMainMenuBar();
-    }
+  mImGuiCtx->EndDockSpace();
+  mImGuiCtx->EndFrame();
 
-    // 4. Update
-    for (auto& layer : mGlobalLayers) {
-      layer->OnUpdate(dt);
-      layer->OnGuiRender();
-    }
-
-    mWindowManager->UpdateWindows(dt);
-    mViewManager->UpdateViews(dt);
-
-    mImGuiCtx->EndDockSpace();
-    mImGuiCtx->EndFrame();
-
-    // 5. Hot Reload Polling
-    if (mHotReloadEnabled) {
-      mHotReloadTimer += dt;
-      if (mHotReloadTimer >= 0.5f) {
-        mHotReloadTimer = 0.0f;
-        auto changed = mRenderer->GetShaderLibrary().CheckForChanges();
-        if (!changed.empty()) {
-          SPDLOG_INFO("Shader changes detected: {}. Reloading...", changed.size());
-          ReloadShaders();
-        }
+  // 5. Hot Reload Polling
+  if (mHotReloadEnabled) {
+    mHotReloadTimer += dt;
+    if (mHotReloadTimer >= 0.5f) {
+      mHotReloadTimer = 0.0f;
+      auto changed = mRenderer->GetShaderLibrary().CheckForChanges();
+      if (!changed.empty()) {
+        SPDLOG_INFO("Shader changes detected: {}. Reloading...", changed.size());
+        ReloadShaders();
       }
     }
+  }
 
-    // 6. Render
-    mWindowManager->DrawWindows(*mViewManager);
+  // 6. Render
+  mWindowManager->DrawWindows(*mViewManager);
 
-    mTimer.EndWork();
+  mTimer.EndWork();
 
-    // 6. Viewports
-    mImGuiCtx->UpdatePlatformWindows();
-    mWindowManager->ProcessPendingCloses();
-    mViewManager->CleanupClosedViews();
+  // 7. Viewports
+  mImGuiCtx->UpdatePlatformWindows();
+  mWindowManager->ProcessPendingCloses();
+  mViewManager->CleanupClosedViews();
+}
+
+void Application::Run(std::atomic<bool>* externalStop) {
+  while (mRunning) {
+    if (externalStop)
+      mRunning = !externalStop->load(std::memory_order_acquire);
+    Frame();
   }
 }
 
@@ -185,8 +193,33 @@ void Application::OnAppEvent(Event& e) {
   mGlobalLayers.OnEvent(e);
 }
 
+Scene* Application::CreateScene(const std::string& name) {
+  for (auto& scene : mScenes) {
+    if (scene->GetName() == name) {
+      SPDLOG_WARN("Scene '{}' already exists, returning existing scene", name);
+      return scene.get();
+    }
+  }
+  auto scene = std::make_unique<Scene>(name);
+  Scene* ptr = scene.get();
+  mScenes.push_back(std::move(scene));
+  return ptr;
+}
+
+Scene* Application::GetScene(const std::string& name) {
+  for (auto& scene : mScenes) {
+    if (scene->GetName() == name) {
+      return scene.get();
+    }
+  }
+  return nullptr;
+}
+
 std::vector<Scene*> Application::GetScenes() {
-  std::vector<Scene*> scenes = mViewManager->GetScenes();
+  std::vector<Scene*> scenes;
+  for (auto& scene : mScenes) {
+    scenes.push_back(scene.get());
+  }
   auto addUnique = [&](Scene* s) {
     if (s && std::find(scenes.begin(), scenes.end(), s) == scenes.end())
       scenes.push_back(s);
@@ -198,7 +231,68 @@ std::vector<Scene*> Application::GetScenes() {
     for (auto& layer : data.viewLayers)
       addUnique(layer->GetScene());
   }
+  auto viewScenes = mViewManager->GetScenes();
+  for (auto* s : viewScenes) {
+    addUnique(s);
+  }
   return scenes;
+}
+
+void Application::SetGameContext(GameContext* ctx) {
+  mGameContext = ctx;
+}
+
+void Application::ClearGameLayers() {
+  try {
+    mGlobalLayers.Clear();
+    mViewManager->Clear();
+    mScenes.clear();
+  } catch (const std::exception& e) {
+    SPDLOG_ERROR("Exception in ClearGameLayers: {}", e.what());
+  }
+}
+
+void Application::ReloadGame() {
+  SPDLOG_INFO("Starting game reload...");
+  try {
+    if (mGameContext) {
+      mGameContext->OnUnload();
+      delete mGameContext;
+      mGameContext = nullptr;
+    }
+
+    ClearGameLayers();
+
+    // Close old handle BEFORE opening new one, so dlopen loads fresh code
+    if (mGameHandle) {
+      dlclose(mGameHandle);
+      mGameHandle = nullptr;
+    }
+
+    void* handle = dlopen("libSandboxApp.so", RTLD_NOW | RTLD_GLOBAL);
+    if (!handle) {
+      SPDLOG_ERROR("Failed to reload game DLL: {}", dlerror());
+      return;
+    }
+    mGameHandle = handle;
+
+    using CreateGameFn = GameContext* (*)(RuntimeStateManager*);
+    auto* create = reinterpret_cast<CreateGameFn>(dlsym(handle, "CreateGame"));
+    if (!create) {
+      SPDLOG_ERROR("Failed to find CreateGame: {}", dlerror());
+      dlclose(handle);
+      return;
+    }
+
+    mGameContext = create(mStateManager);
+    mGameContext->OnLoad(*this);
+
+    mStateManager->Restore(this);
+
+    SPDLOG_INFO("Game reloaded successfully");
+  } catch (const std::exception& e) {
+    SPDLOG_ERROR("Exception during reload: {}", e.what());
+  }
 }
 
 void Application::ReloadShaders() {

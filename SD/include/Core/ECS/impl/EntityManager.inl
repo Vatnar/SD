@@ -36,8 +36,10 @@ bool ViewImpl<Components...>::Iterator::IsValid() const {
 }
 template<typename... Components>
 typename ViewImpl<Components...>::Iterator ViewImpl<Components...>::begin() {
-  if (!mSmallestPool)
+  if (!mSmallestPool) {
+    SPDLOG_WARN("View has no valid component pools - scene may be empty or missing components");
     return end();
+  }
   return Iterator(mManager, mSmallestPool, 0);
 }
 template<typename... Components>

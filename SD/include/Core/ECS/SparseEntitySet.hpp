@@ -1,6 +1,6 @@
 #pragma once
-#include "Entity.hpp"
 #include "Core/Base.hpp"
+#include "Entity.hpp"
 
 namespace SD {
 class SparseEntitySetBase {
@@ -51,6 +51,46 @@ public:
   [[nodiscard]] const std::vector<Entity>& GetDenseEntities() const { return denseEntities; }
 
   [[nodiscard]] usize Size() const { return denseEntities.size(); }
+
+  // TODO: untested
+  void SerializeTo(std::vector<char>& out) const {
+    // Header: size_t entity_count, size_t sizeof(T).
+    size_t entity_count = denseEntities.size();
+    size_t comp_size = sizeof(T);
+
+    out.resize(sizeof(size_t) * 2 + entity_count * (sizeof(Entity) + comp_size));
+    char* ptr = out.data();
+    memcpy(ptr, &entity_count, sizeof(size_t));
+    ptr += sizeof(size_t);
+    memcpy(ptr, &comp_size, sizeof(size_t));
+    ptr += sizeof(size_t);
+
+    // Dense entities + data.
+    memcpy(ptr, denseEntities.data(), entity_count * sizeof(Entity));
+    ptr += entity_count * sizeof(Entity);
+    memcpy(ptr, denseData.data(), entity_count * comp_size);
+  }
+
+  // TODO: untested
+  void DeserializeFrom(const std::vector<char>& data) {
+    const char* ptr = data.data();
+    size_t entity_count, comp_size;
+    memcpy(&entity_count, ptr, sizeof(size_t));
+    ptr += sizeof(size_t);
+    memcpy(&comp_size, ptr, sizeof(size_t));
+    ptr += sizeof(size_t);
+
+    // Resize.
+    denseEntities.resize(entity_count);
+    denseData.resize(entity_count);
+
+    // Replay.
+    memcpy(denseEntities.data(), ptr, entity_count * sizeof(Entity));
+    ptr += entity_count * sizeof(Entity);
+    memcpy(denseData.data(), ptr, entity_count * comp_size);
+  }
+
+  friend class RuntimeStateManager;
 };
 
 #include "impl/SparseEntitySet.inl"

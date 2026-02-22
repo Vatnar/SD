@@ -3,6 +3,8 @@
 #include "Core/Events/window/KeyboardEvents.hpp"
 #include "Core/Events/window/MouseEvents.hpp"
 
+#include "Utils/Utils.hpp"
+
 
 std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
 CreateBuffer2(const vk::Device& device, const vk::PhysicalDevice& physicalDevice,
@@ -66,6 +68,8 @@ Shader2DLayer::Shader2DLayer(Scene& scene, VulkanContext& vulkanCtx, VulkanWindo
                              const std::vector<std::string>& texturePaths) :
   Layer(scene), mVulkanCtx(vulkanCtx), mWindow(window), mTexturePaths(texturePaths),
   mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {
+  SD_ASSERT(vulkanCtx.GetVulkanDevice(), "VulkanContext must have valid device");
+  SD_ASSERT(window.GetSwapchain(), "Window must have valid swapchain");
 }
 
 
@@ -200,6 +204,9 @@ void Shader2DLayer::OnDetach() {
   CheckVulkanRes(device->waitIdle(), "Failed to wait for device to idle");
 }
 void Shader2DLayer::UpdateUniformBuffer(u32 currentImage) const {
+  SD_ASSERT(currentImage < mUniformBuffers.size(), "Frame index out of bounds");
+  SD_ASSERT(mUniformBuffersMapped[currentImage], "Uniform buffer must be mapped");
+
   ViewProjection vp{};
   std::ranges::fill(vp.proj, 0.0f);
   std::ranges::fill(vp.model, 0.0f);
@@ -240,9 +247,15 @@ void Shader2DLayer::UpdateUniformBuffer(u32 currentImage) const {
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
 void Shader2DLayer::OnRender(vk::CommandBuffer cmd) {
+  SD_ASSERT(mPipeline, "Pipeline must be valid");
+  SD_ASSERT(mPipelineLayout, "Pipeline layout must be valid");
+  SD_ASSERT(mVertexBuffer, "Vertex buffer must be valid");
+  SD_ASSERT(!mDescriptorSets.empty(), "Descriptor sets must not be empty");
+
   // Hack: calculate frame index
   static u32 frameIndex = 0;
   frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+  SD_ASSERT(frameIndex < mDescriptorSets.size(), "Frame index out of bounds");
   UpdateUniformBuffer(frameIndex);
 
 

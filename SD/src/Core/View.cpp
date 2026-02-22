@@ -1,6 +1,9 @@
 #include "Core/View.hpp"
 
 #include "Application.hpp"
+
+#include "Utils/Utils.hpp"
+
 VkExtent2D SD::View::GetImGuiExtent() {
   const ImVec2 size = ImGui::GetContentRegionAvail();
   return {static_cast<u32>(size.x), static_cast<u32>(size.y)};
@@ -9,9 +12,11 @@ VkFormat SD::View::FindDepthFormat() {
   std::vector<VkFormat> depthFormats = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
                                         VK_FORMAT_D24_UNORM_S8_UINT};
 
+  auto physicalDevice = Application::Get().GetVulkanContext().GetPhysicalDevice();
+  SD_ASSERT(physicalDevice, "Physical device must be valid");
+
   for (const auto& format : depthFormats) {
     VkFormatProperties props;
-    auto physicalDevice = Application::Get().GetVulkanContext().GetPhysicalDevice();
     vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
 
     if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
@@ -46,6 +51,9 @@ void SD::View::OnGuiRender() {
 // }
 
 void SD::View::SetupLayeredRender(u32 maxStages, VkExtent2D initialExtent) {
+  SD_ASSERT(initialExtent.width > 0 && initialExtent.height > 0, "Initial extent must be valid");
+  SD_ASSERT(maxStages > 0, "Must have at least one stage");
+
   CleanupLayeredRender();
 
   mExtent = initialExtent;
@@ -68,10 +76,15 @@ void SD::View::SetupLayeredRender(u32 maxStages, VkExtent2D initialExtent) {
 }
 
 void SD::View::CreateVulkanResources() {
-  auto& vulkanContext = SD::Application::Get().GetVulkanContext();
+  auto& application = SD::Application::Get();
+  auto& vulkanContext = application.GetVulkanContext();
   VkDevice device = vulkanContext.GetVulkanDevice().get();
   VmaAllocator allocator = vulkanContext.GetVmaAllocator();
   auto extent = mExtent;
+
+  SD_ASSERT(vulkanContext.GetVulkanDevice(), "Vulkan device must be valid");
+  SD_ASSERT(allocator, "VMA allocator must be valid");
+  SD_ASSERT(extent.width > 0 && extent.height > 0, "Extent must be valid");
 
   // 1. Color image (device-local)
   VkImageCreateInfo colorInfo{
@@ -94,6 +107,7 @@ void SD::View::CreateVulkanResources() {
 
   VK_CHECK(vmaCreateImage(allocator, &colorInfo, &colorAllocInfo, &mColorImage, &mColorAllocation,
                           nullptr));
+  SD_ASSERT(mColorImage != VK_NULL_HANDLE, "Color image must be created");
 
   vk::ImageViewCreateInfo colorViewInfo{
       {},
@@ -106,6 +120,7 @@ void SD::View::CreateVulkanResources() {
   mColorView =
       CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createImageViewUnique(colorViewInfo),
                         "Failed to create color view: ");
+  SD_ASSERT(mColorView, "Color view must be created");
 
   // 2. Depth image
   VkFormat depthFormat = FindDepthFormat();
@@ -115,6 +130,7 @@ void SD::View::CreateVulkanResources() {
 
   VK_CHECK(vmaCreateImage(allocator, &depthInfo, &colorAllocInfo, &mDepthImage, &mDepthAllocation,
                           nullptr));
+  SD_ASSERT(mDepthImage != VK_NULL_HANDLE, "Depth image must be created");
 
   vk::ImageViewCreateInfo depthViewInfo{
       {},
@@ -127,6 +143,7 @@ void SD::View::CreateVulkanResources() {
   mDepthView =
       CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createImageViewUnique(depthViewInfo),
                         "Failed to create depth view: ");
+  SD_ASSERT(mDepthView, "Depth view must be created");
 
   // 3. RenderPass attachments
   vk::AttachmentDescription colorAttach(
@@ -181,6 +198,7 @@ void SD::View::CreateVulkanResources() {
         subpasses, (u32)std::size(dependencies), dependencies};
     mLayeredRP = CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createRenderPassUnique(rpInfo),
                                    "Failed to create render pass: ");
+    SD_ASSERT(mLayeredRP, "Render pass must be created");
   }
 
   // Framebuffer (now with valid renderPass)
@@ -190,14 +208,21 @@ void SD::View::CreateVulkanResources() {
   mLayeredFramebuffer =
       CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createFramebufferUnique(fbInfo),
                         "Failed to create framebuffer: ");
+  SD_ASSERT(mLayeredFramebuffer, "Framebuffer must be created");
 
-  auto& imguiCtx = SD::Application::Get().GetImGuiContext();
+  auto& imguiCtx = application.GetImGuiContext();
   mDisplayTexDS = imguiCtx.CreateTextureFromView(mColorView.get());
 }
 
 void SD::View::OnRender(vk::CommandBuffer cmd) {
-  if (!mLayeredRP)
+  SD_ASSERT(mLayeredRP, "Render pass must be valid");
+  SD_ASSERT(mLayeredFramebuffer, "Framebuffer must be valid");
+  SD_ASSERT(mExtent.width > 0 && mExtent.height > 0, "Extent must be valid");
+
+  auto* gameLayer = GetLayerByStage(1);
+  if (!gameLayer) {
     return;
+  }
 
   vk::ClearValue clears[2];
   clears[0].color = vk::ClearColorValue(0.1f, 0.1f, 0.1f, 1.0f);
@@ -242,12 +267,14 @@ void SD::View::CleanupLayeredRender() {
 
   // Images and allocations
   if (mColorImage != VK_NULL_HANDLE) {
+    SD_ASSERT(allocator, "Allocator must be valid for cleanup");
     vmaDestroyImage(allocator, mColorImage, mColorAllocation);
     mColorImage = VK_NULL_HANDLE;
     mColorAllocation = VK_NULL_HANDLE;
   }
 
   if (mDepthImage != VK_NULL_HANDLE) {
+    SD_ASSERT(allocator, "Allocator must be valid for cleanup");
     vmaDestroyImage(allocator, mDepthImage, mDepthAllocation);
     mDepthImage = VK_NULL_HANDLE;
     mDepthAllocation = VK_NULL_HANDLE;
@@ -269,6 +296,7 @@ void SD::View::Resize(VkExtent2D extent) {
   mExtentChanged = true;
 
   auto& vulkanContext = SD::Application::Get().GetVulkanContext();
+  SD_ASSERT(vulkanContext.GetVulkanDevice(), "Device must be valid");
   CheckVulkanRes(vulkanContext.GetVulkanDevice()->waitIdle(),
                  "Failed to wait for device during resize");
 

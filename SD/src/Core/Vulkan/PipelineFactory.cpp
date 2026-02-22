@@ -2,10 +2,13 @@
 
 #include <array>
 
+#include "Utils/Utils.hpp"
+
 namespace SD {
 
 PipelineFactory::PipelineFactory(VkDevice device, ShaderLibrary& shaders) :
   mDevice(device), mShaders(shaders) {
+  SD_ASSERT(device, "Device must be valid");
   // Use default constructor (which is empty/null) for UniqueHandle with dynamic dispatcher
 }
 
@@ -13,6 +16,9 @@ PipelineFactory::~PipelineFactory() = default;
 
 VkPipeline PipelineFactory::CreateGraphicsPipeline(const PipelineDesc& desc,
                                                    VkPipelineLayout layout) {
+  SD_ASSERT(desc.renderPass, "Render pass must be valid");
+  SD_ASSERT(layout, "Pipeline layout must be valid");
+
   vk::UniquePipeline pipeline;
   VK_CHECK(CreatePipelineInstance(desc, layout, &pipeline));
 
@@ -22,6 +28,9 @@ VkPipeline PipelineFactory::CreateGraphicsPipeline(const PipelineDesc& desc,
 }
 
 VkPipelineLayout PipelineFactory::CreatePushConstantLayout(VkShaderStageFlags stages, u32 size) {
+  SD_ASSERT(mDevice, "Device must be valid");
+  SD_ASSERT(size > 0, "Push constant size must be > 0");
+
   vk::PushConstantRange pushConstantRange{(vk::ShaderStageFlags)stages, 0, size};
 
   vk::PipelineLayoutCreateInfo pipelineLayoutInfo{{}, 0, nullptr, 1, &pushConstantRange};
@@ -35,6 +44,8 @@ VkPipelineLayout PipelineFactory::CreatePushConstantLayout(VkShaderStageFlags st
 }
 
 void PipelineFactory::RecreateAllPipelines() {
+  SD_ASSERT(mDevice, "Device must be valid");
+
   for (auto& entry : mTrackedPipelines) {
     if (CreatePipelineInstance(entry.desc, entry.layout, &entry.pipeline) != VkResult::VK_SUCCESS) {
       Abort("Failed to recreate pipeline during hot-reload");
@@ -43,10 +54,18 @@ void PipelineFactory::RecreateAllPipelines() {
 }
 
 VkResult PipelineFactory::CreatePipelineInstance(const PipelineDesc& desc,
-                                                 vk::PipelineLayout layout,
-                                                 vk::UniquePipeline* pipeline) {
+                                                  vk::PipelineLayout layout,
+                                                  vk::UniquePipeline* pipeline) {
+  SD_ASSERT(mDevice, "Device must be valid");
+  SD_ASSERT(pipeline, "Pipeline output pointer must be valid");
+  SD_ASSERT(!desc.vertPath.empty(), "Vertex shader path must be valid");
+  SD_ASSERT(!desc.fragPath.empty(), "Fragment shader path must be valid");
+
   VkShaderModule vertModule = mShaders.Load(desc.vertPath, "vs_6_0");
   VkShaderModule fragModule = mShaders.Load(desc.fragPath, "ps_6_0");
+
+  SD_ASSERT(vertModule, "Vertex shader module must be valid");
+  SD_ASSERT(fragModule, "Fragment shader module must be valid");
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {
       {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,

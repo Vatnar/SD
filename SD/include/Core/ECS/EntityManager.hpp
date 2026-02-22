@@ -129,6 +129,8 @@ private:
   // TODO: make resizable
   using ComponentMask = std::bitset<64>;
   SparseEntitySet<ComponentMask> mEntityMasks;
+
+  friend class RuntimeStateManager;
 };
 
 #include "impl/EntityManager.inl"

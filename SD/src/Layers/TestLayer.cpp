@@ -3,6 +3,8 @@
 #include "Core/Events/window/KeyboardEvents.hpp"
 #include "Core/Events/window/MouseEvents.hpp"
 
+#include "Utils/Utils.hpp"
+
 vk::VertexInputBindingDescription TestLayer::Vertex::getBindingDescription() {
   vk::VertexInputBindingDescription bindingDescription{};
   bindingDescription.binding = 0;
@@ -195,9 +197,15 @@ void TestLayer::UpdateUniformBuffer(u32 currentImage) const {
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
 void TestLayer::OnRender(vk::CommandBuffer& cmd) {
+  SD_ASSERT(mPipeline, "Pipeline must be valid");
+  SD_ASSERT(mPipelineLayout, "Pipeline layout must be valid");
+  SD_ASSERT(mVertexBuffer, "Vertex buffer must be valid");
+  SD_ASSERT(!mDescriptorSets.empty(), "Descriptor sets must not be empty");
+
   // Hack: calculate frame index
   static u32 frameIndex = 0;
   frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+  SD_ASSERT(frameIndex < mDescriptorSets.size(), "Frame index out of bounds");
   UpdateUniformBuffer(frameIndex);
 
 

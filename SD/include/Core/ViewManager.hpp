@@ -62,6 +62,7 @@ public:
   void UpdateViews(float dt);
   void RenderViews(vk::CommandBuffer cmd);
   void CleanupClosedViews();
+  void Clear();
 
 private:
   std::unordered_map<ViewId, std::unique_ptr<View>> mViewsById;
