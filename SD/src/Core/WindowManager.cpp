@@ -4,7 +4,6 @@
 #include "Core/Events/window/WindowEvents.hpp"
 #include "Core/Logging.hpp"
 #include "Core/ViewManager.hpp"
-
 #include "Utils/Utils.hpp"
 
 namespace SD {
@@ -152,8 +151,6 @@ void WindowManager::DrawWindow(WindowId id, WindowData& data, ViewManager& viewM
     }
     return;
   }
-  u32 imageIndex = *acquireRes;
-
   vk::CommandBuffer cmd = renderer.BeginCommandBuffer(vw);
 
   // 1. Offscreen viewports (Handled by ViewManager)

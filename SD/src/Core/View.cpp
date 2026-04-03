@@ -1,7 +1,6 @@
 #include "Core/View.hpp"
 
 #include "Application.hpp"
-
 #include "Utils/Utils.hpp"
 
 VkExtent2D SD::View::GetImGuiExtent() {
@@ -78,7 +77,6 @@ void SD::View::SetupLayeredRender(u32 maxStages, VkExtent2D initialExtent) {
 void SD::View::CreateVulkanResources() {
   auto& application = SD::Application::Get();
   auto& vulkanContext = application.GetVulkanContext();
-  VkDevice device = vulkanContext.GetVulkanDevice().get();
   VmaAllocator allocator = vulkanContext.GetVmaAllocator();
   auto extent = mExtent;
 
@@ -89,6 +87,8 @@ void SD::View::CreateVulkanResources() {
   // 1. Color image (device-local)
   VkImageCreateInfo colorInfo{
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      .pNext = {},
+      .flags = {},
       .imageType = VK_IMAGE_TYPE_2D,
       .format = VK_FORMAT_R8G8B8A8_UNORM,
       .extent = {extent.width, extent.height, 1},
@@ -99,6 +99,8 @@ void SD::View::CreateVulkanResources() {
       .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
                VK_IMAGE_USAGE_TRANSFER_DST_BIT,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+      .queueFamilyIndexCount = {},
+      .pQueueFamilyIndices = {},
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
   };
 

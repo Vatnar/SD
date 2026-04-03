@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file ShaderLibrary.hpp
+//   - @brief HLSL to SPIR-V compilation and shader module caching
+//   - Hot reload support via file change detection
 #pragma once
 
 #include "Core/Base.hpp"
@@ -12,6 +16,12 @@
 
 namespace SD {
 
+// TODO(docs): Document ShaderLibrary class
+//   - Purpose: Compiles HLSL to SPIR-V and caches VkShaderModules
+//   - Load() method usage and profile parameter
+//   - Hot reload: CheckForChanges() + ClearCache() pattern
+//   - Integration with PipelineFactory
+//   - Example: Loading and using shaders
 /// Compiles HLSL → SPIR-V and caches VkShaderModules.
 class ShaderLibrary {
 public:

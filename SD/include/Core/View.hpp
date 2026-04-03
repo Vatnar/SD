@@ -1,35 +1,55 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file View.hpp
+//   - @brief View class - represents a renderable viewport/window content
+//   - Relationship to Layer, LayerList, and VulkanWindow
+//   - Aspect ratio and render mode handling
 #pragma once
 
 #include <imgui.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <vk_mem_alloc.h>
+#include <vulkan/vulkan.hpp>
 
 #include "Core/LayerList.hpp"
 #include "VLA/Matrix.hpp"
-#include <vulkan/vulkan.hpp>
-#include <vk_mem_alloc.h>
 
 namespace SD {
 
 using ViewId = uint32_t;
 
+// TODO(docs): Document ViewError enum
+//   - Each error code's meaning
+//   - How errors are propagated (std::expected)
 enum ViewError {
   NameAlreadyExists,
   Success,
   ViewDoesNotExist,
 };
 
+// TODO(docs): Document AspectMode enum
+//   - Each mode's behavior
+//   - When to use which mode
 enum class AspectMode {
   FixedHeight, // -aspect to +aspect
   FixedWidth,  // -1 to +1
   BestFit      // Auto switch based on aspect
 };
+
+// TODO(docs): Document RenderMode enum
 enum class RenderMode {
   Shaded,
   Wireframe
 };
 
+// TODO(docs): Document View class thoroughly
+//   - Purpose: A renderable region with its own layers and Vulkan resources
+//   - Ownership model (layers, Vulkan resources)
+//   - Integration with ImGui for viewport windows
+//   - Aspect ratio management
+//   - Render pass and framebuffer management
+//   - Example: Creating a custom view with layers
 class View {
 public:
   explicit View(const std::string& name) : mName(name) {
@@ -59,7 +79,7 @@ public:
     layer->mViewId = mViewId;
     layer->mView = this;
 
-    if (stageOrder >= mLayersByStage.size())
+    if (static_cast<size_t>(stageOrder) >= mLayersByStage.size())
       mLayersByStage.resize(stageOrder + 1);
     mLayersByStage[stageOrder] = std::move(layer);
     return static_cast<T&>(*mLayersByStage[stageOrder]);
@@ -80,7 +100,10 @@ public:
   void Resize(VkExtent2D extent);
 
   AspectMode GetAspectMode() const { return mAspectMode; }
-  void SetAspectMode(AspectMode mode) { mAspectMode = mode; Resize(mExtent); }
+  void SetAspectMode(AspectMode mode) {
+    mAspectMode = mode;
+    Resize(mExtent);
+  }
 
   RenderMode GetRenderMode() const { return mRenderMode; }
   void SetRenderMode(RenderMode mode) { mRenderMode = mode; }
@@ -121,17 +144,17 @@ private:
 
   // Vulkan rendering resources
   vk::UniqueRenderPass mLayeredRP;
-  
+
   VkImage mColorImage = VK_NULL_HANDLE;
   VmaAllocation mColorAllocation = VK_NULL_HANDLE;
   vk::UniqueImageView mColorView;
-  
+
   VkImage mDepthImage = VK_NULL_HANDLE;
   VmaAllocation mDepthAllocation = VK_NULL_HANDLE;
   vk::UniqueImageView mDepthView;
 
   VkDescriptorSet mDisplayTexDS = VK_NULL_HANDLE; // imgui::image
-  
+
   vk::UniqueFramebuffer mLayeredFramebuffer;
 
   std::vector<std::unique_ptr<Layer>> mLayersByStage;

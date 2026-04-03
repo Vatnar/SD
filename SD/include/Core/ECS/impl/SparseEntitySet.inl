@@ -1,3 +1,9 @@
+// TODO(invariants): Add assertions after mutations:
+//   - Add(): assert(denseEntities.size() == denseData.size())
+//   - Remove(): assert(denseEntities.size() == denseData.size()) after swap-and-pop
+//   - Remove(): assert(sparse[lastPage][lastOffset] == denseIdx) after update
+//   - DeserializeFrom(): call ValidateInvariants() at end
+
 template<typename T>
 template<typename... Args>
 void SparseEntitySet<T>::Add(Entity entity, Args&&... args) {

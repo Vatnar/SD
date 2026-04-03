@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file PipelineFactory.hpp
+//   - @brief Graphics pipeline creation and caching
+//   - Integration with ShaderLibrary for hot reload
 #pragma once
 
 #include <string>
@@ -9,6 +13,13 @@
 
 namespace SD {
 
+// TODO(docs): Document PipelineFactory class
+//   - Purpose: Creates and caches Vulkan graphics pipelines
+//   - PipelineDesc structure and how to use it
+//   - Pipeline layout creation with push constants
+//   - Hot reload support (RecreateAllPipelines)
+//   - Pipeline cache usage
+//   - Example: Creating a basic pipeline
 /// Creates and owns graphics pipelines. Handles cleanup on destruction.
 class PipelineFactory {
 public:

@@ -7,7 +7,7 @@
 namespace SD {
 VulkanWindow::VulkanWindow(Window& mWindow, VulkanContext& vulkanContext) :
   mVulkanCtx(vulkanContext), mDevice(vulkanContext.GetVulkanDevice().get()), mWindow(mWindow),
-  mIsMinimized(false), mFrameSyncs(false) {
+  mFrameSyncs(false), mIsMinimized(false) {
   SD_ASSERT(mVulkanCtx.GetVulkanDevice(), "VulkanContext must have valid device");
   SD_ASSERT(mVulkanCtx.GetInstance(), "VulkanContext must have valid instance");
 
@@ -311,7 +311,8 @@ void VulkanWindow::CreateFramebuffers() {
   SD_ASSERT(mDevice, "Device must be valid");
   SD_ASSERT(mRenderPass, "Render pass must be valid");
   SD_ASSERT(!mSwapchainImageViews.empty(), "Image views must not be empty");
-  SD_ASSERT(mSwapchainExtent.width > 0 && mSwapchainExtent.height > 0, "Swapchain extent must be valid");
+  SD_ASSERT(mSwapchainExtent.width > 0 && mSwapchainExtent.height > 0,
+            "Swapchain extent must be valid");
 
   mFramebuffers.resize(mSwapchainImageViews.size());
 
@@ -338,7 +339,7 @@ void VulkanWindow::CreateCommandPool() {
   vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
                                      mVulkanCtx.GetGraphicsFamilyIndex());
   mCommandPool = CheckVulkanResVal(mDevice.createCommandPoolUnique(poolInfo),
-                                    "Failed to create unique command pool");
+                                   "Failed to create unique command pool");
 
   // 2. Allocate Buffers (CRITICAL MISSING STEP)
   vk::CommandBufferAllocateInfo allocInfo{};
@@ -348,7 +349,8 @@ void VulkanWindow::CreateCommandPool() {
 
   mCommandBuffers = CheckVulkanResVal(mDevice.allocateCommandBuffersUnique(allocInfo),
                                       "Failed to allocate command buffers");
-  SD_ASSERT(mCommandBuffers.size() == MAX_FRAMES_IN_FLIGHT, "Must allocate MAX_FRAMES_IN_FLIGHT command buffers");
+  SD_ASSERT(mCommandBuffers.size() == MAX_FRAMES_IN_FLIGHT,
+            "Must allocate MAX_FRAMES_IN_FLIGHT command buffers");
 }
 
 

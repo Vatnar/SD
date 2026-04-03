@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file EntityManager.hpp
+//   - @brief Entity-Component System core manager
+//   - Entity creation, destruction, and component management
+//   - View system for component queries
 #pragma once
 #include <bitset>
 #include <memory>
@@ -11,6 +16,12 @@
 
 namespace SD {
 class EntityManager;
+
+// TODO(docs): Document ViewImpl class
+//   - Purpose: Iterator for entities with specific components
+//   - Iteration pattern and validity checking
+//   - begin()/end() semantics
+//   - Example: Iterating over entities with Transform and Velocity
 template<typename... Components>
 class ViewImpl {
   EntityManager& mManager;
@@ -57,6 +68,14 @@ private:
 };
 
 
+// TODO(docs): Document EntityManager class thoroughly
+//   - Purpose: Central ECS manager - entities, components, views
+//   - Entity lifecycle: Create -> (AddComponent) -> Destroy
+//   - Component registration requirement
+//   - View creation patterns (single, multi, ComponentGroup)
+//   - Thread safety: single-threaded only
+//   - Component mask limitations (64 component types max)
+//   - Example: Complete ECS usage pattern
 class EntityManager {
 public:
   Entity Create();
@@ -129,6 +148,23 @@ private:
   // TODO: make resizable
   using ComponentMask = std::bitset<64>;
   SparseEntitySet<ComponentMask> mEntityMasks;
+
+  // INVARIANTS:
+  // 1. For alive entity e: mGenerations[e.index] == e.generation
+  // 2. mFreeList contains only indices of destroyed entities (not in use)
+  // 3. mEntityMasks has entry for every index in mGenerations
+  // 4. Component mask bit is set iff component exists in corresponding pool
+  //
+  // TODO(invariants): Add ValidateInvariants() debug function:
+  //   #ifndef NDEBUG
+  //   void ValidateInvariants() const {
+  //     assert(mEntityMasks.Size() == mGenerations.size());
+  //     for (u32 idx : mFreeList) {
+  //       assert(idx < mGenerations.size());
+  //     }
+  //   }
+  //   #endif
+  // Call at end of Create(), Destroy() in debug builds.
 
   friend class RuntimeStateManager;
 };

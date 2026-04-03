@@ -1,3 +1,9 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file Layer.hpp
+//   - @brief Layer system architecture - the core abstraction for engine functionality
+//   - Explain the three layer subtypes: System, RenderStage, Panel
+//   - Layer lifecycle and event flow
+//   - When to use each subtype
 #pragma once
 
 #include "Events/Event.hpp"
@@ -11,6 +17,12 @@ class View;
 class Layer;
 template<typename T> concept IsLayer = std::is_base_of_v<Layer, T>;
 
+// TODO(docs): Document Layer base class
+//   - Purpose: Base abstraction for all game/engine functionality
+//   - Virtual methods and when to override each
+//   - mActive flag usage
+//   - Scene association
+//   - Example custom layer implementation
 /// Base class for all layers. Prefer using System, RenderStage, or Panel instead.
 class Layer {
 public:
@@ -33,9 +45,9 @@ public:
   [[nodiscard]] Scene* GetScene() const { return mScene; }
 
   virtual void OnEvent(Event&) {}
-  virtual void OnFixedUpdate(double fixedDelta) {}
-  virtual void OnUpdate(float dt) {}
-  virtual void OnRender(vk::CommandBuffer cmd) {}
+  virtual void OnFixedUpdate([[maybe_unused]] double fixedDelta) {}
+  virtual void OnUpdate([[maybe_unused]] float dt) { (void)dt; }
+  virtual void OnRender([[maybe_unused]] vk::CommandBuffer cmd) {}
   virtual void OnGuiRender() {}
   virtual void OnImGuiMenuBar() {}
 

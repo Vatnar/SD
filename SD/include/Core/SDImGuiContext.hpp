@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file SDImGuiContext.hpp
+//   - @brief ImGui context and Vulkan backend setup
+//   - Dock space management
+//   - Texture descriptor set utilities
 #pragma once
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
@@ -9,6 +14,13 @@
 
 namespace SD {
 
+// TODO(docs): Document SDImGuiContext class
+//   - Purpose: Manages ImGui context and Vulkan integration
+//   - Init/Shutdown lifecycle
+//   - Frame begin/end pattern
+//   - Dock space creation (BeginDockSpace/EndDockSpace)
+//   - Texture utilities (CreateTextureFromView, RemoveTexture)
+//   - Example: Setting up ImGui in a custom layer
 class SDImGuiContext {
 public:
   SDImGuiContext() = default;

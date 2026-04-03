@@ -1,10 +1,17 @@
+/**
+ * @file Component.hpp
+ * @brief Component registration and trait utilities for ECS
+ *
+ * @note This ECS implementation is single-threaded. All EntityManager and component
+ *       operations must occur on the same thread. The ComponentIdGenerator uses
+ *       static storage which is not thread-safe for concurrent registration.
+ */
 #pragma once
 
 #include <Core/types.hpp>
 #include <cstddef>
 #include <tuple>
 
-// TODO: we should make this thread safe.
 namespace SD {
 template<typename... Ts>
 struct ComponentGroup {};

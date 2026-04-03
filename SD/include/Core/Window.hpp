@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file Window.hpp
+//   - @brief Window abstraction over GLFW
+//   - Event handling through callbacks
+//   - Builder pattern for window creation
 #pragma once
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -9,6 +14,8 @@
 #include "Vulkan/VulkanConfig.hpp"
 
 namespace SD {
+// TODO(docs): Document callback type aliases
+//   - Each callback's signature and when it's called
 using ResizeCallback = std::function<void(int, int)>;
 using KeyCallback = std::function<void(int, int, int, int)>;
 using ScrollCallback = std::function<void(double, double)>;
@@ -19,6 +26,10 @@ using CharCallback = std::function<void(unsigned int)>;
 
 
 class Window;
+
+// TODO(docs): Document WindowDesc struct
+//   - Each field's purpose
+//   - Which are required vs optional
 struct WindowDesc {
   const char* title{};
   int width{};

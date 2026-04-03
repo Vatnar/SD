@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file GlfwContext.hpp
+//   - @brief RAII wrapper for GLFW initialization
+//   - Error callback setup
+//   - Vulkan extension query
 #pragma once
 
 #include <GLFW/glfw3.h>
@@ -7,6 +12,12 @@
 namespace SD {
 using GlfwErrorCallback = std::function<void(int, const char*)>;
 
+// TODO(docs): Document GlfwContext class
+//   - Purpose: RAII wrapper for GLFW lifecycle
+//   - Initialization and termination guarantees
+//   - Error callback customization
+//   - GetRequiredInstanceExtensions for Vulkan
+//   - Example: Usage in Application
 /**
  * @brief RAII wrapper for initializing and terminating Glfw. Also sets a glfwErrorCallback
  */

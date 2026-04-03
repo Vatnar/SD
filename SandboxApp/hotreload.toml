@@ -1,0 +1,17 @@
+# User game config - place this file where you run HotReloadApp from
+# IMPORTANT: game-so-path is resolved relative to your CURRENT WORKING DIRECTORY (PWD)
+#
+# Examples:
+#   libSandboxApp.so       = PWD/libSandboxApp.so
+#   ./libSandboxApp.so     = PWD/libSandboxApp.so
+#   lib/libSandboxApp.so   = PWD/lib/libSandboxApp.so
+#   ../lib/libMyGame.so    = sibling lib/ directory
+
+[hotreload]
+# Path to game shared library, relative to your working directory
+game-so-path = "libSandboxApp.so"
+
+# Window settings (optional - defaults from engine.toml)
+app-name = "Sandbox"
+window-width = 1280
+window-height = 720

@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file Event.hpp
+//   - @brief Event system base types and macros
+//   - Event type/category system design
+//   - Event macro usage (EVENT_CLASS_TYPE, EVENT_CLASS_CATEGORY)
 #pragma once
 #include <cstddef>
 #include <string>
@@ -5,11 +10,16 @@
 #include "Core/types.hpp"
 
 namespace SD {
+// TODO(docs): Document BIT() helper
+//   - Purpose: Compile-time bit shifting for event categories
 static consteval usize BIT(usize idx) {
   return 1ULL << idx;
 }
 
 
+// TODO(docs): Document EventType enum
+//   - All event types and when they're fired
+//   - Category relationships
 enum class EventType {
   // clang-format off
   None = 0,

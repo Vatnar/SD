@@ -35,7 +35,7 @@ bool ViewImpl<Components...>::Iterator::IsValid() const {
   return (manager.HasComponent<Components>(currentEntity) && ...);
 }
 template<typename... Components>
-typename ViewImpl<Components...>::Iterator ViewImpl<Components...>::begin() {
+ViewImpl<Components...>::Iterator ViewImpl<Components...>::begin() {
   if (!mSmallestPool) {
     SPDLOG_WARN("View has no valid component pools - scene may be empty or missing components");
     return end();
@@ -43,7 +43,7 @@ typename ViewImpl<Components...>::Iterator ViewImpl<Components...>::begin() {
   return Iterator(mManager, mSmallestPool, 0);
 }
 template<typename... Components>
-typename ViewImpl<Components...>::Iterator ViewImpl<Components...>::end() {
+ViewImpl<Components...>::Iterator ViewImpl<Components...>::end() {
   return Iterator(mManager, mSmallestPool, mSmallestPool ? mSmallestPool->size() : 0);
 }
 template<typename... Components>

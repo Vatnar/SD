@@ -12,7 +12,7 @@ enable_testing()
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "tests/*.cpp")
 add_executable(SDGTest ${TEST_SOURCES})
 target_link_libraries(SDGTest PRIVATE
-        SDEngineLib
+        SD
         GTest::gtest
 )
 include(GoogleTest)

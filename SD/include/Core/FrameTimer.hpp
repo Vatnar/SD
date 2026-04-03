@@ -1,9 +1,20 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file FrameTimer.hpp
+//   - @brief Frame timing and fixed timestep management
+//   - Explain the fixed timestep pattern
+//   - GPU/CPU time tracking
 #pragma once
 
 #include <GLFW/glfw3.h>
 
 namespace SD {
 
+// TODO(docs): Document FrameTimer class
+//   - Purpose: Manages frame timing, fixed timestep accumulation
+//   - Usage pattern: Begin -> BeginWork -> EndWork -> ConsumeFixedStep (loop)
+//   - Frame time clamping (max 0.25s)
+//   - GPU wait time tracking
+//   - Example game loop using FrameTimer
 /// Tracks frame timing, fixed timestep accumulation, and CPU work time.
 class FrameTimer {
 public:

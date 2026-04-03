@@ -2,10 +2,15 @@
     <configuration default="false" name="HotReload" type="CMakeRunConfiguration" factoryName="Application"
                    REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false"
                    PASS_PARENT_ENVS_2="true" PROJECT_NAME="SD" TARGET_NAME="HotReloadApp" CONFIG_NAME="debug"
-                   RUN_TARGET_PROJECT_NAME="SD" RUN_TARGET_NAME="HotReloadApp">
+                   RUN_TARGET_PROJECT_NAME="SD" RUN_TARGET_NAME="HotReloadApp"
+                   WORKING_DIRECTORY="$(PROJECT_DIR)/build/bin"
+                   PROGRAM_ARGUMENTS="">
         <method v="2">
             <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask"
                     enabled="true"/>
         </method>
+        <envs>
+            <env name="LD_LIBRARY_PATH" value="$(PROJECT_DIR)/build/bin:$LD_LIBRARY_PATH"/>
+        </envs>
     </configuration>
 </component>

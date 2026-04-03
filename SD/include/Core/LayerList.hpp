@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file LayerList.hpp
+//   - @brief Ordered collection of layers with lifecycle management
+//   - Layer ordering and event propagation
 #pragma once
 #include <list>
 #include <spdlog/spdlog.h>
@@ -5,6 +9,12 @@
 #include "Core/Layer.hpp"
 
 namespace SD {
+// TODO(docs): Document LayerList class
+//   - Purpose: Manages an ordered collection of layers
+//   - Layer lifecycle (PushLayer -> OnAttach, PopLayer -> OnDetach)
+//   - Event propagation order (reverse iteration for bubbling)
+//   - Iteration patterns
+//   - Thread safety considerations
 class LayerList
 
 {

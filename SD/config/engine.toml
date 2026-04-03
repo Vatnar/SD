@@ -1,0 +1,14 @@
+# Engine defaults - ships with the engine
+# These can be overridden by user config, env vars, or CLI args
+
+[engine]
+build-dir = "../build"
+window-width = 1280
+window-height = 720
+poll-interval = 0.5
+
+# Future: hotreload-specific settings
+# [engine.hotreload]
+
+# Future: debug layer settings
+# [engine.debug]

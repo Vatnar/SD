@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file Base.hpp
+//   - @brief Core engine utilities (abort, Vulkan helpers, math)
+//   - Note this is a "catch-all" for low-level utilities
 #pragma once
 
 #include <concepts>
@@ -16,12 +20,17 @@ namespace SD {
  * @brief Math utilities
  */
 namespace Math {
+// TODO(docs): Document log2_int - explain use case, constraints (what happens with 0)
 consteval usize log2_int(std::unsigned_integral auto n) {
   // log2(n) = bit_width(n) - 1
   return n == 0 ? 0 : std::bit_width(n) - 1;
 }
 } // namespace Math
 
+// TODO(docs): Document Abort() overloads
+//   - Explain when to use vs exceptions
+//   - Note about spdlog shutdown behavior
+//   - Thread-safety considerations
 /**
  * Terminates the engine and prints following fatal message
  * @param message
@@ -39,6 +48,10 @@ consteval usize log2_int(std::unsigned_integral auto n) {
   std::abort();
 }
 
+// TODO(docs): Document CheckVulkanRes and CheckVulkanResVal
+//   - Explain the pattern for Vulkan error handling
+//   - When to use each function
+//   - Example usage patterns
 inline void CheckVulkanRes(vk::Result result, std::string_view message,
                            std::source_location loc = std::source_location::current()) {
   if (result != vk::Result::eSuccess) {

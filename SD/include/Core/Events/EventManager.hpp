@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file EventManager.hpp
+//   - @brief Event queue and dispatcher
+//   - Event queuing vs immediate dispatch patterns
 #pragma once
 
 #include <algorithm>
@@ -7,6 +11,11 @@
 #include "Event.hpp"
 
 namespace SD {
+// TODO(docs): Document EventManager class
+//   - Purpose: Queued event storage and type queries
+//   - Event lifetime (pushed, queried, cleared)
+//   - Integration with LayerList event handling
+//   - Example: Checking for specific events
 class EventManager {
 public:
   EventManager() { mEvents.reserve(64); }

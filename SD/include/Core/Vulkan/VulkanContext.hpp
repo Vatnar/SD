@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file VulkanContext.hpp
+//   - @brief Vulkan device and instance management
+//   - Note about class being too large - refactoring planned
+//   - Relationship to VulkanWindow and VulkanRenderer
 #pragma once
 
 #include <vector>
@@ -8,13 +13,13 @@
 #include <vk_mem_alloc.h>
 
 namespace SD {
-// TODO: This class is doing too much. Consider splitting it into smaller, more focused classes
-// (e.g., Device, Swapchain, PipelineManager)
-/**
- * @brief RAII class for managing the Vulkan Context.
- * @details Will be split up since its absolutely humongous, perhaps, Device, Swapchain,
- * PipelineManager
- */
+// TODO(docs): Document VulkanContext class thoroughly
+//   - Purpose: Manages Vulkan instance, physical device, logical device, and VMA allocator
+//   - Initialization order and dependencies
+//   - Feature enablement (Vulkan 1.2, 1.3 features)
+//   - Queue setup and family indices
+//   - Memory management with VMA
+//   - Note about refactoring into smaller classes
 class VulkanContext {
 public:
   explicit VulkanContext(const GlfwContext& glfwCtx);

@@ -104,19 +104,41 @@ set_target_properties(SD PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if (MSVC)
     target_compile_options(SD PUBLIC
+            -fsanitize=address
             $<$<CONFIG:Release>:/O2 /Ob2>
             $<$<CONFIG:Debug>:/Od /Zi>
     )
 else ()
     target_compile_options(SD PUBLIC
+            -fsanitize=address
             $<$<CONFIG:Release>:-O3>
             $<$<CONFIG:Debug>:-g -O0>
+            -Wall -Wextra -Werror
     )
 endif ()
 
+target_link_options(SD PRIVATE
+        -fsanitize=address
+)
+
 # Hot reloading
-add_executable(HotReloadApp src/HotReloader.cpp)
-target_link_libraries(HotReloadApp PRIVATE SD dl)
+add_executable(HotReloadApp src/HotReloader.cpp src/ConfigLoader.cpp)
+target_link_libraries(HotReloadApp PRIVATE SD dl spdlog::spdlog)
+target_include_directories(HotReloadApp PRIVATE 
+    include 
+    ${PROJECT_SOURCE_DIR}/SandboxApp
+    ${PROJECT_SOURCE_DIR}/vendor/tomlplusplus/include
+)
+target_compile_definitions(HotReloadApp PRIVATE SD_ENGINE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Copy engine config to bin
+add_custom_command(TARGET HotReloadApp POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/config"
+        "${CMAKE_BINARY_DIR}/bin/config"
+        COMMENT "Deploy engine config to bin/"
+        VERBATIM
+)
 
 # assets
 add_custom_command(TARGET SD POST_BUILD
@@ -127,3 +149,8 @@ add_custom_command(TARGET SD POST_BUILD
         VERBATIM
 )
 add_dependencies(HotReloadApp SandboxApp)
+
+target_compile_options(HotReloadApp PRIVATE
+        -fsanitize=address -Wall -Wextra -Werror)
+target_link_options(HotReloadApp PRIVATE
+        -fsanitize=address)

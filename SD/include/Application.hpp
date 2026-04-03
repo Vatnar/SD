@@ -1,3 +1,9 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file Application.hpp
+//   - @brief Main application class - the central hub of the engine
+//   - Architecture overview: Application owns all subsystems
+//   - Lifecycle diagram (Init -> Run -> Shutdown)
+//   - Hot reload integration notes
 #pragma once
 #include <expected>
 #include <unordered_map>
@@ -17,6 +23,9 @@
 
 namespace SD {
 
+// TODO(docs): Document ApplicationSpecification
+//   - Each field's purpose and default value rationale
+//   - Example configuration
 struct ApplicationSpecification {
   std::string name = "SDEngine App";
   int width = 1600;
@@ -24,6 +33,12 @@ struct ApplicationSpecification {
   bool enableHotReload = true;
 };
 
+// TODO(docs): Document Application class thoroughly
+//   - Class overview and responsibilities
+//   - Ownership model (what it owns vs references)
+//   - Singleton pattern usage (Get())
+//   - Thread safety considerations
+//   - Example minimal application setup
 class Application {
 public:
   Application(const ApplicationSpecification& spec, RuntimeStateManager* stateManager = nullptr);

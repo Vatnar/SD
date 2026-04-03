@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file WindowManager.hpp
+//   - @brief Multi-window management for GLFW and Vulkan windows
+//   - Relationship to ViewManager and Application
 #pragma once
 
 #include "Core/Base.hpp"
@@ -12,8 +16,18 @@
 namespace SD {
 
 class ViewManager;
+
+// TODO(strong-typedef): Change from `using` to struct for type safety
+//   using WindowId = u32;
+// becomes:
+//   struct WindowId { u32 value; };
+// This prevents accidental mixing of WindowId with ViewId or raw u32.
+// Zero performance cost, compiler catches type errors.
 using WindowId = u32;
 
+// TODO(docs): Document WindowProps struct
+//   - Each field's purpose
+//   - Default values rationale
 struct WindowProps {
   std::string title;
   int width, height;
@@ -21,6 +35,12 @@ struct WindowProps {
     title(title), width(width), height(height) {}
 };
 
+// TODO(docs): Document WindowManager class
+//   - Purpose: Manages multiple windows (GLFW + Vulkan)
+//   - Window lifecycle (Create, Destroy, ProcessPendingCloses)
+//   - WindowData structure (logic window, render window, layers)
+//   - Update/Draw loop integration
+//   - Example: Creating and managing multiple windows
 class WindowManager {
 public:
   WindowManager();

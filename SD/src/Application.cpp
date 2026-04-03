@@ -68,10 +68,10 @@ ImVec4 ApplyTheme() {
 
 Application::Application(const ApplicationSpecification& spec, RuntimeStateManager* stateManager) :
 
-  mGlfwCtx(std::make_unique<GlfwContext>()), mVulkanCtx(std::make_unique<VulkanContext>(*mGlfwCtx)),
+  mSpec(spec), mHotReloadEnabled(spec.enableHotReload), mGlfwCtx(std::make_unique<GlfwContext>()),
+  mVulkanCtx(std::make_unique<VulkanContext>(*mGlfwCtx)),
   mImGuiCtx(std::make_unique<SDImGuiContext>()), mWindowManager(std::make_unique<WindowManager>()),
-  mViewManager(std::make_unique<ViewManager>()), mSpec(spec),
-  mHotReloadEnabled(spec.enableHotReload), mStateManager(stateManager) {
+  mViewManager(std::make_unique<ViewManager>()), mStateManager(stateManager) {
   sInstance = this;
 
   WindowProps props(spec.name, spec.width, spec.height);
@@ -100,6 +100,14 @@ Application::~Application() {
     (void)mVulkanCtx->GetVulkanDevice()->waitIdle();
   }
   mWindowManager.reset();
+}
+
+void Application::Run(std::atomic<bool>* externalStop) {
+  while (mRunning) {
+    if (externalStop)
+      mRunning = !externalStop->load(std::memory_order_acquire);
+    Frame();
+  }
 }
 
 void Application::Frame() {
@@ -173,14 +181,6 @@ void Application::Frame() {
   mImGuiCtx->UpdatePlatformWindows();
   mWindowManager->ProcessPendingCloses();
   mViewManager->CleanupClosedViews();
-}
-
-void Application::Run(std::atomic<bool>* externalStop) {
-  while (mRunning) {
-    if (externalStop)
-      mRunning = !externalStop->load(std::memory_order_acquire);
-    Frame();
-  }
 }
 
 void Application::OnAppEvent(Event& e) {

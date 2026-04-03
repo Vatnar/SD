@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file VulkanRenderer.hpp
+//   - @brief Frame rendering orchestration
+//   - Relationship to VulkanContext, VulkanWindow, PipelineFactory, ShaderLibrary
 #pragma once
 
 #include "Core/Base.hpp"
@@ -8,6 +12,12 @@
 #include "VulkanWindow.hpp"
 
 namespace SD {
+// TODO(docs): Document VulkanRenderer class
+//   - Purpose: Orchestrates frame rendering (BeginFrame, BeginRenderPass, EndFrame)
+//   - Command buffer management
+//   - Clear color and render state
+//   - Subsystems (ShaderLibrary, PipelineFactory)
+//   - Example rendering loop
 class VulkanRenderer {
 public:
   explicit VulkanRenderer(VulkanContext& ctx);

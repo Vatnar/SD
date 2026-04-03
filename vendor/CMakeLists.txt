@@ -4,6 +4,7 @@ add_subdirectory(spdlog)
 add_subdirectory(stb)
 add_subdirectory(dxc)
 add_subdirectory(VLA)
+add_subdirectory(tomlplusplus)
 
 add_library(imgui STATIC
         imgui/imgui.cpp

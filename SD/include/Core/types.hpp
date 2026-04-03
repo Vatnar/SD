@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file types.hpp
+//   - @brief Engine type aliases
+//   - Rationale for using custom type aliases (clarity, consistency)
 #pragma once
 #include <cstdint>
 using i8 = std::int8_t;

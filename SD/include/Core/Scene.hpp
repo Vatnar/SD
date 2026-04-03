@@ -1,7 +1,18 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file Scene.hpp
+//   - @brief Scene container - holds EntityManager and scene-level state
+//   - Relationship to View and Application
+//   - Scene lifecycle (OnStart, OnUpdate, OnStop)
 #pragma once
 #include "ECS/EntityManager.hpp"
 
 namespace SD {
+// TODO(docs): Document Scene class
+//   - Purpose: Container for entities and scene-level systems
+//   - Ownership of EntityManager
+//   - Active/inactive state management
+//   - Future: scene-level systems registration
+//   - Example: Creating and populating a scene
 class Scene {
 public:
   explicit Scene(std::string name = "Untitled Scene") : mName(std::move(name)) {}

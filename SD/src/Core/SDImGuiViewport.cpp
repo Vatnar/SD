@@ -49,8 +49,8 @@ void SDImGuiViewport::Begin() {
   }
 
   if (mTextureID == VK_NULL_HANDLE) {
-    auto& app = Application::Get();
-    auto pool = app.GetImGuiContext().GetDescriptorPool();
+    // auto& app = Application::Get();
+    // auto pool = app.GetImGuiContext().GetDescriptorPool();
 
     mTextureID = ImGui_ImplVulkan_AddTexture(*mSampler, mFramebuffer->GetColorImageView(),
                                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

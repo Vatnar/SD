@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file VulkanWindow.hpp
+//   - @brief Vulkan swapchain and per-window rendering resources
+//   - Relationship to Window (GLFW) and VulkanContext
+//   - Frame synchronization model
 #pragma once
 #include "Core/Events/window/WindowEvents.hpp"
 #include "Core/LayerList.hpp"
@@ -6,8 +11,11 @@
 #include "VulkanContext.hpp"
 
 namespace SD {
-// TODO: Consider creating a "FrameData" struct to hold all per-frame resources (semaphores, fences,
-// command buffers, etc.)
+// TODO(docs): Document FrameSync and SwapchainSync structs
+//   - Purpose: Synchronization primitives for frame rendering
+//   - imageAcquired: GPU signal when swapchain image is ready
+//   - inFlight: CPU-GPU sync for command buffer reuse
+//   - renderComplete: GPU signal when rendering done
 struct FrameSync {
   vk::UniqueSemaphore imageAcquired;
   vk::UniqueFence inFlight;
@@ -17,6 +25,13 @@ struct SwapchainSync {
   vk::UniqueSemaphore renderComplete;
 };
 
+// TODO(docs): Document VulkanWindow class thoroughly
+//   - Purpose: Manages Vulkan swapchain and per-window resources
+//   - Swapchain creation and recreation
+//   - Frame synchronization (MAX_FRAMES_IN_FLIGHT)
+//   - Command buffer management
+//   - Minimization handling
+//   - Integration with LayerList for swapchain recreation
 class VulkanWindow {
 public:
   uint32_t CurrentFrame = 0;

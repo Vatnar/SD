@@ -1,3 +1,8 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file Utils.hpp
+//   - @brief Vulkan utility functions and macros
+//   - Note: This is a "kitchen sink" file - consider splitting
+//   - Categories: Error checking, buffer/image creation, texture loading
 #pragma once
 #include <expected>
 #include <filesystem>
@@ -19,6 +24,10 @@
 namespace SD {
 
 
+// TODO(docs): Document VK_CHECK macro
+//   - Purpose: Vulkan error checking with abort on failure
+//   - When to use vs CheckVulkanRes
+//   - Example usage
 #define VK_CHECK(x)               \
   do {                            \
     VkResult res = (x);           \
@@ -26,6 +35,9 @@ namespace SD {
       Abort("Vulkan error: " #x); \
   } while (0)
 
+// TODO(docs): Document SD_CORE_ASSERT and SD_ASSERT macros
+//   - Difference between debug and release behavior
+//   - When to use assertions vs error handling
 #ifdef NDEBUG
 #define SD_CORE_ASSERT(x, ...) ((void)0)
 #else
@@ -38,15 +50,20 @@ namespace SD {
   } while (0)
 #endif
 
-#define SD_ASSERT(x, ...)                                                      \
-  do {                                                                        \
-    if (!(x)) {                                                               \
-      SD::Log::Error("ASSERT {}:{} {}", __FILE__, __LINE__, #x);              \
-      SD::Abort();                                                            \
-    }                                                                         \
+#define SD_ASSERT(x, ...)                                        \
+  do {                                                           \
+    if (!(x)) {                                                  \
+      SD::Log::Error("ASSERT {}:{} {}", __FILE__, __LINE__, #x); \
+      SD::Abort();                                               \
+    }                                                            \
   } while (0)
 
 
+// TODO(docs): Document SingleTimeCommand function
+//   - Purpose: Execute Vulkan commands with automatic synchronization
+//   - Error handling (returns std::expected)
+//   - Performance considerations
+//   - Example usage
 inline std::expected<void, std::string>
 SingleTimeCommand(const vk::Device& device, const vk::Queue& queue,
                   const vk::CommandPool& commandPool,
@@ -97,6 +114,11 @@ SingleTimeCommand(const vk::Device& device, const vk::Queue& queue,
 }
 
 
+// TODO(docs): Document CreateBuffer function
+//   - Purpose: Create a Vulkan buffer with memory allocation
+//   - Memory property flags explanation
+//   - Note about VMA TODO - this will be deprecated
+//   - Example usage
 inline std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
 CreateBuffer(const vk::Device& device, const vk::PhysicalDevice& physicalDevice,
              vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
@@ -120,6 +142,10 @@ CreateBuffer(const vk::Device& device, const vk::PhysicalDevice& physicalDevice,
   return {std::move(buffer), std::move(bufferMemory)};
 }
 
+// TODO(docs): Document CreateImage function
+//   - Purpose: Create a Vulkan image with memory allocation
+//   - Format, tiling, usage parameter guidance
+//   - Note about VMA TODO
 inline std::pair<vk::UniqueImage, vk::UniqueDeviceMemory>
 CreateImage(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t width,
             uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage,
@@ -145,6 +171,9 @@ CreateImage(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, 
   return {std::move(image), std::move(imageMemory)};
 }
 
+// TODO(docs): Document CopyBufferToImage function
+//   - Purpose: Copy buffer data to an image via command buffer
+//   - Requires image to be in eTransferDstOptimal layout
 inline void CopyBufferToImage(const vk::CommandBuffer& cmdBuffer, const vk::Buffer& buffer,
                               const vk::Image& image, uint32_t width, uint32_t height) {
   vk::BufferImageCopy region(0, 0, 0,
@@ -153,8 +182,13 @@ inline void CopyBufferToImage(const vk::CommandBuffer& cmdBuffer, const vk::Buff
   cmdBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
 }
 
+// TODO(docs): Document TransitionImageLayout function
+//   - Purpose: Transition image layout with pipeline barrier
+//   - Supported transitions (Undefined->TransferDst, TransferDst->ShaderReadOnly)
+//   - Pipeline stage and access mask logic
+//   - Note about ImageMemoryBarrier2 TODO
 inline void TransitionImageLayout(const vk::CommandBuffer& cmdBuffer, const vk::Image& image,
-                                  vk::Format format, vk::ImageLayout oldLayout,
+                                  [[maybe_unused]] vk::Format format, vk::ImageLayout oldLayout,
                                   vk::ImageLayout newLayout) {
   // TODO: Use vk::ImageMemoryBarrier2 for better synchronization (requires Vulkan 1.3 or extension)
   vk::ImageMemoryBarrier barrier;
@@ -194,14 +228,22 @@ inline void TransitionImageLayout(const vk::CommandBuffer& cmdBuffer, const vk::
 }
 
 
-// TODO: Create a proper Texture class abstraction (e.g., class Texture2D) that manages image, view,
-// sampler, and descriptor info
+// TODO(docs): Document Texture struct
+//   - Purpose: Simple texture container (image + memory + view)
+//   - Note about Texture class TODO - this will be replaced
+//   - Ownership semantics
 struct Texture {
   vk::UniqueImage image;
   vk::UniqueDeviceMemory imageMemory;
   vk::UniqueImageView imageView;
 };
 
+// TODO(docs): Document CreateTexture function
+//   - Purpose: Load a texture from file (STB image + Vulkan upload)
+//   - Format (R8G8B8A8Srgb) and why
+//   - Error handling (file not found, Vulkan errors)
+//   - Performance notes (staging buffer)
+//   - Example usage
 inline std::expected<Texture, std::string> CreateTexture(const vk::Device& device,
                                                          const vk::PhysicalDevice& physicalDevice,
                                                          const vk::Queue& graphicsQueue,
@@ -257,6 +299,10 @@ inline std::expected<Texture, std::string> CreateTexture(const vk::Device& devic
   return Texture{std::move(image), std::move(imageMemory), std::move(imageView)};
 }
 
+// TODO(docs): Document CreateShaderModule function
+//   - Purpose: Create a Vulkan shader module from SPIR-V bytecode
+//   - Input format (vector<char> of SPIR-V)
+//   - Example usage with shader loading
 inline vk::UniqueShaderModule CreateShaderModule(const vk::Device& device,
                                                  const std::vector<char>& code) {
   vk::ShaderModuleCreateInfo createInfo({}, code.size(),

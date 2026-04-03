@@ -6,7 +6,7 @@
 #include "VLA/Matrix.hpp"
 #include "imgui.h"
 
-static int sLoadCount = 0;
+// static int sLoadCount = 0;
 
 GameRenderLayer::GameRenderLayer(const std::string& name, SD::Scene* scene, VkPipeline pipeline,
                                  VkPipeline wireframePipeline, VkPipelineLayout layout) :
@@ -15,8 +15,6 @@ GameRenderLayer::GameRenderLayer(const std::string& name, SD::Scene* scene, VkPi
 }
 
 void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
-  static int version = 0;
-  fprintf(stderr, "VERSION %d - OnRender called\n", ++version);
   VkPipeline activePipe =
       (mView->GetRenderMode() == SD::RenderMode::Wireframe) ? mWireframePipeline : mPipeline;
   // BUG: Crash here SEGFAULT
@@ -86,7 +84,7 @@ void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
 
     if (inside) {
       push.color[0] = 1.0f;
-      push.color[1] = 1.0f;
+      push.color[1] = 0.0f;
       push.color[2] = 1.0f;
     }
 

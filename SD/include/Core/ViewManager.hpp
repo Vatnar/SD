@@ -1,3 +1,7 @@
+// TODO(docs): Add file-level Doxygen header
+//   - @file ViewManager.hpp
+//   - @brief Manages View instances (create, destroy, query)
+//   - Relationship to Application and View classes
 #pragma once
 
 #include "Core/Base.hpp"
@@ -13,8 +17,19 @@
 
 namespace SD {
 
+// TODO(strong-typedef): Change from `using` to struct for type safety
+//   using ViewId = u32;
+// becomes:
+//   struct ViewId { u32 value; };
+// This prevents accidental mixing of ViewId with WindowId or raw u32.
+// Zero performance cost, compiler catches type errors.
 using ViewId = u32;
 
+// TODO(docs): Document ViewManager class
+//   - Purpose: Factory and registry for View objects
+//   - View naming and ID system
+//   - Error handling patterns (std::expected)
+//   - Example: Creating and managing multiple views
 class ViewManager {
 public:
   ViewManager();
