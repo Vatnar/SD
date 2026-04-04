@@ -20,19 +20,29 @@ This project is licensed under the **PolyForm Shield License 1.0.0**. (See `LICE
 
 ## Engine TODO (Roadmap)
 
-### 🟢 Immediate Focus: Modular Infrastructure
+### 🟢 Phase 1: Command System (In Progress)
 
-- [ ] **Handle-Based Asset Management**: Implementation of a centralized `AssetManager` with `Handle<T>` semantics for
-  textures, meshes, and shaders.
-- [x] **ECS System Orchestration**: Evolving `Scene` to host logic/render systems that operate on the `EntityManager`.
-- [ ] **Command-Based Mutations**: Routing scene changes through a `CommandBus` to support Undo/Redo and future
-  networking.
+- [ ] **EntityHandle**: Implement handle system for deferred entity creation
+- [ ] **Command Base Class**: Command interface with serialization support
+- [ ] **CommandQueue**: Thread-safe queue with mutex, Apply() method
+- [ ] **Entity Commands**: CreateEntity, AddComponent, RemoveComponent
+- [ ] **Scene Integration**: Add command queue to Scene with Execute() methods
+- [ ] **Serialization**: Serialize/deserialize commands for networking + file saving
 
-### 🔵 Rendering & Pipeline
+### 🟡 Phase 2: Asset Management
 
-- [ ] **Generic Render Graph**: Decoupling the rendering pipeline into modular, swappable passes.
-- [ ] **View-Specific Renderers**: Allowing different `Views` to use different render configurations (e.g. Wireframe vs
-  Lit).
+- [ ] **AssetManager Core**: Centralized asset loading/management
+- [ ] **Asset Handles**: Handle<T> system for type-safe asset references
+- [ ] **Texture Loading**: Load textures from files
+- [ ] **Mesh Loading**: Load meshes from files
+- [ ] **Material System**: Material assets referencing textures/shaders
+
+### 🔵 Phase 3: Graphics Pipeline
+
+- [ ] **Render System**: ECS-based render system querying Renderable components
+- [ ] **Generic Render Graph**: Modular, swappable render passes
+- [ ] **View-Specific Renderers**: Different render configs per view (Wireframe, Lit, etc.)
+- [ ] **Asset Integration**: Connect AssetManager with RenderSystem
 
 ### 🛠️ Developer Workflow
 

@@ -15,3 +15,6 @@ using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 
 using usize = std::size_t;
+
+template<typename T>
+constexpr T type_max = std::numeric_limits<T>::max();

@@ -5,12 +5,39 @@
  * @note This ECS implementation is single-threaded. All EntityManager and component
  *       operations must occur on the same thread. The ComponentIdGenerator uses
  *       static storage which is not thread-safe for concurrent registration.
+ *
+ * @section ComponentRegistration Component Registration
+ *
+ * To create a new component:
+ * 1. Define the struct as pure data (no methods)
+ * 2. Use REGISTER_SD_COMPONENT(Type) macro to register with ECS
+ * 3. Specialize ComponentSerializer<Type> to implement Serialize/Deserialize
+ *
+ * Example:
+ * @code
+ * struct MyComponent {
+ *     float value;
+ *     int count;
+ * };
+ * REGISTER_SD_COMPONENT(MyComponent);
+ *
+ * template<>
+ * struct ComponentSerializer<MyComponent> {
+ *     static void Serialize(const MyComponent& c, Serializer& s) {
+ *         s.Write(c.value);
+ *         s.Write(c.count);
+ *     }
+ *     static void Deserialize(MyComponent& c, Serializer& s) {
+ *         c.value = s.Read<float>();
+ *         c.count = s.Read<int>();
+ *     }
+ * };
+ * @endcode
  */
 #pragma once
 
 #include <Core/types.hpp>
-#include <cstddef>
-#include <tuple>
+#include <Utils/Serialization.hpp>
 
 namespace SD {
 template<typename... Ts>
@@ -19,11 +46,13 @@ struct ComponentGroup {};
 template<typename T>
 struct ComponentTraits;
 
+template<typename T>
+struct ComponentSerializer {
+    static void Serialize(const T& component, Serializer& s) = delete;
+    static void Deserialize(T& component, Serializer& s) = delete;
+};
+
 namespace detail {
-/**
- * @internal Implementation detail
- * @brief Generates component ids, used internally by ComponentTraits
- */
 struct ComponentIdGenerator {
   ComponentIdGenerator() = delete;
   ~ComponentIdGenerator() = delete;
@@ -37,12 +66,7 @@ private:
 };
 
 } // namespace detail
-/**
- * @brief Traits for a component, Name, and Id
- * @details Use @ref REGISTER_SD_COMPONENT or @ref REGISTER_COMPONENT macro to properly define the
- * correct traits
- * @tparam T Pure data struct
- */
+
 template<typename T>
 struct ComponentTraits {
   static constexpr bool IsRegistered = false;
@@ -62,8 +86,7 @@ struct ComponentTraits {
   };
 
 /**
- * @brief Registers a component for use with ECS
- * @details Needs to be run to use a component with ECS
+ * @brief Registers a component for use with ECS (non-namespaced)
  * @param Type struct type
  */
 #define REGISTER_COMPONENT(Type)                                             \

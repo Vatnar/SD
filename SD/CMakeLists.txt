@@ -124,10 +124,10 @@ target_link_options(SD PRIVATE
 # Hot reloading
 add_executable(HotReloadApp src/HotReloader.cpp src/ConfigLoader.cpp)
 target_link_libraries(HotReloadApp PRIVATE SD dl spdlog::spdlog)
-target_include_directories(HotReloadApp PRIVATE 
-    include 
-    ${PROJECT_SOURCE_DIR}/SandboxApp
-    ${PROJECT_SOURCE_DIR}/vendor/tomlplusplus/include
+target_include_directories(HotReloadApp PRIVATE
+        include
+        ${PROJECT_SOURCE_DIR}/SandboxApp
+        ${PROJECT_SOURCE_DIR}/vendor/tomlplusplus/include
 )
 target_compile_definitions(HotReloadApp PRIVATE SD_ENGINE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
