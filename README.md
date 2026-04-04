@@ -22,12 +22,14 @@ This project is licensed under the **PolyForm Shield License 1.0.0**. (See `LICE
 
 ### 🟢 Phase 1: Command System (In Progress)
 
-- [ ] **EntityHandle**: Implement handle system for deferred entity creation
-- [ ] **Command Base Class**: Command interface with serialization support
-- [ ] **CommandQueue**: Thread-safe queue with mutex, Apply() method
-- [ ] **Entity Commands**: CreateEntity, AddComponent, RemoveComponent
-- [ ] **Scene Integration**: Add command queue to Scene with Execute() methods
-- [ ] **Serialization**: Serialize/deserialize commands for networking + file saving
+- [x] **EntityHandle**: Implement handle system for deferred entity creation
+- [x] **Command Base Class**: Command interface with serialization support
+- [x] **CommandQueue**: Queue with Apply() method (thread-safety deferred)
+- [x] **Entity Commands**: CreateEntity, DestroyEntity, AddComponent, RemoveComponent
+- [x] **Scene Integration**: Add command queue to Scene with AddCommand/ApplyCommands
+- [x] **Serialization**: Serialize/deserialize commands for networking + file saving
+- [ ] **Testing**: Write unit tests for CommandQueue and Scene
+- [ ] **File Serialization**: Serialize command queue to file and reload
 
 ### 🟡 Phase 2: Asset Management
 

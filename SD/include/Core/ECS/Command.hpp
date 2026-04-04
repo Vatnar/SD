@@ -7,6 +7,7 @@
 #include "Utils/Serialization.hpp"
 
 namespace SD {
+class CommandQueue;
 class EntityManager;
 
 /**
@@ -17,7 +18,7 @@ struct EntityHandle {
   EntityHandle() : id(type_max<u32>) {}
   explicit EntityHandle(const u32 id) : id(id) {}
 
-  bool IsValid() const { return id != type_max<u32>; }
+  [[nodiscard]] bool IsValid() const { return id != type_max<u32>; }
 
   bool operator==(const EntityHandle& other) const { return id == other.id; }
 };
@@ -30,7 +31,7 @@ public:
    * Called when Apply() is called on the queue
    * @param em entity manager
    */
-  virtual void Execute(EntityManager& em) = 0;
+  virtual void Execute(EntityManager& em, CommandQueue& queue) = 0;
 
   /**
    * Serialize command to buffer (networking and files)
@@ -44,5 +45,4 @@ public:
    */
   virtual void Deserialize(Serializer& serializer) = 0;
 };
-using CommandPtr = std::unique_ptr<Command>;
 } // namespace SD

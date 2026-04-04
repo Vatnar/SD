@@ -48,8 +48,8 @@ struct ComponentTraits;
 
 template<typename T>
 struct ComponentSerializer {
-    static void Serialize(const T& component, Serializer& s) = delete;
-    static void Deserialize(T& component, Serializer& s) = delete;
+  static void Serialize(const T& component, Serializer& s) = delete;
+  static void Deserialize(T& component, Serializer& s) = delete;
 };
 
 namespace detail {
@@ -102,4 +102,11 @@ struct ComponentDebugInfo {
   const char* name;
   void* data;
 };
+
+template<typename T>
+concept SerializableComponent = requires(T& t, Serializer& s) {
+  ComponentSerializer<T>::Serialize(t, s);
+  ComponentSerializer<T>::Deserialize(t, s);
+};
+
 } // namespace SD
