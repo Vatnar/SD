@@ -1,6 +1,7 @@
 #pragma once
 #include "Command.hpp"
 #include "Entity.hpp"
+
 namespace SD {
 
 class CommandQueue {
@@ -16,6 +17,9 @@ public:
   void SetEntityForHandle(EntityHandle entityHandle, Entity entity);
   void Clear();
   [[nodiscard]] usize GetCount() const;
+
+  void Serialize(Serializer& serializer) const;
+  void Deserialize(Serializer& serializer);
 
 private:
   std::vector<std::unique_ptr<Command>> mCommands;

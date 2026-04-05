@@ -5,13 +5,15 @@
 //   - Performance characteristics (O(1) add/remove/get)
 #pragma once
 #include "Core/Base.hpp"
+#include "Component.hpp"
 #include "Entity.hpp"
+#include "Utils/Serialization.hpp"
 
 namespace SD {
 // TODO(docs): Document SparseEntitySetBase interface
 //   - Purpose: Type-erased base for component pools
 //   - Used by EntityManager for heterogeneous storage
-class SparseEntitySetBase {
+class SparseEntitySetBase : public Serializable {
 public:
   virtual ~SparseEntitySetBase() = default;
   virtual bool Remove(Entity entity) = 0;
@@ -122,6 +124,50 @@ public:
 
     sparse.clear();
     for (size_t i = 0; i < entity_count; ++i) {
+      Entity e = denseEntities[i];
+      const usize page = e.index >> SHIFT;
+      const usize offset = e.index & MASK;
+
+      if (page >= sparse.size())
+        sparse.resize(page + 1);
+      if (!sparse[page]) {
+        sparse[page] = std::make_unique<usize[]>(PAGE_SIZE);
+        std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<usize>::max());
+      }
+      sparse[page][offset] = i;
+    }
+  }
+
+  void Serialize(Serializer& s) const override {
+    s.Write(static_cast<u32>(denseEntities.size()));
+    for (const auto& e : denseEntities) {
+      s.Write(e.index);
+      s.Write(e.generation);
+    }
+    // Only serialize component data if it's serializable
+    if constexpr (SerializableComponent<T>) {
+      for (const auto& data : denseData) {
+        ComponentSerializer<T>::Serialize(data, s);
+      }
+    }
+  }
+
+  void Deserialize(Serializer& s) override {
+    u32 count = s.Read<u32>();
+    denseEntities.resize(count);
+    for (u32 i = 0; i < count; ++i) {
+      denseEntities[i].index = s.Read<u32>();
+      denseEntities[i].generation = s.Read<u32>();
+    }
+    denseData.resize(denseEntities.size());
+    if constexpr (SerializableComponent<T>) {
+      for (auto& data : denseData) {
+        ComponentSerializer<T>::Deserialize(data, s);
+      }
+    }
+    // Rebuild sparse index
+    sparse.clear();
+    for (size_t i = 0; i < denseEntities.size(); ++i) {
       Entity e = denseEntities[i];
       const usize page = e.index >> SHIFT;
       const usize offset = e.index & MASK;

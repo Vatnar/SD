@@ -2,6 +2,7 @@
 #include <VLA/Matrix.hpp>
 
 #include "Component.hpp"
+#include "ComponentFactory.hpp"
 #include "Core/types.hpp"
 
 namespace SD {
@@ -10,6 +11,7 @@ struct Transform {
   VLA::Matrix4x4f worldMatrix;
 };
 REGISTER_SD_COMPONENT(Transform);
+REGISTER_SERIALIZABLE_COMPONENT(Transform);
 
 template<>
 struct ComponentSerializer<Transform> {
@@ -22,6 +24,7 @@ struct Camera {
   VLA::Matrix4x4f proj;
 };
 REGISTER_SD_COMPONENT(Camera);
+REGISTER_SERIALIZABLE_COMPONENT(Camera);
 
 template<>
 struct ComponentSerializer<Camera> {
@@ -43,6 +46,7 @@ struct Renderable {
   float color[4] = {1.0f, 0.0f, 0.0f, 1.0f};
 };
 REGISTER_SD_COMPONENT(Renderable);
+REGISTER_SERIALIZABLE_COMPONENT(Renderable);
 
 template<>
 struct ComponentSerializer<Renderable> {
@@ -66,6 +70,7 @@ struct DebugName {
   std::string name;
 };
 REGISTER_SD_COMPONENT(DebugName);
+REGISTER_SERIALIZABLE_COMPONENT(DebugName);
 
 template<>
 struct ComponentSerializer<DebugName> {

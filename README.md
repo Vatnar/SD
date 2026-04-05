@@ -20,7 +20,7 @@ This project is licensed under the **PolyForm Shield License 1.0.0**. (See `LICE
 
 ## Engine TODO (Roadmap)
 
-### 🟢 Phase 1: Command System (In Progress)
+### 🟢 Phase 1: Command System (Completed)
 
 - [x] **EntityHandle**: Implement handle system for deferred entity creation
 - [x] **Command Base Class**: Command interface with serialization support
@@ -28,8 +28,8 @@ This project is licensed under the **PolyForm Shield License 1.0.0**. (See `LICE
 - [x] **Entity Commands**: CreateEntity, DestroyEntity, AddComponent, RemoveComponent
 - [x] **Scene Integration**: Add command queue to Scene with AddCommand/ApplyCommands
 - [x] **Serialization**: Serialize/deserialize commands for networking + file saving
-- [ ] **Testing**: Write unit tests for CommandQueue and Scene
-- [ ] **File Serialization**: Serialize command queue to file and reload
+- [x] **Testing**: Write unit tests for CommandQueue and Scene
+- [x] **Command Factory**: Type registry with factory for deserialization
 
 ### 🟡 Phase 2: Asset Management
 

@@ -8,7 +8,7 @@ template<typename... Components>
 ViewImpl<Components...>::Iterator::Iterator(EntityManager& em,
                                             const std::vector<Entity>* denseEntities, usize idx) :
   manager(em), entities(denseEntities), index(idx) {
-  if (index < entities->size() && !IsValid()) {
+  if (entities && index < entities->size() && !IsValid()) {
     Next();
   }
 }
@@ -25,12 +25,14 @@ std::tuple<Entity, Components&...> ViewImpl<Components...>::Iterator::operator*(
 }
 template<typename... Components>
 void ViewImpl<Components...>::Iterator::Next() {
+  if (!entities) return;
   do {
     index++;
   } while (index < entities->size() && !IsValid());
 }
 template<typename... Components>
 bool ViewImpl<Components...>::Iterator::IsValid() const {
+  if (!entities) return false;
   Entity currentEntity = (*entities)[index];
   return (manager.HasComponent<Components>(currentEntity) && ...);
 }
@@ -43,8 +45,11 @@ ViewImpl<Components...>::Iterator ViewImpl<Components...>::begin() {
   return Iterator(mManager, mSmallestPool, 0);
 }
 template<typename... Components>
-ViewImpl<Components...>::Iterator ViewImpl<Components...>::end() {
-  return Iterator(mManager, mSmallestPool, mSmallestPool ? mSmallestPool->size() : 0);
+typename ViewImpl<Components...>::Iterator ViewImpl<Components...>::end() {
+  if (!mSmallestPool) {
+    return Iterator(mManager, nullptr, 0);
+  }
+  return Iterator(mManager, mSmallestPool, mSmallestPool->size());
 }
 template<typename... Components>
 template<typename Component>
@@ -143,6 +148,9 @@ bool EntityManager::HasComponent(Entity e) const {
   if (e.index >= mEntityMasks.GetDenseEntities().size())
     return false;
 
+  if (!IsAlive(e))
+    return false;
+
   auto mask = mEntityMasks.Get(e);
   return mask && mask->test(ComponentTraits<T>::Id);
 }
@@ -220,4 +228,90 @@ inline uint32_t EntityManager::PopFreeList() {
   const auto idx = mFreeList.back();
   mFreeList.pop_back();
   return idx;
+}
+
+inline void EntityManager::Serialize(Serializer& s) const {
+  s.Write(mGenerations);
+  s.Write(mFreeList);
+  
+  // Serialize entity masks - only serialize alive entities
+  const auto& maskEntities = mEntityMasks.GetDenseEntities();
+  u32 aliveCount = 0;
+  for (Entity e : maskEntities) {
+    if (IsAlive(e)) aliveCount++;
+  }
+  s.Write(aliveCount);
+  
+  for (Entity e : maskEntities) {
+    if (!IsAlive(e)) continue;
+    
+    s.Write(e.index);
+    s.Write(e.generation);
+    const ComponentMask* mask = mEntityMasks.Get(e);
+    if (mask) {
+      for (usize i = 0; i < mask->size(); ++i) {
+        s.Write(mask->test(i) ? u64(1) : u64(0));
+      }
+    } else {
+      for (usize i = 0; i < 64; ++i) {
+        s.Write(u64(0));
+      }
+    }
+  }
+  
+  // Serialize component pools - only registered serializable ones
+  u32 serializableCount = 0;
+  for (u32 i = 0; i < mComponentPools.size(); ++i) {
+    if (mComponentPools[i] && ComponentFactory::IsRegistered(i)) {
+      serializableCount++;
+    }
+  }
+  s.Write(serializableCount);
+  
+  for (u32 i = 0; i < mComponentPools.size(); ++i) {
+    if (mComponentPools[i] && ComponentFactory::IsRegistered(i)) {
+      s.Write(i);  // component type ID
+      mComponentPools[i]->Serialize(s);
+    }
+  }
+}
+
+inline void EntityManager::Deserialize(Serializer& s) {
+  s.Read(mGenerations);
+  s.Read(mFreeList);
+  
+  // Deserialize entity masks
+  u32 maskCount = s.Read<u32>();
+  for (u32 i = 0; i < maskCount; ++i) {
+    u32 index = s.Read<u32>();
+    u32 generation = s.Read<u32>();
+    Entity e{index, generation};
+    mEntityMasks.Add(e, ComponentMask{});
+    ComponentMask* mask = mEntityMasks.Get(e);
+    if (mask) {
+      for (usize j = 0; j < mask->size(); ++j) {
+        u64 bit = s.Read<u64>();
+        if (bit) mask->set(j);
+      }
+    } else {
+      for (usize j = 0; j < 64; ++j) {
+        s.Read<u64>();
+      }
+    }
+  }
+  
+  // Deserialize component pools
+  u32 serializableCount = s.Read<u32>();
+  mComponentPools.resize(16);  // Basic size, expand as needed
+  
+  for (u32 i = 0; i < serializableCount; ++i) {
+    u32 componentId = s.Read<u32>();
+    auto pool = ComponentFactory::Create(componentId);
+    if (pool) {
+      pool->Deserialize(s);
+      if (componentId < mComponentPools.size()) {
+        mComponentPools[componentId] = std::move(pool);
+      }
+    }
+  }
 }

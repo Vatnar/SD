@@ -15,5 +15,6 @@ target_link_libraries(SDGTest PRIVATE
         SD
         GTest::gtest
 )
+target_link_options(SDGTest PRIVATE -fsanitize=address)
 include(GoogleTest)
 gtest_discover_tests(SDGTest)

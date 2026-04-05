@@ -38,7 +38,9 @@ set(ENGINE_SOURCES
         src/Core/View.cpp
         src/RuntimeStateManager.cpp
         src/Core/ECS/CommandQueue.cpp
+        src/Core/ECS/ComponentFactory.cpp
         include/Core/ECS/CommandQueue.hpp
+        include/Core/ECS/ComponentFactory.hpp
 )
 
 add_library(SD SHARED ${ENGINE_SOURCES} ${ECS_IMPL_headers})

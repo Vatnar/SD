@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "Component.hpp"
+#include "ComponentFactory.hpp"
 #include "Entity.hpp"
 #include "EntityManager.hpp"
 #include "SparseEntitySet.hpp"
@@ -76,7 +77,7 @@ private:
 //   - Thread safety: single-threaded only
 //   - Component mask limitations (64 component types max)
 //   - Example: Complete ECS usage pattern
-class EntityManager {
+class EntityManager : public Serializable {
 public:
   Entity Create();
 
@@ -94,7 +95,8 @@ public:
    */
   template<typename T>
   T& GetComponent(Entity e);
-
+  void Serialize(Serializer& s) const override;
+  void Deserialize(Serializer& s) override;
   template<typename T>
   bool TryRemoveComponent(Entity e);
 
@@ -102,7 +104,7 @@ public:
   [[nodiscard]] std::vector<ComponentDebugInfo> GetAllComponentInfo(Entity e) const;
 
   [[nodiscard]] bool IsAlive(Entity e) const;
-  int GetEntityCount() { return mEntityMasks.Size(); }
+  int GetEntityCount() const { return mEntityMasks.Size(); }
 
 
   template<typename T>

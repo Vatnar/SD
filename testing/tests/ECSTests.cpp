@@ -276,7 +276,7 @@ TEST_F(EntityManagerTest, Destroy_RemovesAllComponents) {
 TEST_F(EntityManagerTest, View_SingleComponent) {
   SD::Entity e1 = manager.Create();
   SD::Entity e2 = manager.Create();
-  SD::Entity e3 = manager.Create();
+  (void)manager.Create();
 
   manager.AddComponent<SD::Velocity>(e1, 1.0f, 0.0f, 0.0f);
   manager.AddComponent<SD::Velocity>(e2, 2.0f, 0.0f, 0.0f);
@@ -311,7 +311,7 @@ TEST_F(EntityManagerTest, View_MultipleComponents) {
 }
 
 TEST_F(EntityManagerTest, View_EmptyPool_ReturnsEmptyRange) {
-  for (auto [entity, vel] : manager.View<SD::Velocity>()) {
+  for ([[maybe_unused]] auto [entity, vel] : manager.View<SD::Velocity>()) {
     FAIL() << "View should be empty for non-existent component pool";
   }
 }

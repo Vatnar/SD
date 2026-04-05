@@ -4,6 +4,7 @@
 //   - Rationale for using custom type aliases (clarity, consistency)
 #pragma once
 #include <cstdint>
+#include <limits>
 using i8 = std::int8_t;
 using i16 = std::int16_t;
 using i32 = std::int32_t;

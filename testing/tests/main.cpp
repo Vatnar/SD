@@ -1,9 +1,10 @@
-#include <spdlog/spdlog.h>
 #ifdef Error
 #undef Error
 #endif
+
 #include "Core/Logging.hpp"
 #include "gtest/gtest.h"
+
 int main(int argc, char** argv) {
   SD::Log::Init();
   ::testing::InitGoogleTest(&argc, argv);
