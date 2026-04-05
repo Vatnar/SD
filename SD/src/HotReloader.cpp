@@ -28,13 +28,22 @@ static bool LoadGameCode(const std::string& gameSoPath) {
 
   std::string gameSoFilename = std::filesystem::path(gameSoPath).filename().string();
   std::string liveSo = GetLiveSoName(gameSoFilename);
+  std::string tempSo = liveSo + ".tmp";
 
+  // Copy to temp file first (not the watched file)
   try {
-    if (!std::filesystem::copy_file(gameSoPath, liveSo,
+    if (!std::filesystem::copy_file(gameSoPath, tempSo,
                                     std::filesystem::copy_options::overwrite_existing))
-      std::cerr << "Failed to copy " << gameSoPath << "\n";
+      std::cerr << "Failed to copy " << gameSoPath << " to " << tempSo << "\n";
   } catch (std::filesystem::filesystem_error& e) {
     SD::Abort("Failed with error " + std::string(e.what()));
+  }
+
+  // Atomically rename temp to final - this ensures the loader only sees complete file
+  try {
+    std::filesystem::rename(tempSo, liveSo);
+  } catch (std::filesystem::filesystem_error& e) {
+    SD::Abort("Failed to rename " + std::string(e.what()));
   }
 
   gameHandle = dlopen(liveSo.c_str(), RTLD_NOW);
