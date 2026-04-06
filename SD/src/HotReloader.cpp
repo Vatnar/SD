@@ -99,6 +99,7 @@ int main(int argc, char* argv[]) {
 
         SPDLOG_INFO("Detected change, reloading game code...");
 
+
         // Unload old code
         if (gameAPI.OnUnload) {
           gameAPI.OnUnload(reinterpret_cast<SD_Application*>(&app), &gameState);
@@ -106,6 +107,8 @@ int main(int argc, char* argv[]) {
 
         // Clear engine state before reload
         app.ClearGameLayers();
+
+        // BUG: DIES HERE
 
         // Load new code
         if (LoadGameCode(cfg.gameSoPath)) {

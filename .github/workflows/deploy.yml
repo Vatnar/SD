@@ -1,0 +1,72 @@
+name: Deploy Docs & Site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  doxygen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Doxygen
+        run: sudo apt-get install -y doxygen graphviz
+      
+      - name: Create output directory
+        run: mkdir -p docs_output/html
+      
+      - name: Setup Doxygen Awesome Theme
+        run: |
+          git clone https://github.com/jothepro/doxygen-awesome-css.git docs/theme
+          sed -i 's|/theme/|docs/theme/|g' docs/Doxyfile
+          sed -i 's|OUTPUT_DIRECTORY.*|OUTPUT_DIRECTORY = docs_output|' docs/Doxyfile
+          sed -i 's|HTML_OUTPUT.*|HTML_OUTPUT = html|' docs/Doxyfile
+      
+      - name: Build Doxygen
+        run: doxygen docs/Doxyfile
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs_output/html
+
+  quartz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      
+      - name: Install & Build Quartz
+        run: |
+          cd website
+          npm i
+          rm -f content/.gitkeep
+          rm -rf content
+          ln -s ../docs/SD content
+          sed -i 's|baseUrl: "localhost"|baseUrl: "SD"|' quartz.config.ts
+          npx quartz build
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./website/public
+
+  deploy:
+    needs: [doxygen, quartz]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
