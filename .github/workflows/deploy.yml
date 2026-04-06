@@ -25,6 +25,7 @@ jobs:
       
       - name: Setup Doxygen Awesome Theme
         run: |
+          rm -rf docs/theme
           git clone https://github.com/jothepro/doxygen-awesome-css.git docs/theme
           sed -i 's|/theme/|docs/theme/|g' docs/Doxyfile
           sed -i 's|OUTPUT_DIRECTORY.*|OUTPUT_DIRECTORY = docs_output|' docs/Doxyfile
