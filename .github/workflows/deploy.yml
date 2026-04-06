@@ -52,7 +52,8 @@ jobs:
       # Merge both into single public folder
       - name: Merge outputs
         run: |
-          cp -r docs_output/html website/public/docs
+          mkdir -p public
+          cp -r docs_output/html public/docs
           cp -r website/public/* public/
       
       - name: Upload artifact
