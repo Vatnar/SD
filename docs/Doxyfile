@@ -2,6 +2,7 @@ PROJECT_NAME           = "SDEngine"
 PROJECT_BRIEF          = "Game Engine"
 
 INPUT                  = SD
+RECURSIVE              = YES
 USE_MDFILE_AS_MAINPAGE = api-reference.md
 
 OUTPUT_DIRECTORY       = /docs_output
