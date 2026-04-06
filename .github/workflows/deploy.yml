@@ -34,7 +34,10 @@ jobs:
           sed -i 's|USE_MDFILE_AS_MAINPAGE.*|USE_MDFILE_AS_MAINPAGE = docs/SD/api-reference.md|' docs/Doxyfile
       
       - name: Build Doxygen
-        run: doxygen docs/Doxyfile
+        run: |
+          cat docs/Doxyfile | grep -E "^INPUT|^USE_MDFILE"
+          ls -la SD/include/ | head -5
+          doxygen docs/Doxyfile
        
       - name: List Doxygen output
         run: ls -la docs_output/html/*.html | head -20
