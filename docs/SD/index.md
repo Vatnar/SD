@@ -1,15 +1,16 @@
 ---
-title: Home
-date: 2026-01-01
+title: Welcome to SD
 ---
+Welcome to SD. This is my game engine / graphics engine project. I’m using Vulkan as the graphics API, with GLFW for window management, and ImGUI for UI.
 
-# Welcome to SD
+## [[Quick start]]
+### Get started
 
-This is the home page for the SD game engine project.
+1. [[Introduction]]
+2. [[Guide]]
+3. [[Examples]]
 
-- [ECS Design](/design/ecs)
-- [Memory Management](/design/systems/memory)
-
+To view the API documentation:
 ---
 
 [API Documentation →](https://vatnar.github.io/SD/docs/)

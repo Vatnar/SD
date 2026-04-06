@@ -1,6 +1,6 @@
 # SDEngine API Documentation
 
-Welcome to the SDEngine API documentation. This section contains **reference documentation** for the engine's C++ source code.
+Welcome to the SD API documentation. This section contains **reference documentation** for the engine's C++ source code.
 
 ## What You'll Find Here
 
@@ -12,15 +12,9 @@ Welcome to the SDEngine API documentation. This section contains **reference doc
 
 ## Getting Started & Architecture
 
-For **guides**, **tutorials**, and **architecture overviews**, visit the main documentation site:
+For **guides**, **tutorials**, and **architecture overviews**, visit the main site for SD:
 
-**👉 [SD Documentation](https://vatnar.github.io/SD/)**
-
-That site contains:
-- Getting started guides
-- Architecture design documents
-- Conceptual explanations and diagrams
-- Contributing guidelines
+** [SD](https://vatnar.github.io/SD/)**
 
 ## Quick Links
 

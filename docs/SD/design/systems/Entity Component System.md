@@ -1,12 +1,7 @@
 ---
-title: ECS Design
 date: 2026-04-06
-status: draft
-summary: Entity Component System architecture notes
 ---
-
-# Entity Component System
-
+The entity component system 
 ## Overview
 
 The ECS pattern for the game engine...

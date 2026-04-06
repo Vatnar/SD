@@ -54,6 +54,7 @@ jobs:
       - name: Merge outputs
         run: |
           mkdir -p public
+          echo "sd.vatnar.dev" > public/CNAME
           cp -r docs_output/html public/docs
           cp -r website/public/* public/
       
