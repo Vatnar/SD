@@ -59,3 +59,6 @@ HTML_EXTRA_STYLESHEET += /theme/doxygen-awesome-sidebar-only.css
 HTML_EXTRA_FILES       = /theme/doxygen-awesome-darkmode-toggle.js
 HTML_COLORSTYLE        = LIGHT
 HTML_EXTRA_FILES      += .nojekyll
+
+# Custom layout for navigation
+LAYOUT_FILE            = /theme/custom-layout.xml

@@ -1,0 +1,28 @@
+<doxygenlayout version="1.0">
+  <nav index="index.html">
+    <menus>
+      <menu name="Classes" id="classes">
+        <item name="Class List" url="annotated.html"/>
+        <item name="Class Index" url="classes.html"/>
+        <item name="Class Hierarchy" url="hierarchy.html"/>
+        <item name="Class Members" url="functions.html"/>
+      </menu>
+      <menu name="Namespaces" id="namespaces">
+        <item name="Namespace List" url="namespaces.html"/>
+        <item name="SD Namespace" url="namespaceSD.html"/>
+      </menu>
+      <menu name="Files" id="files">
+        <item name="File List" url="files.html"/>
+        <item name="File Members" url="globals.html"/>
+        <item name="File Definitions" url="globals_defs.html"/>
+      </menu>
+      <menu name="Modules" id="modules">
+        <item name="Module List" url="modules.html"/>
+        <item name="Module Members" url="modules_members.html"/>
+      </menu>
+      <menu name="Concepts" id="concepts">
+        <item name="Concept List" url="concepts.html"/>
+      </menu>
+    </menus>
+  </nav>
+</doxygenlayout>
