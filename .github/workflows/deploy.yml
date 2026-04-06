@@ -30,18 +30,10 @@ jobs:
           sed -i 's|/theme/|docs/theme/|g' docs/Doxyfile
           sed -i 's|OUTPUT_DIRECTORY.*|OUTPUT_DIRECTORY = docs_output|' docs/Doxyfile
           sed -i 's|HTML_OUTPUT.*|HTML_OUTPUT = html|' docs/Doxyfile
-          sed -i 's|INPUT.*|INPUT                  = SD docs/SD|' docs/Doxyfile
-          sed -i 's|USE_MDFILE_AS_MAINPAGE.*|USE_MDFILE_AS_MAINPAGE = docs/SD/api-reference.md|' docs/Doxyfile
       
       - name: Build Doxygen
-        run: |
-          cat docs/Doxyfile | grep -E "^INPUT|^USE_MDFILE"
-          ls -la SD/include/ | head -5
-          doxygen docs/Doxyfile
-       
-      - name: List Doxygen output
-        run: ls -la docs_output/html/*.html | head -20
-      
+        run: doxygen docs/Doxyfile
+
       # Quartz build
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -63,7 +55,6 @@ jobs:
         run: |
           mkdir -p public
           cp -r docs_output/html public/docs
-          ls -la public/docs/*.html | head -20
           cp -r website/public/* public/
       
       - name: Upload artifact

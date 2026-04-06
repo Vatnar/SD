@@ -1,8 +1,8 @@
 PROJECT_NAME           = "SDEngine"
 PROJECT_BRIEF          = "Game Engine"
 
-INPUT                  = SD /code/docs/SD
-USE_MDFILE_AS_MAINPAGE = /code/docs/SD/api-reference.md
+INPUT                  = SD
+USE_MDFILE_AS_MAINPAGE = api-reference.md
 
 OUTPUT_DIRECTORY       = /docs_output
 HTML_OUTPUT            = .
