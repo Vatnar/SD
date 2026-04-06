@@ -29,14 +29,19 @@ SHOW_NAMESPACES        = YES
 SHOW_INCLUDE_FILES     = YES
 SHOW_USED_FILES        = YES
 SHOW_COMPOUND_REFRESH  = YES
+GENERATE_DEPRECATEDLIST= YES
+GENERATE_MEMBERGROUP   = YES
 
-# Search engine - enable full text search
+# Search engine - full text
 SEARCHENGINE           = YES
 FULL_SEARCH_NAMES      = YES
-SEARCHENGINE_URL       = ""
 SEARCH_INCLUDES        = YES
 SEARCH_INCLUDE_FILES   = YES
 SEARCH_OUTPUT_MATCHES = YES
+ALLOW_SEARCH_SCRIPTS   = YES
+
+# Disable compact index to show all entries
+COMPACT_INDEX          = NO
 
 # HTML settings
 GENERATE_HTML          = YES
@@ -44,12 +49,13 @@ DISABLE_INDEX          = NO
 GENERATE_TREEVIEW      = YES
 TREEVIEW_WIDTH        = 250
 
+# Disable smart quotes to preserve search terms
+HTML_DYNAMIC_MENUS    = YES
+HTML_DYNAMIC_SECTIONS = YES
+
 # Theme
 HTML_EXTRA_STYLESHEET  = /theme/doxygen-awesome.css
 HTML_EXTRA_STYLESHEET += /theme/doxygen-awesome-sidebar-only.css
 HTML_EXTRA_FILES       = /theme/doxygen-awesome-darkmode-toggle.js
 HTML_COLORSTYLE        = LIGHT
 HTML_EXTRA_FILES      += .nojekyll
-
-# Navigation
-GENERATE_HTML          = YES
