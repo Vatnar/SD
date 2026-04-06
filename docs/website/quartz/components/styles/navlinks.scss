@@ -1,14 +1,33 @@
-.nav-links {
-  display: flex;
-  gap: 1.5rem;
-  align-items: center;
+header .nav-links {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 2rem !important;
+  align-items: center !important;
 }
 
-.nav-links a {
-  text-decoration: none;
-  font-weight: 500;
-  color: var(--secondary);
-  &:hover {
-    color: var(--primary);
-  }
+header .nav-links a {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  text-decoration: none !important;
+  font-weight: 500 !important;
+  color: var(--secondary) !important;
+  white-space: nowrap !important;
+}
+
+header .nav-links a:hover {
+  color: var(--primary) !important;
+}
+
+header .nav-links svg {
+  width: 1em !important;
+  height: 1em !important;
+  flex-shrink: 0 !important;
+}
+
+header .nav-icon {
+  display: inline-flex !important;
+  align-items: center !important;
 }

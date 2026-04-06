@@ -7,9 +7,9 @@ export const sharedPageComponents: SharedLayout = {
   header: [
     Component.NavLinks({
       links: {
-        Home: "/",
-        "API Docs": "/docs/",
-        "GitHub Repo": "https://github.com/Vatnar/SD",
+        Home: { href: "/", icon: "home" },
+        "API Docs": { href: "/docs/", icon: "docs" },
+        "GitHub Repo": { href: "https://github.com/Vatnar/SD", icon: "github" },
       },
     }),
   ],
