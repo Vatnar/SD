@@ -42,11 +42,8 @@ jobs:
       
       - name: Install & Build Quartz
         run: |
-          cd website
+          cd docs/website
           npm i
-          rm -f content/.gitkeep
-          rm -rf content
-          ln -s ../docs/SD content
           sed -i 's|baseUrl: "localhost"|baseUrl: "SD"|' quartz.config.ts
           npx quartz build
       
@@ -56,7 +53,7 @@ jobs:
           mkdir -p public
           echo "sd.vatnar.dev" > public/CNAME
           cp -r docs_output/html public/docs
-          cp -r website/public/* public/
+          cp -r docs/website/public/* public/
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
