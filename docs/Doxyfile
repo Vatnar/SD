@@ -1,7 +1,7 @@
 PROJECT_NAME           = "SDEngine"
 PROJECT_BRIEF          = "Game Engine"
 
-INPUT                  = SD include README.md
+INPUT                  = SD include api-mainpage.md
 RECURSIVE              = YES
 FILE_PATTERNS          = *.cpp *.hpp *.h *.c *.md
 
