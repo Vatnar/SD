@@ -35,6 +35,9 @@ jobs:
       
       - name: Build Doxygen
         run: doxygen docs/Doxyfile
+       
+      - name: List Doxygen output
+        run: ls -la docs_output/html/*.html | head -20
       
       # Quartz build
       - name: Setup Node
@@ -57,6 +60,7 @@ jobs:
         run: |
           mkdir -p public
           cp -r docs_output/html public/docs
+          ls -la public/docs/*.html | head -20
           cp -r website/public/* public/
       
       - name: Upload artifact
