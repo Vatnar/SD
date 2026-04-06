@@ -11,11 +11,12 @@ permissions:
   id-token: write
 
 jobs:
-  doxygen:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
+      # Doxygen build
       - name: Install Doxygen
         run: sudo apt-get install -y doxygen graphviz
       
@@ -32,17 +33,7 @@ jobs:
       - name: Build Doxygen
         run: doxygen docs/Doxyfile
       
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./docs_output/html
-          name: doxygen-docs
-
-  quartz:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
+      # Quartz build
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -58,17 +49,20 @@ jobs:
           sed -i 's|baseUrl: "localhost"|baseUrl: "SD"|' quartz.config.ts
           npx quartz build
       
+      # Merge both into single public folder
+      - name: Merge outputs
+        run: |
+          cp -r docs_output/html website/public/docs
+          cp -r website/public/* public/
+      
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./website/public
-          name: quartz-site
+          path: ./public
 
   deploy:
-    needs: [doxygen, quartz]
+    needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
     steps:
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
