@@ -30,7 +30,8 @@ jobs:
           sed -i 's|/theme/|docs/theme/|g' docs/Doxyfile
           sed -i 's|OUTPUT_DIRECTORY.*|OUTPUT_DIRECTORY = docs_output|' docs/Doxyfile
           sed -i 's|HTML_OUTPUT.*|HTML_OUTPUT = html|' docs/Doxyfile
-          sed -i 's|INPUT.*|INPUT                  = SD include api-mainpage.md|' docs/Doxyfile
+          sed -i 's|INPUT.*|INPUT                  = SD /code/docs/SD|' docs/Doxyfile
+          sed -i 's|USE_MDFILE_AS_MAINPAGE.*|USE_MDFILE_AS_MAINPAGE = /code/docs/SD/api-reference.md|' docs/Doxyfile
       
       - name: Build Doxygen
         run: doxygen docs/Doxyfile
