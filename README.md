@@ -1,56 +1,14 @@
 # SD - Shader Debugger
 
-[![Docs](https://img.shields.io/badge/docs-gh--pages-blue)](https://vatnar.github.io/SD/annotated.html)
+[![License: PolyForm Shield](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-5D6D7E)](https://polyformproject.org/licenses/shield/1.0.0)
+[![Docs](https://img.shields.io/badge/docs-gh--pages-blue)](https://sd.vatnar.dev) 
 
 ### Features
-
-* (WIP) Real-time shader debugging
-* (WIP) Vulkan-based rendering engine
-
-### Architecture & Design
-
-* (WIP)
+- TODO
 
 ---
 
-[![License: PolyForm Shield](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-5D6D7E)](https://polyformproject.org/licenses/shield/1.0.0)
 This project is licensed under the **PolyForm Shield License 1.0.0**. (See `LICENSE` and `NOTICE`)
-
----
-
-## Engine TODO (Roadmap)
-
-### 🟢 Phase 1: Command System (Completed)
-
-- [x] **EntityHandle**: Implement handle system for deferred entity creation
-- [x] **Command Base Class**: Command interface with serialization support
-- [x] **CommandQueue**: Queue with Apply() method (thread-safety deferred)
-- [x] **Entity Commands**: CreateEntity, DestroyEntity, AddComponent, RemoveComponent
-- [x] **Scene Integration**: Add command queue to Scene with AddCommand/ApplyCommands
-- [x] **Serialization**: Serialize/deserialize commands for networking + file saving
-- [x] **Testing**: Write unit tests for CommandQueue and Scene
-- [x] **Command Factory**: Type registry with factory for deserialization
-
-### 🟡 Phase 2: Asset Management
-
-- [ ] **AssetManager Core**: Centralized asset loading/management
-- [ ] **Asset Handles**: Handle<T> system for type-safe asset references
-- [ ] **Texture Loading**: Load textures from files
-- [ ] **Mesh Loading**: Load meshes from files
-- [ ] **Material System**: Material assets referencing textures/shaders
-
-### 🔵 Phase 3: Graphics Pipeline
-
-- [ ] **Render System**: ECS-based render system querying Renderable components
-- [ ] **Generic Render Graph**: Modular, swappable render passes
-- [ ] **View-Specific Renderers**: Different render configs per view (Wireframe, Lit, etc.)
-- [ ] **Asset Integration**: Connect AssetManager with RenderSystem
-
-### 🛠️ Developer Workflow
-
-- [x] **DLL Hot-Reloading Support**: Enhancing the `Application` and `View` persistence to allow game logic swaps
-  without state loss.
-- [ ] **Editor Tooling**: Building out more `GuiToolLayers` for scene inspection and entity manipulation.
 
 ---
 
