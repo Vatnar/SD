@@ -3,7 +3,7 @@ PROJECT_BRIEF          = "Game Engine"
 
 INPUT                  = SD
 RECURSIVE              = YES
-USE_MDFILE_AS_MAINPAGE = api-reference.md
+USE_MDFILE_AS_MAINPAGE = SD/api-reference.md 
 
 OUTPUT_DIRECTORY       = /docs_output
 HTML_OUTPUT            = .
