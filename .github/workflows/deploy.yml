@@ -29,6 +29,7 @@ jobs:
           sed -i 's|/theme/|docs/theme/|g' docs/Doxyfile
           sed -i 's|OUTPUT_DIRECTORY.*|OUTPUT_DIRECTORY = docs_output|' docs/Doxyfile
           sed -i 's|HTML_OUTPUT.*|HTML_OUTPUT = html|' docs/Doxyfile
+          sed -i 's|INPUT.*|INPUT                  = SD include README.md|' docs/Doxyfile
       
       - name: Build Doxygen
         run: doxygen docs/Doxyfile

@@ -2,7 +2,7 @@ PROJECT_NAME           = "SDEngine"
 # PROJECT_BRIEF          =
 # PROJECT_LOGO         = docs/logo.png
 
-INPUT                  = SDEngine include README.md
+INPUT                  = SD include README.md
 RECURSIVE              = YES
 FILE_PATTERNS          = *.cpp *.hpp *.h *.c
 
