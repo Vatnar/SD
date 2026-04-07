@@ -1,18 +1,17 @@
 # SD
 
-[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](https://github.com/Vatnar/SD/blob/main/LICENSE.md)
+[![License](https://img.shields.io/github/license/vatnar/VLA)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-gh--pages-blue)](https://sd.vatnar.dev) 
 
 ### Features
 - TODO
 
----
+### License
 
-This game engine is licensed under the [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) license.
+This engine is licensed under the [MIT License](LICENSE).  
+You may use it to build and sell games.
 
-- You may use, modify, and build games with this engine freely, including to sell those games.
-- You may not distribute or sell a modified version of this engine as a standalone product without a separate commercial license.
-
+If you want to redistribute, OEM, or sell a product based on this engine itself (e.g., as a hosted engine, SDK, or bundled engine), please contact for a commercial‑engine license.
 ---
 
 ## Hot Reloading
