@@ -8,7 +8,10 @@
 
 ---
 
-This project is licensed under the **PolyForm Shield License 1.0.0**. (See `LICENSE` and `NOTICE`)
+This game engine is licensed under the [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) license.
+
+- You may use, modify, and build games with this engine freely, including to sell those games.
+- You may not distribute or sell a modified version of this engine as a standalone product without a separate commercial license.
 
 ---
 
