@@ -1,4 +1,4 @@
-[![License: PolyForm Shield](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-5D6D7E)](https://polyformproject.org/licenses/shield/1.0.0) [![VLA](https://img.shields.io/badge/VLA-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/vatnar/VLA)
+ [![VLA](https://img.shields.io/badge/VLA-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/vatnar/VLA)
 
 > [!FAQ] People coming from [SD](https://sd.vatnar.dev)
 > Since SD is for learning, instead of just diving in and using [glm](https://github.com/icaven/glm) (definitely check it out :)) I decided to implement my own linear algebra library, which I call Vatnar Linear Algebra. The project is standalone from the engine, but developed at the same time, and therefore it does not implement features I don't have a use for in the engine yet. The repository for VLA can be found [here](https://github.com/Vatnar/VLA). 
@@ -7,7 +7,7 @@
 ### Using CMake and git submodules (recommended)
 
 Clone the repository into where you want to put it, I recommend in a vendor folder or similar
-```
+```bashe
 git clone https://github.com/Vatnar/VLA
 ```
 In your main `CMakeLists.txt`:
