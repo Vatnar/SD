@@ -1,6 +1,6 @@
-# SD - Shader Debugger
+# SD
 
-[![License: PolyForm Shield](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-5D6D7E)](https://polyformproject.org/licenses/shield/1.0.0)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)
 [![Docs](https://img.shields.io/badge/docs-gh--pages-blue)](https://sd.vatnar.dev) 
 
 ### Features
