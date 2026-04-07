@@ -12,6 +12,7 @@ This engine is licensed under the [MIT License](LICENSE).
 You may use it to build and sell games.
 
 If you want to redistribute, OEM, or sell a product based on this engine itself (e.g., as a hosted engine, SDK, or bundled engine), please contact for a commercial‑engine license.
+
 ---
 
 ## Hot Reloading
