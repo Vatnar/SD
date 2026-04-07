@@ -1,6 +1,6 @@
 # SD
 
-[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](https://github.com/Vatnar/SD/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](https://github.com/Vatnar/SD/blob/main/LICENSE.md)
 [![Docs](https://img.shields.io/badge/docs-gh--pages-blue)](https://sd.vatnar.dev) 
 
 ### Features
