@@ -3,8 +3,28 @@
 [![License](https://img.shields.io/github/license/vatnar/VLA)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-gh--pages-blue)](https://sd.vatnar.dev) 
 
+SD is a game engine built for learning purposes, using Vulkan as the graphics API, GLFW for window management, and ImGui for UI.
+
 ### Features
-- TODO
+
+- **Vulkan Renderer** — Modern GPU graphics with custom pipeline and shader management
+- **ECS Architecture** — Entity Component System with sparse storage for efficient component queries
+- **Command Queue** — Command-based ECS mutations for deterministic, serializable state changes (useful for networking/rollback)
+- **Serialization** — Save/load component and ECS state to binary files
+- **Hot Reloading** — Reload game code without restarting the engine
+- **Multi-Window/View System** — Multiple render targets and windows with layered rendering
+- **Event System** — Typed event dispatch for input, window, and application events
+- **Custom Linear Algebra** — VLA library for matrices, vectors, and quaternions
+- **Layer System** — Global and per-window layer stacks for flexible rendering pipelines
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Graphics | Vulkan |
+| Window | GLFW |
+| UI | ImGui |
+| Math | VLA (custom) |
 
 ### License
 

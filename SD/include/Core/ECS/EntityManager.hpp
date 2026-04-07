@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "Component.hpp"
+#include "ComponentFactory.hpp"
 #include "Entity.hpp"
 #include "EntityManager.hpp"
 #include "SparseEntitySet.hpp"

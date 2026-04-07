@@ -10,7 +10,7 @@
 	branch = docking
 [submodule "vendor/VLA"]
 	path = vendor/VLA
-	url = git@github.com:Vatnar/VLA.git
+	url = https://github.com/Vatnar/VLA.git
 [submodule "vendor/tomlplusplus"]
 	path = vendor/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
