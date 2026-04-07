@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "Component.hpp"
-#include "ComponentFactory.hpp"
 #include "Entity.hpp"
 #include "EntityManager.hpp"
 #include "SparseEntitySet.hpp"
@@ -69,14 +68,17 @@ private:
 };
 
 
-// TODO(docs): Document EntityManager class thoroughly
-//   - Purpose: Central ECS manager - entities, components, views
-//   - Entity lifecycle: Create -> (AddComponent) -> Destroy
-//   - Component registration requirement
-//   - View creation patterns (single, multi, ComponentGroup)
-//   - Thread safety: single-threaded only
-//   - Component mask limitations (64 component types max)
-//   - Example: Complete ECS usage pattern
+// TODO: make multi-threaded safe.
+/**
+ * EntityManager is the central ECS manager, that manages entities, components and allows for
+ * queries into the system using views. If you intend to use the entitymanager with a custom
+ * component, it will require you to register the component using the \ref REGISTER_COMPONENT macro.
+ *
+ * # Querying the ECS
+ * Many systems and subsystems query the ECS for entities and their components, the views can be
+ * created per component, for multiple components, or of a ComponentGroup of components.
+ *
+ */
 class EntityManager : public Serializable {
 public:
   Entity Create();
@@ -104,7 +106,7 @@ public:
   [[nodiscard]] std::vector<ComponentDebugInfo> GetAllComponentInfo(Entity e) const;
 
   [[nodiscard]] bool IsAlive(Entity e) const;
-  int GetEntityCount() const { return mEntityMasks.Size(); }
+  [[nodiscard]] int GetEntityCount() const { return mEntityMasks.Size(); }
 
 
   template<typename T>
@@ -147,8 +149,8 @@ private:
   std::vector<u32> mFreeList;
 
   std::vector<std::unique_ptr<SparseEntitySetBase>> mComponentPools;
-  // TODO: make resizable
-  using ComponentMask = std::bitset<64>;
+  // NOTE: Hard capped at 256 for now, shouldn't really be a problem. Change in future if needed
+  using ComponentMask = std::bitset<256>;
   SparseEntitySet<ComponentMask> mEntityMasks;
 
   // INVARIANTS:
