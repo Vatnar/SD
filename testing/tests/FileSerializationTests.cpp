@@ -80,7 +80,6 @@ TEST_F(FileSerializationTest, CommandQueue_FileWithMultipleEntities) {
   EXPECT_EQ(queue2.GetCount(), 4u);
 }
 
-// TODO: Implement EntityManager::Serialize/Deserialize
 TEST_F(FileSerializationTest, ECS_EntityManagerSerialize) {
   EntityManager em;
   Entity e1 = em.Create();
@@ -108,7 +107,6 @@ TEST_F(FileSerializationTest, ECS_EntityManagerSerialize) {
   EXPECT_TRUE(em2.HasComponent<Transform>(e2));
 }
 
-// TODO: Implement EntityManager::Serialize/Deserialize
 TEST_F(FileSerializationTest, ECS_EmptyEntityManager) {
   EntityManager em;
 
