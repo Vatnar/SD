@@ -37,7 +37,7 @@ TEST_F(FileSerializationTest, CommandQueue_FileRoundTrip) {
   CommandQueue queue;
   EntityHandle h(0);
   queue.Add<CreateEntityCmd>(h);
-  queue.Add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity});
+  queue.Add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity()});
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
@@ -61,8 +61,8 @@ TEST_F(FileSerializationTest, CommandQueue_FileWithMultipleEntities) {
   EntityHandle h2(1);
   queue.Add<CreateEntityCmd>(h1);
   queue.Add<CreateEntityCmd>(h2);
-  queue.Add<AddComponentCmd<Transform>>(h1, Transform{VLA::Matrix4x4f::Identity});
-  queue.Add<AddComponentCmd<Transform>>(h2, Transform{VLA::Matrix4x4f::Identity * 2.0f});
+  queue.Add<AddComponentCmd<Transform>>(h1, Transform{VLA::Matrix4x4f::Identity()});
+  queue.Add<AddComponentCmd<Transform>>(h2, Transform{VLA::Matrix4x4f::Identity() * 2.0f});
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
@@ -84,8 +84,8 @@ TEST_F(FileSerializationTest, ECS_EntityManagerSerialize) {
   EntityManager em;
   Entity e1 = em.Create();
   Entity e2 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
-  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity * 2.0f);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
+  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 2.0f);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
@@ -129,7 +129,7 @@ TEST_F(FileSerializationTest, ECS_EmptyEntityManager) {
 TEST_F(FileSerializationTest, ECS_MultipleComponentsSameEntity) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<DebugName>(e1, "EntityOne");
 
   std::vector<std::byte> buffer;
@@ -156,8 +156,8 @@ TEST_F(FileSerializationTest, ECS_VerifyComponentData) {
   EntityManager em;
   Entity e1 = em.Create();
   Entity e2 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity * 3.0f);
-  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity * 5.0f);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity() * 3.0f);
+  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 5.0f);
   em.AddComponent<DebugName>(e1, "First");
   em.AddComponent<DebugName>(e2, "Second");
 
@@ -194,8 +194,8 @@ TEST_F(FileSerializationTest, ECS_DestroyedEntityNotSerialized) {
   EntityManager em;
   Entity e1 = em.Create();
   Entity e2 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
-  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
+  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity());
   em.Destroy(e1);
 
   std::vector<std::byte> buffer;
@@ -213,7 +213,7 @@ TEST_F(FileSerializationTest, ECS_DestroyedEntityNotSerialized) {
 
   (void)e2;
 
-  EXPECT_EQ(em2.GetEntityCount(), 1u);
+  EXPECT_EQ(em2.GetAliveEntityCount(), 1u);
   EXPECT_FALSE(em2.IsAlive(e1));
   EXPECT_TRUE(em2.IsAlive(e2));
   EXPECT_NE(nullptr, em2.TryGetComponent<Transform>(e2));
@@ -222,7 +222,7 @@ TEST_F(FileSerializationTest, ECS_DestroyedEntityNotSerialized) {
 TEST_F(FileSerializationTest, ECS_RemoveComponentSerialized) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<DebugName>(e1, "Test");
   em.TryRemoveComponent<DebugName>(e1);
 
@@ -252,7 +252,7 @@ TEST_F(FileSerializationTest, ECS_ManyEntities) {
   for (int i = 0; i < ENTITY_COUNT; ++i) {
     Entity e = em.Create();
     entities.push_back(e);
-    em.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity * static_cast<float>(i + 1));
+    em.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity() * static_cast<float>(i + 1));
     em.AddComponent<DebugName>(e, "Entity" + std::to_string(i));
   }
 
@@ -288,7 +288,7 @@ TEST_F(FileSerializationTest, ECS_ManyEntities) {
 TEST_F(FileSerializationTest, ECS_DoubleSerializationConsistent) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer1;
@@ -306,7 +306,7 @@ TEST_F(FileSerializationTest, ECS_DoubleSerializationConsistent) {
 TEST_F(FileSerializationTest, ECS_DeserializeIntoNonEmpty) {
   EntityManager em;
   Entity existing = em.Create();
-  em.AddComponent<Transform>(existing, VLA::Matrix4x4f::Identity * 10.0f);
+  em.AddComponent<Transform>(existing, VLA::Matrix4x4f::Identity() * 10.0f);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
@@ -314,7 +314,7 @@ TEST_F(FileSerializationTest, ECS_DeserializeIntoNonEmpty) {
 
   EntityManager em2;
   Entity e3 = em2.Create();
-  em2.AddComponent<Transform>(e3, VLA::Matrix4x4f::Identity * 99.0f);
+  em2.AddComponent<Transform>(e3, VLA::Matrix4x4f::Identity() * 99.0f);
 
   Serializer deserializer(buffer);
   deserializer.ResetOffset();
@@ -331,10 +331,10 @@ TEST_F(FileSerializationTest, ECS_DeserializeIntoNonEmpty) {
 TEST_F(FileSerializationTest, ECS_GenerationAfterDeserialize) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.Destroy(e1);
   Entity e2 = em.Create();
-  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity * 2.0f);
+  em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 2.0f);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
@@ -375,11 +375,11 @@ TEST_F(FileSerializationTest, ECS_FreeListPreserved) {
   deserializer.ResetOffset();
   em2.Deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetEntityCount(), 5u);
+  EXPECT_EQ(em2.GetAliveEntityCount(), 5u);
 
   Entity e = em2.Create();
   EXPECT_TRUE(em2.IsAlive(e));
-  em2.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity);
+  em2.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity());
   EXPECT_NE(nullptr, em2.TryGetComponent<Transform>(e));
 }
 
@@ -387,7 +387,7 @@ TEST_F(FileSerializationTest, ECS_EmptyString) {
   EntityManager em;
   Entity e1 = em.Create();
   em.AddComponent<DebugName>(e1, "");
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
@@ -432,7 +432,7 @@ TEST_F(FileSerializationTest, ECS_LongString) {
 TEST_F(FileSerializationTest, ECS_DoubleRoundTrip) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer1;
@@ -469,7 +469,7 @@ TEST_F(FileSerializationTest, ECS_DoubleRoundTrip) {
 TEST_F(FileSerializationTest, ECS_AllComponentTypes) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<DebugName>(e1, "TestEntity");
 
   Entity e2 = em.Create();
@@ -507,7 +507,7 @@ TEST_F(FileSerializationTest, ECS_AllComponentTypes) {
 TEST_F(FileSerializationTest, ECS_SerializableComponentsOnly) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer;
@@ -531,12 +531,12 @@ TEST_F(FileSerializationTest, ECS_SerializableComponentsOnly) {
 TEST_F(FileSerializationTest, ECS_IndependentInstances) {
   EntityManager em1;
   Entity e1 = em1.Create();
-  em1.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em1.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em1.AddComponent<DebugName>(e1, "FirstECS");
 
   EntityManager em2;
   Entity e2 = em2.Create();
-  em2.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity * 5.0f);
+  em2.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 5.0f);
   em2.AddComponent<DebugName>(e2, "SecondECS");
 
   std::vector<std::byte> buffer1, buffer2;
@@ -583,8 +583,8 @@ TEST_F(FileSerializationTest, ECS_IndependentInstances) {
   EXPECT_EQ(em1Restored.GetEntityCount(), 2u);
   EXPECT_EQ(em2Restored.GetEntityCount(), 2u);
 
-  em1Restored.AddComponent<Transform>(newInEM1, VLA::Matrix4x4f::Identity * 10.0f);
-  em2Restored.AddComponent<Transform>(newInEM2, VLA::Matrix4x4f::Identity * 20.0f);
+  em1Restored.AddComponent<Transform>(newInEM1, VLA::Matrix4x4f::Identity() * 10.0f);
+  em2Restored.AddComponent<Transform>(newInEM2, VLA::Matrix4x4f::Identity() * 20.0f);
 
   const Transform* tNew1 = em1Restored.TryGetComponent<Transform>(newInEM1);
   const Transform* tNew2 = em2Restored.TryGetComponent<Transform>(newInEM2);
@@ -605,7 +605,7 @@ TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
   {
     EntityManager em;
     Entity e = em.Create();
-    em.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity);
+    em.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity());
 
     Serializer ser(buffer);
     em.Serialize(ser);
@@ -619,7 +619,7 @@ TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
   EXPECT_EQ(em.GetEntityCount(), 1u);
 
   Entity newEntity = em.Create();
-  em.AddComponent<Transform>(newEntity, VLA::Matrix4x4f::Identity * 2.0f);
+  em.AddComponent<Transform>(newEntity, VLA::Matrix4x4f::Identity() * 2.0f);
   em.AddComponent<DebugName>(newEntity, "CreatedAfter");
 
   EXPECT_EQ(em.GetEntityCount(), 2u);
@@ -636,7 +636,7 @@ TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
 TEST_F(FileSerializationTest, ECS_IdempotentSerialization) {
   EntityManager em;
   Entity e1 = em.Create();
-  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity);
+  em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<DebugName>(e1, "Test");
 
   std::vector<std::byte> b1, b2, b3;

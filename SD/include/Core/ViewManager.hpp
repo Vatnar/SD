@@ -17,14 +17,6 @@
 
 namespace SD {
 
-// TODO(strong-typedef): Change from `using` to struct for type safety
-//   using ViewId = u32;
-// becomes:
-//   struct ViewId { u32 value; };
-// This prevents accidental mixing of ViewId with WindowId or raw u32.
-// Zero performance cost, compiler catches type errors.
-using ViewId = u32;
-
 // TODO(docs): Document ViewManager class
 //   - Purpose: Factory and registry for View objects
 //   - View naming and ID system
@@ -82,7 +74,7 @@ public:
 private:
   std::unordered_map<ViewId, std::unique_ptr<View>> mViewsById;
   std::unordered_map<std::string, ViewId> mViewNameToId;
-  ViewId mNextViewId = 0;
+  ViewId mNextViewId;
 };
 
 } // namespace SD

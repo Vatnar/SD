@@ -1,5 +1,7 @@
 #include "Core/Vulkan/ShaderLibrary.hpp"
 
+#include <system_error>
+
 #include "Core/Logging.hpp"
 
 namespace SD {
@@ -36,9 +38,9 @@ VkShaderModule ShaderLibrary::Load(const std::string& hlslPath, const std::strin
   VkShaderModule rawModule = module.get();
   ShaderEntry entry;
   entry.module = std::move(module);
-  try {
-    entry.lastWriteTime = std::filesystem::last_write_time(hlslPath);
-  } catch (...) {
+  std::error_code ec;
+  entry.lastWriteTime = std::filesystem::last_write_time(hlslPath, ec);
+  if (ec) {
     entry.lastWriteTime = std::filesystem::file_time_type::min();
   }
   entry.profile = profile;
@@ -50,13 +52,10 @@ VkShaderModule ShaderLibrary::Load(const std::string& hlslPath, const std::strin
 std::set<std::string> ShaderLibrary::CheckForChanges() {
   std::set<std::string> changed;
   for (auto& [path, entry] : mCache) {
-    try {
-      auto currentTime = std::filesystem::last_write_time(path);
-      if (currentTime > entry.lastWriteTime) {
-        changed.insert(path);
-      }
-    } catch (...) {
-      // File might be temporarily locked or deleted, skip for now
+    std::error_code ec;
+    auto currentTime = std::filesystem::last_write_time(path, ec);
+    if (!ec && currentTime > entry.lastWriteTime) {
+      changed.insert(path);
     }
   }
   return changed;

@@ -3,7 +3,9 @@
 #include "Application.hpp"
 #include "Core/Events/window/WindowEvents.hpp"
 #include "Core/Logging.hpp"
+#include "Core/SDImGuiContext.hpp"
 #include "Core/ViewManager.hpp"
+#include "Core/Vulkan/VulkanRenderer.hpp"
 #include "Utils/Utils.hpp"
 
 namespace SD {
@@ -12,15 +14,15 @@ WindowManager::WindowManager() = default;
 WindowManager::~WindowManager() = default;
 
 WindowId WindowManager::Create(const WindowProps& props) {
-  SD_ASSERT(!props.title.empty(), "Window title must not be empty");
-  SD_ASSERT(props.width > 0 && props.height > 0, "Window dimensions must be positive");
+  SD_ALWAYS_ASSERT(!props.title.empty(), "Window title must not be empty");
+  SD_ALWAYS_ASSERT(props.width > 0 && props.height > 0, "Window dimensions must be positive");
 
   WindowId id = mNextWindowId++;
 
   auto window =
       WindowBuilder().SetTitle(props.title.c_str()).SetSize(props.width, props.height).Build();
 
-  SD_ASSERT(window, "Window must be created");
+  SD_ALWAYS_ASSERT(window, "Window must be created");
 
   auto& app = Application::Get();
   auto& vulkanCtx = app.GetVulkanContext();
@@ -41,7 +43,7 @@ WindowId WindowManager::Create(const WindowProps& props) {
 
 void WindowManager::Destroy(WindowId id) {
   auto it = mWindows.find(id);
-  SD_ASSERT(it != mWindows.end(), "Cannot destroy window - window ID does not exist");
+  SD_ALWAYS_ASSERT(it != mWindows.end(), "Cannot destroy window - window ID does not exist");
 
   auto& app = Application::Get();
   (void)app.GetVulkanContext().GetVulkanDevice()->waitIdle();
@@ -57,14 +59,14 @@ void WindowManager::ProcessPendingCloses() {
 
 Window& WindowManager::GetWindow(WindowId id) {
   auto it = mWindows.find(id);
-  SD_ASSERT(it != mWindows.end(), "Window ID does not exist");
+  SD_ALWAYS_ASSERT(it != mWindows.end(), "Window ID does not exist");
   return *it->second.logic;
 }
 
 VulkanWindow& WindowManager::GetRenderWindow(WindowId id) {
   auto it = mWindows.find(id);
-  SD_ASSERT(it != mWindows.end(), "Window ID does not exist");
-  SD_ASSERT(it->second.render, "Render window must be valid");
+  SD_ALWAYS_ASSERT(it != mWindows.end(), "Window ID does not exist");
+  SD_ALWAYS_ASSERT(it->second.render, "Render window must be valid");
   return *it->second.render;
 }
 
@@ -75,7 +77,7 @@ void WindowManager::UpdateWindows(float dt) {
 }
 
 void WindowManager::DrawWindows(ViewManager& viewManager) {
-  SD_ASSERT(!mWindows.empty(), "Must have at least one window to draw");
+  SD_ALWAYS_ASSERT(!mWindows.empty(), "Must have at least one window to draw");
 
   for (auto& [id, data] : mWindows) {
     DrawWindow(id, data, viewManager);
@@ -83,8 +85,8 @@ void WindowManager::DrawWindows(ViewManager& viewManager) {
 }
 
 void WindowManager::UpdateWindow(WindowId id, WindowData& data, float dt) {
-  SD_ASSERT(data.logic, "Logic window must be valid");
-  SD_ASSERT(data.render, "Render window must be valid");
+  SD_ALWAYS_ASSERT(data.logic, "Logic window must be valid");
+  SD_ALWAYS_ASSERT(data.render, "Render window must be valid");
 
   Window& window = *data.logic;
   VulkanWindow& vw = *data.render;
@@ -103,7 +105,7 @@ void WindowManager::UpdateWindow(WindowId id, WindowData& data, float dt) {
     });
 
     dispatcher.Dispatch<WindowCloseEvent>([&](const WindowCloseEvent&) {
-      if (id == 0) {
+      if (id == WindowId{}) {
         app.Close();
       } else {
         mPendingClose.push_back(id);
@@ -126,7 +128,7 @@ void WindowManager::UpdateWindow(WindowId id, WindowData& data, float dt) {
 }
 
 void WindowManager::DrawWindow(WindowId id, WindowData& data, ViewManager& viewManager) {
-  SD_ASSERT(data.render, "Render window must be valid");
+  SD_ALWAYS_ASSERT(data.render, "Render window must be valid");
 
   VulkanWindow& vw = *data.render;
   LayerList& layers = data.viewLayers;
@@ -163,7 +165,7 @@ void WindowManager::DrawWindow(WindowId id, WindowData& data, ViewManager& viewM
   for (auto& layer : layers)
     layer->OnRender(cmd);
 
-  if (id == 0) {
+  if (id == WindowId{}) {
     app.GetImGuiContext().RenderDrawData(cmd);
   }
 

@@ -40,8 +40,8 @@ void TestLayer::OnAttach() {
 
   auto textureResult = CreateTexture(device.get(), physicalDevice, queue, commandPool,
                                      "assets/textures/example.jpg");
-  if (textureResult) {
-    mTexture = std::move(textureResult.value());
+    if (textureResult) {
+    mTexture = std::move(*textureResult);
   } else {
     Abort(textureResult.error());
   }
@@ -197,15 +197,15 @@ void TestLayer::UpdateUniformBuffer(u32 currentImage) const {
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
 void TestLayer::OnRender(vk::CommandBuffer& cmd) {
-  SD_ASSERT(mPipeline, "Pipeline must be valid");
-  SD_ASSERT(mPipelineLayout, "Pipeline layout must be valid");
-  SD_ASSERT(mVertexBuffer, "Vertex buffer must be valid");
-  SD_ASSERT(!mDescriptorSets.empty(), "Descriptor sets must not be empty");
+  SD_ALWAYS_ASSERT(mPipeline, "Pipeline must be valid");
+  SD_ALWAYS_ASSERT(mPipelineLayout, "Pipeline layout must be valid");
+  SD_ALWAYS_ASSERT(mVertexBuffer, "Vertex buffer must be valid");
+  SD_ALWAYS_ASSERT(!mDescriptorSets.empty(), "Descriptor sets must not be empty");
 
   // Hack: calculate frame index
   static u32 frameIndex = 0;
   frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-  SD_ASSERT(frameIndex < mDescriptorSets.size(), "Frame index out of bounds");
+  SD_ALWAYS_ASSERT(frameIndex < mDescriptorSets.size(), "Frame index out of bounds");
   UpdateUniformBuffer(frameIndex);
 
 
@@ -219,30 +219,31 @@ void TestLayer::OnRender(vk::CommandBuffer& cmd) {
 void TestLayer::OnEvent(Event& e) {
   switch (e.GetEventType()) {
     case EventType::KeyReleased: {
-      if (const auto key = dynamic_cast<KeyReleasedEvent&>(e); GLFW_KEY_SPACE == key.key) {
+      if (const auto* key = dynamic_cast<KeyReleasedEvent*>(&e);
+          key && GLFW_KEY_SPACE == key->key) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     case EventType::MouseReleased: {
-      if (const auto button = dynamic_cast<MouseReleasedEvent&>(e);
-          GLFW_MOUSE_BUTTON_LEFT == button.button) {
+      if (const auto* button = dynamic_cast<MouseReleasedEvent*>(&e);
+          button && GLFW_MOUSE_BUTTON_LEFT == button->button) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     case EventType::MousePressed: {
-      if (const auto button = dynamic_cast<MousePressedEvent&>(e);
-          GLFW_MOUSE_BUTTON_LEFT == button.button) {
+      if (const auto* button = dynamic_cast<MousePressedEvent*>(&e);
+          button && GLFW_MOUSE_BUTTON_LEFT == button->button) {
         mClearColor = std::array{0.0f, 1.0f, 0.0f, 1.0f};
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     case EventType::KeyPressed: {
-      if (const auto key = dynamic_cast<KeyPressedEvent&>(e);
-          GLFW_KEY_SPACE == key.key && false == key.repeat) {
+      if (const auto* key = dynamic_cast<KeyPressedEvent*>(&e);
+          key && GLFW_KEY_SPACE == key->key && false == key->repeat) {
         mClearColor = std::array{1.0f, 0.0f, 0.0f, 1.0f};
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     default:

@@ -31,6 +31,7 @@ set(ENGINE_SOURCES
         src/Core/Vulkan/VulkanWindow.cpp
         src/Core/Vulkan/VulkanFramebuffer.cpp
         src/Core/SDImGuiViewport.cpp
+        src/Core/LayoutManager.cpp
         src/Application.cpp
         src/Core/WindowManager.cpp
         src/Core/ViewManager.cpp
@@ -39,6 +40,7 @@ set(ENGINE_SOURCES
         src/RuntimeStateManager.cpp
         src/Core/ECS/CommandQueue.cpp
         src/Core/ECS/ComponentFactory.cpp
+        src/Core/IWYU_Test.cpp
         include/Core/ECS/CommandQueue.hpp
         include/Core/ECS/ComponentFactory.hpp
 )
@@ -92,6 +94,7 @@ target_precompile_headers(SD PRIVATE
 
 target_compile_definitions(SD PUBLIC
         SPDLOG_COMPILED_LIB
+        SPDLOG_NO_EXCEPTIONS
         VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
         VULKAN_HPP_USE_STD_EXPECTED=1
         VULKAN_HPP_NO_EXCEPTIONS=1
@@ -106,24 +109,39 @@ target_compile_definitions(SD PUBLIC
 # PIC
 set_target_properties(SD PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# Unity builds - Release only for faster clean builds
+# Debug uses ccache for fast incremental builds
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    set_target_properties(SD PROPERTIES
+        UNITY_BUILD ON
+        UNITY_BUILD_BATCH_SIZE 8
+    )
+else()
+    set_target_properties(SD PROPERTIES UNITY_BUILD OFF)
+endif()
+
+# AddressSanitizer - Debug builds only
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if (MSVC)
+        target_compile_options(SD PUBLIC -fsanitize=address)
+    else ()
+        target_compile_options(SD PUBLIC -fsanitize=address -fno-omit-frame-pointer)
+    endif ()
+    target_link_options(SD PRIVATE -fsanitize=address)
+endif ()
+
 if (MSVC)
     target_compile_options(SD PUBLIC
-            -fsanitize=address
-            $<$<CONFIG:Release>:/O2 /Ob2>
-            $<$<CONFIG:Debug>:/Od /Zi>
+            $<$<CONFIG:Release>:/O2 /Ob2 /EHsc->
+            $<$<CONFIG:Debug>:/Od /Zi /EHsc->
     )
 else ()
     target_compile_options(SD PUBLIC
-            -fsanitize=address
-            $<$<CONFIG:Release>:-O3>
-            $<$<CONFIG:Debug>:-g -O0>
+            $<$<CONFIG:Release>:-O3 -fno-exceptions>
+            $<$<CONFIG:Debug>:-g -O0 -fno-exceptions>
             -Wall -Wextra -Werror
     )
 endif ()
-
-target_link_options(SD PRIVATE
-        -fsanitize=address
-)
 
 # Hot reloading
 add_executable(HotReloadApp src/HotReloader.cpp src/ConfigLoader.cpp)
@@ -154,7 +172,69 @@ add_custom_command(TARGET SD POST_BUILD
 )
 add_dependencies(HotReloadApp SandboxApp)
 
-target_compile_options(HotReloadApp PRIVATE
-        -fsanitize=address -Wall -Wextra -Werror)
-target_link_options(HotReloadApp PRIVATE
-        -fsanitize=address)
+# AddressSanitizer - Debug builds only
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(HotReloadApp PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(HotReloadApp PRIVATE -fsanitize=address)
+endif ()
+
+target_compile_options(HotReloadApp PRIVATE -Wall -Wextra -Werror -fno-exceptions)
+target_compile_definitions(HotReloadApp PRIVATE TOML_EXCEPTIONS=0)
+
+# IWYU (Include What You Use) - Native CMake support
+# To enable IWYU, configure with:
+#   cmake -DCMAKE_CXX_INCLUDE_WHAT_YOU_USE="iwyu_tool;-p;build-iwyu" ...
+# Or use the iwyu-apply script from the project root
+
+find_program(IWYU_TOOL iwyu_tool)
+find_program(IWYU_TOOL_PY iwyu_tool.py)
+
+if(IWYU_TOOL OR IWYU_TOOL_PY)
+    set(IWYU_CMD ${IWYU_TOOL})
+    if(NOT IWYU_CMD)
+        set(IWYU_CMD ${IWYU_TOOL_PY})
+    endif()
+    
+    # Create a convenience script to run IWYU with proper settings
+    file(WRITE ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "#!/bin/bash\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "# IWYU convenience script\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "# Usage: ./iwyu-apply.sh [build-dir]\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "BUILD_DIR=\${1:-build-iwyu}\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo 'Configuring with IWYU enabled...'\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "cmake -B \$BUILD_DIR -DCMAKE_EXPORT_COMPILE_COMMANDS=ON\\\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "    -DCMAKE_CXX_INCLUDE_WHAT_YOU_USE=\"${IWYU_CMD};-p;\$BUILD_DIR;-Xiwyu;--mapping_file=\\\${CMAKE_SOURCE_DIR}/iwyu.imp\"\\\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "    -DCMAKE_BUILD_TYPE=Debug\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo ''\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo 'Building with IWYU analysis...'\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo '(This will compile and run IWYU on each source file)'\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "cmake --build \$BUILD_DIR --target SD 2>&1 | tee iwyu-output.log\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo ''\n")
+    file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo 'IWYU output saved to: iwyu-output.log'\n")
+    
+    execute_process(COMMAND chmod +x ${CMAKE_SOURCE_DIR}/iwyu-apply.sh)
+    
+    # Test target for the IWYU test file
+    add_custom_target(iwyu-test
+        COMMAND ${CMAKE_COMMAND} -E echo "Testing IWYU on test file..."
+        COMMAND ${CMAKE_COMMAND} -E echo "File: SD/src/Core/IWYU_Test.cpp"
+        COMMAND ${CMAKE_COMMAND} -E echo ""
+        COMMAND ${IWYU_CMD} -p ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/IWYU_Test.cpp 2>&1 
+            | grep -v "bits/unicode-data.h"
+            | grep -v "bits/mofunc_impl.h"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Testing IWYU on IWYU_Test.cpp..."
+        VERBATIM
+    )
+    
+    message(STATUS "IWYU available. Usage:")
+    message(STATUS "  1. Run ./iwyu-apply.sh from project root")
+    message(STATUS "  2. Or: cmake --build . --target iwyu-test")
+    message(STATUS "  3. Or manually: cmake -DCMAKE_CXX_INCLUDE_WHAT_YOU_USE=\"iwyu_tool;-p;<build-dir>\" ...")
+else()
+    message(STATUS "iwyu_tool not found. IWYU will not be available.")
+    message(STATUS "Install with: sudo apt install iwyu")
+endif()

@@ -7,16 +7,24 @@
 #include "Core/types.hpp"
 
 namespace SD {
+
+enum class FileError {
+  none,
+  error,
+  file_too_large,
+  already_exists,
+};
+
 /**
  * Reads a file from given path
  * @param filename
  * @return array of chars
  */
-inline std::expected<std::vector<char>, std::unexpect_t> readFile(const std::string& filename) {
+inline std::expected<std::vector<char>, FileError> readFile(const std::string& filename) {
   std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
   if (!file.is_open()) {
-    return std::unexpected(std::unexpect);
+    return std::unexpected(FileError::error);
   }
 
   const usize fileSize = file.tellg();
@@ -26,16 +34,14 @@ inline std::expected<std::vector<char>, std::unexpect_t> readFile(const std::str
   file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
   file.close();
 
+  if (!file) {
+    return std::unexpected(FileError::error);
+  }
+
   return buffer;
 }
 
 namespace Filesystem {
-enum class FileError {
-  none,
-  error,
-  file_too_large,
-  already_exists,
-};
 /**
  * Overwrites given buffer with read binary data
  * @param path

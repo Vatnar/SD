@@ -1,13 +1,20 @@
+/**
+ * @file PerformanceLayer.hpp
+ * @brief x86-only performance monitoring layer using RDTSC
+ *
+ * @note This layer requires x86_64 architecture. Not portable to ARM.
+ */
 #pragma once
 #include <chrono>
-#include <spdlog/spdlog.h>
-#include <x86intrin.h>
+
+#if defined(__x86_64__) || defined(_M_X64)
+  #include <x86intrin.h>
+#else
+  #error "PerformanceLayer requires x86_64 (__rdtsc). Consider using std::chrono instead."
+#endif
 
 #include "Core/Layer.hpp"
-
-/**
- * Non-visual layer that checks performance every frame. Only for x86.
- */
+#include "Core/Logging.hpp"
 namespace SD {
 class PerformanceLayer : public Layer {
 public:
@@ -31,8 +38,7 @@ public:
           static_cast<double>(mCycleAccumulator - mSleepCycleAccumulator) / mFrameCount;
 
 
-      if (const auto logger = spdlog::get("engine"))
-        logger->info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}", fps, msPerFrame, avgCycles);
+      SD::Log::Engine::Info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}", fps, msPerFrame, avgCycles);
 
       mFrameCount = 0;
       mTimeAccumulator = 0.0f;

@@ -60,7 +60,14 @@ public:
   [[nodiscard]] virtual const char* GetName() const = 0;
   std::string ToString() const { return GetName(); }
 
-  bool isHandled = false;
+  void MarkHandled() { mHandled = true; }
+  [[nodiscard]] bool IsHandled() const { return mHandled; }
+
+private:
+  bool mHandled = false;
+
+  friend class EventDispatcher;
+  friend class LayerList;
 };
 
 #define EVENT_CLASS_TYPE(type)                      \

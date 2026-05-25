@@ -5,21 +5,40 @@
 //   - Lifecycle diagram (Init -> Run -> Shutdown)
 //   - Hot reload integration notes
 #pragma once
+#include <atomic>
 #include <expected>
+#include <format>
+#include <functional>
+#include <memory>
+#include <string>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
+#include "Core/Base.hpp"
+#include "Core/Events/EventManager.hpp"
 #include "Core/FrameTimer.hpp"
-#include "Core/GlfwContext.hpp"
 #include "Core/LayerList.hpp"
-#include "Core/SDImGuiContext.hpp"
 #include "Core/Scene.hpp"
 #include "Core/View.hpp"
 #include "Core/ViewManager.hpp"
-#include "Core/Vulkan/VulkanContext.hpp"
-#include "Core/Vulkan/VulkanRenderer.hpp"
 #include "Core/WindowManager.hpp"
-#include "GameContext.hpp"
-#include "RuntimeStateManager.hpp"
+
+namespace SD {
+class Event;
+class GameContext;
+class GlfwContext;
+class Layer;
+class LayoutManager;
+class RuntimeStateManager;
+class SDImGuiContext;
+class VulkanContext;
+class VulkanRenderer;
+class VulkanWindow;
+class Window;
+} // namespace SD
+
 
 namespace SD {
 
@@ -31,6 +50,7 @@ struct ApplicationSpecification {
   int width = 1600;
   int height = 900;
   bool enableHotReload = true;
+  std::string gameSoPath = "libSandboxApp.so";
 };
 
 // TODO(docs): Document Application class thoroughly
@@ -44,8 +64,8 @@ public:
   Application(const ApplicationSpecification& spec, RuntimeStateManager* stateManager = nullptr);
   virtual ~Application();
 
-  void Run(std::atomic<bool>* externalStop);
-  void Frame();  // Single frame - for external hot reload loop
+  void Run(const std::atomic<bool>* externalStop);
+  void Frame(); // Single frame - for external hot reload loop
   bool IsRunning() const { return mRunning; }
   void Close() { mRunning = false; }
   void OnAppEvent(Event& e);
@@ -67,7 +87,8 @@ public:
   T& PushViewLayer(WindowId id, Args&&... args) {
     auto& windows = mWindowManager->GetWindows();
     if (windows.find(id) == windows.end()) {
-      Abort(std::format("Attempted to push layer to invalid window ID: {}", id));
+      Abort(std::format("Attempted to push layer to invalid window ID: {}",
+                        static_cast<uint32_t>(id)));
     }
     return windows[id].viewLayers.PushLayer<T>(std::forward<Args>(args)...);
   }
@@ -110,9 +131,13 @@ public:
     return mViewManager->GetViews();
   }
 
+  // Global layer access (needed for layout management)
+  LayerList& GetGlobalLayers() { return mGlobalLayers; }
+  const LayerList& GetGlobalLayers() const { return mGlobalLayers; }
+
   // Scene management
   Scene* CreateScene(const std::string& name);
-  Scene* GetScene(const std::string& name);
+  Scene* GetScene(const std::string& name) const;
   std::vector<Scene*> GetScenes();
 
   // Game Context (for hot reload)
@@ -125,7 +150,7 @@ public:
   // Hot Reload
   void SetHotReloadEnabled(bool enabled) { mHotReloadEnabled = enabled; }
   bool IsHotReloadEnabled() const { return mHotReloadEnabled; }
-  void ReloadShaders();
+  void ReloadShaders() const;
 
   // Accessors
   VulkanContext& GetVulkanContext() { return *mVulkanCtx; }
@@ -133,8 +158,12 @@ public:
   SDImGuiContext& GetImGuiContext() { return *mImGuiCtx; }
   WindowManager& GetWindowManager() { return *mWindowManager; }
   ViewManager& GetViewManager() { return *mViewManager; }
+  LayoutManager& GetLayoutManager() { return *mLayoutManager; }
 
-  static Application& Get() { return *sInstance; }
+  static Application& Get() {
+    assert(sInstance && "Application::Get() called before Application was constructed");
+    return *sInstance;
+  }
   float GetFrameWorkTime() const { return mTimer.GetFrameWorkTime(); }
   void AddGpuWaitTime(float t) { mTimer.AddGpuWaitTime(t); }
   FrameTimer& GetFrameTimer() { return mTimer; }
@@ -153,6 +182,7 @@ private:
 
   std::unique_ptr<WindowManager> mWindowManager;
   std::unique_ptr<ViewManager> mViewManager;
+  std::unique_ptr<LayoutManager> mLayoutManager;
 
   LayerList mGlobalLayers;
   EventManager mAppEventManager;

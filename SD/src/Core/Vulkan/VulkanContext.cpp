@@ -153,6 +153,9 @@ void VulkanContext::SetupQueues(vk::SurfaceKHR surface) {
   mGraphicsFamilyIndex = graphicsFamilyIndex;
 }
 void VulkanContext::SetupDeviceExtensions() {
+  // Enable features for wireframe rendering (VK_POLYGON_MODE_LINE)
+  mFeatures2.features.fillModeNonSolid = VK_TRUE;
+  
   mFeatures12.timelineSemaphore = VK_TRUE;
   mFeatures12.bufferDeviceAddress = VK_TRUE;
   mFeatures13.setDynamicRendering(true).setSynchronization2(true);
@@ -184,7 +187,7 @@ void VulkanContext::CreateVulkanDevice() {
 
   mVulkanDevice =
       CheckVulkanResVal(mPhysDev.createDeviceUnique(devInfo), "Failed to create unique device: ");
-  mVkGetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)mVulkanDevice->getProcAddr("vkGetDeviceProcAddr");
+  mVkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(mVulkanDevice->getProcAddr("vkGetDeviceProcAddr"));
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*mInstance, mVulkanDevice.get());
 }
 } // namespace SD

@@ -25,6 +25,10 @@ void SDImGuiContext::Init(Window& window, VulkanWindow& vw) {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigDockingTransparentPayload = true;
+  
+  // Set stable INI filename for layout persistence
+  // Stored in project root (gitignored)
+  io.IniFilename = "imgui.ini";
 
   ImGui::StyleColorsDark();
 

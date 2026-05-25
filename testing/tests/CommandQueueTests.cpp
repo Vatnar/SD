@@ -38,7 +38,7 @@ TEST_F(CommandQueueTest, CreateEntityCmd_CreatesEntity) {
 TEST_F(CommandQueueTest, AddComponentCmd_AddsComponent) {
   EntityHandle h(0);
   queue.Add<CreateEntityCmd>(h);
-  queue.Add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity});
+  queue.Add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity()});
   queue.Apply(em);
 
   Entity e = queue.GetEntity(h);
@@ -48,7 +48,7 @@ TEST_F(CommandQueueTest, AddComponentCmd_AddsComponent) {
 TEST_F(CommandQueueTest, RemoveComponentCmd_RemovesComponent) {
   EntityHandle h(0);
   queue.Add<CreateEntityCmd>(h);
-  queue.Add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity});
+  queue.Add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity()});
   queue.Apply(em);
 
   Entity e = queue.GetEntity(h);
@@ -94,7 +94,7 @@ TEST_F(CommandSerializationTest, CreateEntityCmd_SerializeDeserialize) {
 TEST_F(CommandSerializationTest, AddComponentCmd_SerializeDeserialize) {
   AddComponentCmd<Transform> cmd;
   cmd.mHandle.id = 5;
-  cmd.mData = Transform{VLA::Matrix4x4f::Identity};
+  cmd.mData = Transform{VLA::Matrix4x4f::Identity()};
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
@@ -106,7 +106,7 @@ TEST_F(CommandSerializationTest, AddComponentCmd_SerializeDeserialize) {
   cmd2.Deserialize(deserializer);
 
   EXPECT_EQ(cmd2.mHandle.id, 5u);
-  EXPECT_EQ(cmd2.mData.worldMatrix, VLA::Matrix4x4f::Identity);
+  EXPECT_EQ(cmd2.mData.worldMatrix, VLA::Matrix4x4f::Identity());
 }
 
 TEST_F(CommandSerializationTest, CommandQueue_SerializeDeserialize) {

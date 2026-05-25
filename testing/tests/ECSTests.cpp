@@ -29,14 +29,14 @@ TEST(ECSTest, ReplaceComponent) {
   SD::EntityManager entityManager;
   SD::Entity e = entityManager.Create();
 
-  VLA::Matrix4x4f initialMatrix = VLA::Matrix4x4f::Identity;
+  VLA::Matrix4x4f initialMatrix = VLA::Matrix4x4f::Identity();
   entityManager.AddComponent<SD::Transform>(e, initialMatrix);
 
   SD::Transform* transPtrBefore = entityManager.TryGetComponent<SD::Transform>(e);
   ASSERT_NE(transPtrBefore, nullptr);
   EXPECT_EQ(transPtrBefore->transform, initialMatrix);
 
-  VLA::Matrix4x4f newMatrix = VLA::Matrix4x4f::Identity;
+  VLA::Matrix4x4f newMatrix = VLA::Matrix4x4f::Identity();
   newMatrix(0, 3) = 123.0f;
   newMatrix(1, 3) = 456.0f;
   entityManager.AddComponent<SD::Transform>(e, newMatrix);

@@ -11,7 +11,7 @@ TabWidth: 2
 AccessModifierOffset: -2
 
 # Alignment
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: True
 AlignArrayOfStructures: Right
 AlignConsecutiveAssignments: None
 AlignConsecutiveBitFields: None
@@ -110,14 +110,17 @@ IfMacros:
 IncludeBlocks: Regroup
 SortIncludes: true
 IncludeCategories:
-  - Regex: '^<.*'
+  - Regex: '^<[a-z0-9_]+(\.[a-z0-9_]*)?>'
     Priority: 1
     SortPriority: 0
-  - Regex: '^".*'
+  - Regex: '^<.*'
     Priority: 2
     SortPriority: 0
-  - Regex: '.*'
+  - Regex: '^".*'
     Priority: 3
+    SortPriority: 0
+  - Regex: '.*'
+    Priority: 4
     SortPriority: 0
 IncludeIsMainRegex: '([-_](test|unittest))?$'
 IncludeIsMainSourceRegex: ''

@@ -8,25 +8,20 @@ namespace SD {
 RuntimeStateManager::RuntimeStateManager() = default;
 RuntimeStateManager::~RuntimeStateManager() = default;
 
+// TODO: this doesnt make sense since game doesnt own state
 void RuntimeStateManager::Serialize() {
   if (!mApp)
     return;
-  auto scenes = mApp->GetScenes();
-  for ([[maybe_unused]] auto* scene : scenes) {
-    // TODO: Implement ECS serialization when component serialization is ready
-    SPDLOG_DEBUG("Serializing scene: {}", scene->GetName());
-  }
+  SD::Log::Engine::Debug("RuntimeStateManager::Serialize() called (state persists externally)");
 }
 
 void RuntimeStateManager::Restore(Application* app) {
+  // Game state is externally owned and auto-persists across hot reloads.
+  // Engine state does not need restoration here.
   mApp = app;
   if (!app)
     return;
-  auto scenes = app->GetScenes();
-  for ([[maybe_unused]] auto* scene : scenes) {
-    // TODO: Implement ECS deserialization when component serialization is ready
-    SPDLOG_DEBUG("Restoring scene: {}", scene->GetName());
-  }
+  SD::Log::Engine::Debug("RuntimeStateManager::Restore() called (state persists externally)");
 }
 
 void RuntimeStateManager::SetApplication(Application* app) {
@@ -34,7 +29,8 @@ void RuntimeStateManager::SetApplication(Application* app) {
 }
 
 bool RuntimeStateManager::HasState() const {
-  return !mSerializedScenes.empty();
+  // mSerializedScenes is unused — state is externally owned.
+  return false;
 }
 
 } // namespace SD

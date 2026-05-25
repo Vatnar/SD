@@ -6,4 +6,6 @@ build/
 .idea**
 !.idea/cmake.xml
 !.idea/codeStyles/
+SD/docs/plans/
 
+build**

@@ -8,17 +8,17 @@ namespace SD {
 VulkanWindow::VulkanWindow(Window& mWindow, VulkanContext& vulkanContext) :
   mVulkanCtx(vulkanContext), mDevice(vulkanContext.GetVulkanDevice().get()), mWindow(mWindow),
   mFrameSyncs(false), mIsMinimized(false) {
-  SD_ASSERT(mVulkanCtx.GetVulkanDevice(), "VulkanContext must have valid device");
-  SD_ASSERT(mVulkanCtx.GetInstance(), "VulkanContext must have valid instance");
+  SD_ALWAYS_ASSERT(mVulkanCtx.GetVulkanDevice(), "VulkanContext must have valid device");
+  SD_ALWAYS_ASSERT(mVulkanCtx.GetInstance(), "VulkanContext must have valid instance");
 
   mSurface = mWindow.CreateWindowSurface(mVulkanCtx.GetInstance(), nullptr);
-  SD_ASSERT(mSurface, "Failed to create window surface");
+  SD_ALWAYS_ASSERT(mSurface, "Failed to create window surface");
   CreateCommandPool();
-  SD_ASSERT(mCommandPool, "Failed to create command pool");
+  SD_ALWAYS_ASSERT(mCommandPool, "Failed to create command pool");
   CreateSwapchain();
-  SD_ASSERT(mSwapchain, "Failed to create swapchain");
+  SD_ALWAYS_ASSERT(mSwapchain, "Failed to create swapchain");
   CreateRenderPass();
-  SD_ASSERT(mRenderPass, "Failed to create render pass");
+  SD_ALWAYS_ASSERT(mRenderPass, "Failed to create render pass");
   CreateSwapchainDependentResources();
 
   std::generate_n(std::back_inserter(mFrameSyncs), MAX_FRAMES_IN_FLIGHT, [&] {
@@ -48,7 +48,7 @@ VulkanWindow::~VulkanWindow() {
 }
 
 void VulkanWindow::RecreateSwapchain(LayerList& layers) {
-  SD_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
   u32 oldWidth = mSwapchainExtent.width;
   u32 oldHeight = mSwapchainExtent.height;
 
@@ -80,12 +80,12 @@ const Window& VulkanWindow::GetWindow() const {
   return mWindow;
 }
 FrameSync& VulkanWindow::GetFrameSync() {
-  SD_ASSERT(CurrentFrame < MAX_FRAMES_IN_FLIGHT, "CurrentFrame index out of bounds");
-  SD_ASSERT(CurrentFrame < mFrameSyncs.size(), "CurrentFrame exceeds frame syncs size");
+  SD_ALWAYS_ASSERT(CurrentFrame < MAX_FRAMES_IN_FLIGHT, "CurrentFrame index out of bounds");
+  SD_ALWAYS_ASSERT(CurrentFrame < mFrameSyncs.size(), "CurrentFrame exceeds frame syncs size");
   return mFrameSyncs[CurrentFrame];
 }
 SwapchainSync& VulkanWindow::GetSwapchainSync(const u32 imageIndex) {
-  SD_ASSERT(imageIndex < mSwapchainSyncs.size(), "Image index out of bounds");
+  SD_ALWAYS_ASSERT(imageIndex < mSwapchainSyncs.size(), "Image index out of bounds");
   return mSwapchainSyncs[imageIndex];
 }
 vk::UniqueSwapchainKHR& VulkanWindow::GetSwapchain() {
@@ -115,8 +115,8 @@ vk::RenderPass VulkanWindow::GetRenderPass() const {
 }
 
 std::expected<u32, vk::Result> VulkanWindow::GetVulkanImages(vk::UniqueSemaphore& imageAcquired) {
-  SD_ASSERT(mSwapchain, "Swapchain must be valid");
-  SD_ASSERT(imageAcquired, "Semaphore must be valid");
+  SD_ALWAYS_ASSERT(mSwapchain, "Swapchain must be valid");
+  SD_ALWAYS_ASSERT(imageAcquired, "Semaphore must be valid");
   u32 imageIndex;
   vk::Result res =
       mDevice.acquireNextImageKHR(*mSwapchain, UINT64_MAX, *imageAcquired, nullptr, &imageIndex);
@@ -129,9 +129,9 @@ std::expected<u32, vk::Result> VulkanWindow::GetVulkanImages(vk::UniqueSemaphore
 }
 
 vk::Result VulkanWindow::PresentImage(u32 imageIndex) {
-  SD_ASSERT(mSwapchain, "Swapchain must be valid");
-  SD_ASSERT(imageIndex < mSwapchainSyncs.size(), "Image index out of bounds");
-  SD_ASSERT(mSwapchainSyncs[imageIndex].renderComplete, "Render complete semaphore must be valid");
+  SD_ALWAYS_ASSERT(mSwapchain, "Swapchain must be valid");
+  SD_ALWAYS_ASSERT(imageIndex < mSwapchainSyncs.size(), "Image index out of bounds");
+  SD_ALWAYS_ASSERT(mSwapchainSyncs[imageIndex].renderComplete, "Render complete semaphore must be valid");
 
   vk::PresentInfoKHR presentInfo{};
   presentInfo.setWaitSemaphores(*mSwapchainSyncs[imageIndex].renderComplete);
@@ -147,8 +147,8 @@ vk::Result VulkanWindow::PresentImage(u32 imageIndex) {
 
 
 void VulkanWindow::RebuildPerImageSync() {
-  SD_ASSERT(mDevice, "Device must be valid");
-  SD_ASSERT(!mSwapchainImages.empty(), "Swapchain images must not be empty");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(!mSwapchainImages.empty(), "Swapchain images must not be empty");
 
   const auto imageCount = GetSwapchainImages().size();
   mSwapchainSyncs.clear();
@@ -171,8 +171,8 @@ void VulkanWindow::Resize(int width, int height) {
   mFramebufferResized = true;
 }
 void VulkanWindow::CreateSwapchain() {
-  SD_ASSERT(mDevice, "Device must be valid");
-  SD_ASSERT(mSurface, "Surface must be valid");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(mSurface, "Surface must be valid");
 
   auto& physDev = mVulkanCtx.GetPhysicalDevice();
   mSurfaceCapabilities = CheckVulkanResVal(physDev.getSurfaceCapabilitiesKHR(mSurface.get()),
@@ -246,11 +246,11 @@ void VulkanWindow::CreateSwapchain() {
                                  "Failed to create unique swapchain: ");
   mSwapchainImages = CheckVulkanResVal(mDevice.getSwapchainImagesKHR(*mSwapchain),
                                        "Failed to get swapchain images");
-  SD_ASSERT(!mSwapchainImages.empty(), "Swapchain must have at least one image");
+  SD_ALWAYS_ASSERT(!mSwapchainImages.empty(), "Swapchain must have at least one image");
 }
 void VulkanWindow::CreateRenderPass() {
-  SD_ASSERT(mDevice, "Device must be valid");
-  SD_ASSERT(mSurfaceFormat.format != vk::Format::eUndefined, "Surface format must be valid");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(mSurfaceFormat.format != vk::Format::eUndefined, "Surface format must be valid");
 
   // TODO: Use dynamic rendering (VK_KHR_dynamic_rendering) to simplify render pass management
   vk::AttachmentDescription colorAttachment{};
@@ -284,8 +284,8 @@ void VulkanWindow::CreateRenderPass() {
                                   "Failed to create unique renderpass");
 }
 void VulkanWindow::CreateSwapchainDependentResources() {
-  SD_ASSERT(mDevice, "Device must be valid");
-  SD_ASSERT(!mSwapchainImages.empty(), "Swapchain images must not be empty");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(!mSwapchainImages.empty(), "Swapchain images must not be empty");
 
   mSwapchainImageViews.clear();
   mFramebuffers.clear();
@@ -308,10 +308,10 @@ void VulkanWindow::CreateSwapchainDependentResources() {
 }
 
 void VulkanWindow::CreateFramebuffers() {
-  SD_ASSERT(mDevice, "Device must be valid");
-  SD_ASSERT(mRenderPass, "Render pass must be valid");
-  SD_ASSERT(!mSwapchainImageViews.empty(), "Image views must not be empty");
-  SD_ASSERT(mSwapchainExtent.width > 0 && mSwapchainExtent.height > 0,
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(mRenderPass, "Render pass must be valid");
+  SD_ALWAYS_ASSERT(!mSwapchainImageViews.empty(), "Image views must not be empty");
+  SD_ALWAYS_ASSERT(mSwapchainExtent.width > 0 && mSwapchainExtent.height > 0,
             "Swapchain extent must be valid");
 
   mFramebuffers.resize(mSwapchainImageViews.size());
@@ -333,7 +333,7 @@ void VulkanWindow::CreateFramebuffers() {
 }
 
 void VulkanWindow::CreateCommandPool() {
-  SD_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
 
   // 1. Create Pool
   vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -349,7 +349,7 @@ void VulkanWindow::CreateCommandPool() {
 
   mCommandBuffers = CheckVulkanResVal(mDevice.allocateCommandBuffersUnique(allocInfo),
                                       "Failed to allocate command buffers");
-  SD_ASSERT(mCommandBuffers.size() == MAX_FRAMES_IN_FLIGHT,
+  SD_ALWAYS_ASSERT(mCommandBuffers.size() == MAX_FRAMES_IN_FLIGHT,
             "Must allocate MAX_FRAMES_IN_FLIGHT command buffers");
 }
 

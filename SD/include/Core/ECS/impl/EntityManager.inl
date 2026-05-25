@@ -39,7 +39,7 @@ bool ViewImpl<Components...>::Iterator::IsValid() const {
 template<typename... Components>
 ViewImpl<Components...>::Iterator ViewImpl<Components...>::begin() {
   if (!mSmallestPool) {
-    SPDLOG_WARN("View has no valid component pools - scene may be empty or missing components");
+    SD::Log::Engine::Warn("View has no valid component pools - scene may be empty or missing components");
     return end();
   }
   return Iterator(mManager, mSmallestPool, 0);
@@ -82,8 +82,10 @@ T* EntityManager::AddComponent(Entity e, Args&&... args) {
 
   // add data
   if (mEntityMasks[e]->test(typeId)) {
-    spdlog::get("engine")->warn("Overwriting already existing component: {}, id: {} ",
-                                ComponentTraits<T>::Name, typeId);
+    if (auto logger = spdlog::get("Engine")) {
+      logger->warn("Overwriting already existing component: {}, id: {} ",
+                   ComponentTraits<T>::Name, typeId);
+    }
   }
   auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
   mEntityMasks[e]->set(typeId);
@@ -110,6 +112,14 @@ T& EntityManager::GetComponent(Entity e) {
   assert(HasComponent<T>(e) && "Entity doesnt have component");
 
   auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
+  return *pool->Get(e);
+}
+template<typename T>
+const T& EntityManager::GetComponent(Entity e) const {
+  usize typeId = ComponentTraits<T>::Id;
+  assert(HasComponent<T>(e) && "Entity doesnt have component");
+
+  auto* pool = static_cast<const SparseEntitySet<T>*>(mComponentPools[typeId].get());
   return *pool->Get(e);
 }
 
@@ -186,6 +196,9 @@ inline Entity EntityManager::Create() {
   Entity e = {idx, mGenerations[idx]};
 
   mEntityMasks.Add(e, ComponentMask{});
+#ifndef NDEBUG
+  ValidateInvariants();
+#endif
   return e;
 }
 inline void EntityManager::Destroy(const Entity e) {
@@ -206,6 +219,9 @@ inline void EntityManager::Destroy(const Entity e) {
   mask->reset();
   mGenerations[e.index]++;
   mFreeList.push_back(e.index);
+#ifndef NDEBUG
+  ValidateInvariants();
+#endif
 }
 inline std::vector<ComponentDebugInfo> EntityManager::GetAllComponentInfo(Entity e) const {
   std::vector<ComponentDebugInfo> components;
@@ -233,7 +249,7 @@ inline uint32_t EntityManager::PopFreeList() {
 inline void EntityManager::Serialize(Serializer& s) const {
   s.Write(mGenerations);
   s.Write(mFreeList);
-  
+
   // Serialize entity masks - only serialize alive entities
   const auto& maskEntities = mEntityMasks.GetDenseEntities();
   u32 aliveCount = 0;
@@ -241,19 +257,26 @@ inline void EntityManager::Serialize(Serializer& s) const {
     if (IsAlive(e)) aliveCount++;
   }
   s.Write(aliveCount);
-  
+
   for (Entity e : maskEntities) {
     if (!IsAlive(e)) continue;
-    
+
     s.Write(e.index);
     s.Write(e.generation);
     const ComponentMask* mask = mEntityMasks.Get(e);
+    // Pack 256-bit mask into 4 x u64 values (instead of 256 x u64)
     if (mask) {
-      for (usize i = 0; i < mask->size(); ++i) {
-        s.Write(mask->test(i) ? u64(1) : u64(0));
+      for (usize word = 0; word < 4; ++word) {
+        u64 packed = 0;
+        for (usize bit = 0; bit < 64; ++bit) {
+          if (mask->test(word * 64 + bit)) {
+            packed |= (u64(1) << bit);
+          }
+        }
+        s.Write(packed);
       }
     } else {
-      for (usize i = 0; i < 64; ++i) {
+      for (usize i = 0; i < 4; ++i) {
         s.Write(u64(0));
       }
     }
@@ -279,8 +302,8 @@ inline void EntityManager::Serialize(Serializer& s) const {
 inline void EntityManager::Deserialize(Serializer& s) {
   s.Read(mGenerations);
   s.Read(mFreeList);
-  
-  // Deserialize entity masks
+
+  // Deserialize alive entity masks
   u32 maskCount = s.Read<u32>();
   for (u32 i = 0; i < maskCount; ++i) {
     u32 index = s.Read<u32>();
@@ -288,22 +311,34 @@ inline void EntityManager::Deserialize(Serializer& s) {
     Entity e{index, generation};
     mEntityMasks.Add(e, ComponentMask{});
     ComponentMask* mask = mEntityMasks.Get(e);
+    // Read 4 x u64 values and unpack to 256-bit mask
     if (mask) {
-      for (usize j = 0; j < mask->size(); ++j) {
-        u64 bit = s.Read<u64>();
-        if (bit) mask->set(j);
+      for (usize word = 0; word < 4; ++word) {
+        u64 packed = s.Read<u64>();
+        for (usize bit = 0; bit < 64; ++bit) {
+          if (packed & (u64(1) << bit)) {
+            mask->set(word * 64 + bit);
+          }
+        }
       }
     } else {
-      for (usize j = 0; j < 64; ++j) {
+      for (usize j = 0; j < 4; ++j) {
         s.Read<u64>();
       }
     }
   }
-  
+
+  // Reconstruct mask entries for destroyed entities (needed for invariants)
+  for (u32 idx : mFreeList) {
+    assert(mGenerations[idx] > 0 && "Freelist index has generation 0");
+    Entity e{idx, mGenerations[idx] - 1};
+    mEntityMasks.Add(e, ComponentMask{});
+  }
+
   // Deserialize component pools
   u32 serializableCount = s.Read<u32>();
   mComponentPools.resize(16);  // Basic size, expand as needed
-  
+
   for (u32 i = 0; i < serializableCount; ++i) {
     u32 componentId = s.Read<u32>();
     auto pool = ComponentFactory::Create(componentId);

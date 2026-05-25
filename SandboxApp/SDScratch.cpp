@@ -4,7 +4,9 @@
 #include "Core/ECS/Components.hpp"
 #include "Core/Layers/EngineDebugLayer.hpp"
 #include "Core/SceneView.hpp"
+#include "Core/Vulkan/VulkanRenderer.hpp"
 #include "GameRenderLayer.hpp"
+#include "Logging.hpp"
 #include "game.h"
 
 // Wrap SD types for C interface
@@ -21,7 +23,15 @@ static SD_Scene* FromScene(SD::Scene* scene) {
   return reinterpret_cast<SD_Scene*>(scene);
 }
 
+static void RegisterGameCategories() {
+  SD::Log::RegisterCategory("Game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+  SD::Log::RegisterCategory("Game/Combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
+  SD::Log::RegisterCategory("Game/UI", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
+  SD::Log::RegisterCategory("Game/Audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
+}
+
 static void GameOnLoad(SD_Application* appPtr, GameState* state) {
+  RegisterGameCategories();
   SD::Application& app = *ToApp(appPtr);
 
   state->version++;
@@ -29,7 +39,6 @@ static void GameOnLoad(SD_Application* appPtr, GameState* state) {
 
   state->sharedScene = FromScene(app.CreateScene("MainScene"));
   state->anotherScene = FromScene(app.CreateScene("AnotherScene"));
-
 
   SD::WindowId mainWin = 0;
   auto& ctrl =
@@ -53,30 +62,30 @@ static void GameOnLoad(SD_Application* appPtr, GameState* state) {
                                               .renderPass = gameView.GetLayeredRenderPass(),
                                               .subpass = 1};
 
-  VkPipeline worldPipe = pipelines.CreateGraphicsPipeline(worldDesc, pushLayout);
+  auto worldPipeHandle = pipelines.CreateGraphicsPipeline(worldDesc, pushLayout);
 
   SD::PipelineFactory::PipelineDesc wireDesc = worldDesc;
   wireDesc.polygonMode = VK_POLYGON_MODE_LINE;
-  // VkPipeline wirePipe = pipelines.CreateGraphicsPipeline(wireDesc, pushLayout);
+  auto wirePipeHandle = pipelines.CreateGraphicsPipeline(wireDesc, pushLayout);
 
-  SPDLOG_INFO("Pushing GameRenderLayer");
-  gameView.PushLayer<GameRenderLayer>(1, "GameRender", ToScene(state->sharedScene), worldPipe,
-                                      worldPipe, pushLayout);
+  SD::Log::Game::Info("Pushing GameRenderLayer");
+  gameView.PushLayer<GameRenderLayer>(1, "GameRender", ToScene(state->sharedScene),
+                                      worldPipeHandle, wirePipeHandle, pushLayout, &pipelines);
   app.PushGlobalLayer<SD::EngineDebugLayer>(ToScene(state->sharedScene));
 
   auto scene = ToScene(state->sharedScene);
   auto ent = scene->em.Create();
   scene->em.AddComponent<SD::DebugName>(ent, "Triangle");
-  scene->em.AddComponent<SD::Transform>(ent, VLA::Matrix4x4f::Identity);
+  scene->em.AddComponent<SD::Transform>(ent, VLA::Matrix4x4f::Identity());
   scene->em.AddComponent<SD::Renderable>(ent, SD::Renderable{0, 0, 1, 1});
 
 
   auto ent2 = scene->em.Create();
   scene->em.AddComponent<SD::DebugName>(ent2, "Better triangle");
-  scene->em.AddComponent<SD::Transform>(ent2, VLA::Matrix4x4f::Identity);
+  scene->em.AddComponent<SD::Transform>(ent2, VLA::Matrix4x4f::Identity());
   scene->em.AddComponent<SD::Renderable>(ent2, SD::Renderable{0, 0, 1, 1});
 
-  spdlog::get("engine")->info("Game loaded, version {}", state->version);
+  SD::Log::Game::Info("Game loaded, version {}", state->version);
 }
 
 static void GameOnUpdate(SD_Application* appPtr, GameState* state, float dt) {

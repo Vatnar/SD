@@ -11,7 +11,6 @@
 #include "Component.hpp"
 #include "ComponentFactory.hpp"
 #include "Entity.hpp"
-#include "EntityManager.hpp"
 #include "SparseEntitySet.hpp"
 
 
@@ -98,6 +97,8 @@ public:
    */
   template<typename T>
   T& GetComponent(Entity e);
+  template<typename T>
+  const T& GetComponent(Entity e) const;
   void Serialize(Serializer& s) const override;
   void Deserialize(Serializer& s) override;
   template<typename T>
@@ -108,6 +109,13 @@ public:
 
   [[nodiscard]] bool IsAlive(Entity e) const;
   [[nodiscard]] int GetEntityCount() const { return mEntityMasks.Size(); }
+  [[nodiscard]] int GetAliveEntityCount() const {
+    int alive = 0;
+    for (Entity e : mEntityMasks.GetDenseEntities()) {
+      if (IsAlive(e)) ++alive;
+    }
+    return alive;
+  }
 
 
   template<typename T>
@@ -159,17 +167,15 @@ private:
   // 2. mFreeList contains only indices of destroyed entities (not in use)
   // 3. mEntityMasks has entry for every index in mGenerations
   // 4. Component mask bit is set iff component exists in corresponding pool
-  //
-  // TODO(invariants): Add ValidateInvariants() debug function:
-  //   #ifndef NDEBUG
-  //   void ValidateInvariants() const {
-  //     assert(mEntityMasks.Size() == mGenerations.size());
-  //     for (u32 idx : mFreeList) {
-  //       assert(idx < mGenerations.size());
-  //     }
-  //   }
-  //   #endif
-  // Call at end of Create(), Destroy() in debug builds.
+
+#ifndef NDEBUG
+  void ValidateInvariants() const {
+    assert(mEntityMasks.Size() == mGenerations.size());
+    for (u32 idx : mFreeList) {
+      assert(idx < mGenerations.size());
+    }
+  }
+#endif
 
   friend class RuntimeStateManager;
 };

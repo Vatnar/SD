@@ -143,4 +143,23 @@ readability-static-accessed-through-instance,
 readability-static-definition-in-anonymous-namespace,
 readability-string-compare,
 readability-uniqueptr-delete-release,
-readability-use-anyofallof'
+readability-use-anyofallof,
+readability-identifier-naming'
+
+CheckOptions:
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: UPPER_CASE
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ClassMemberCase: lower_case
+  readability-identifier-naming.ClassMemberPrefix: m_
+  readability-identifier-naming.StaticVariableCase: lower_case
+  readability-identifier-naming.StaticVariablePrefix: s_
+  readability-identifier-naming.GlobalVariableCase: lower_case
+  readability-identifier-naming.GlobalVariablePrefix: g_
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.ConceptCase: CamelCase
+  readability-identifier-naming.NamespaceCase: lower_case

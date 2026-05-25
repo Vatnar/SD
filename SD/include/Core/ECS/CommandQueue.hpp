@@ -15,6 +15,7 @@ public:
   [[nodiscard]] Entity GetEntity(EntityHandle handle) const;
 
   void SetEntityForHandle(EntityHandle entityHandle, Entity entity);
+  [[nodiscard]] bool IsHandleResolved(EntityHandle handle) const;
   void Clear();
   [[nodiscard]] usize GetCount() const;
 

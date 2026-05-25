@@ -49,19 +49,10 @@ public:                                                                    \
   u32 GetTypeId() const override { return sTypeId; }                    \
 private:
 
-#define REGISTER_COMMAND_FACTORY(Name)                                    \
-  namespace {                                                             \
-    static SD::CommandFactory::CreatorFunc Name##Creator =               \
-      [] { return std::make_unique<Name>(); };                            \
-    struct Name##AutoRegister {                                           \
-      Name##AutoRegister() {                                             \
-        SD::CommandFactory::Register(Name::sTypeId, Name##Creator);     \
-      }                                                                   \
-    };                                                                    \
-    static Name##AutoRegister Name##Registrar;                           \
-  }
-
 /**
+ * Note: Command factory registration is done centrally in CommandQueue.cpp
+ * to avoid duplicate registrations and keep header-only classes clean.
+ *
  * Represents a "future" entity in the command queue
  */
 struct EntityHandle {
@@ -72,6 +63,7 @@ struct EntityHandle {
   [[nodiscard]] bool IsValid() const { return id != type_max<u32>; }
 
   bool operator==(const EntityHandle& other) const { return id == other.id; }
+  bool operator!=(const EntityHandle& other) const { return !(*this == other); }
 };
 
 class Command {
@@ -99,3 +91,10 @@ public:
   virtual void Deserialize(Serializer& serializer) = 0;
 };
 } // namespace SD
+
+template<>
+struct std::hash<SD::EntityHandle> {
+  inline std::size_t operator()(SD::EntityHandle h) const noexcept {
+    return std::hash<uint32_t>{}(h.id);
+  }
+};

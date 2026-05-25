@@ -6,21 +6,25 @@
 #include "VLA/Matrix.hpp"
 #include "imgui.h"
 
-// static int sLoadCount = 0;
-
-GameRenderLayer::GameRenderLayer(const std::string& name, SD::Scene* scene, VkPipeline pipeline,
-                                 VkPipeline wireframePipeline, VkPipelineLayout layout) :
-  RenderStage(name, scene), mPipeline(pipeline), mWireframePipeline(wireframePipeline),
-  mLayout(layout) {
+GameRenderLayer::GameRenderLayer(const std::string& name, SD::Scene* scene,
+                                 SD::PipelineFactory::Handle pipelineHandle,
+                                 SD::PipelineFactory::Handle wireframeHandle,
+                                 VkPipelineLayout layout, SD::PipelineFactory* pipelineFactory) :
+  RenderStage(name, scene), mPipelineHandle(pipelineHandle), mWireframeHandle(wireframeHandle),
+  mLayout(layout), mPipelineFactory(pipelineFactory) {
 }
 
 void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
-  VkPipeline activePipe =
-      (mView->GetRenderMode() == SD::RenderMode::Wireframe) ? mWireframePipeline : mPipeline;
-  // BUG: Crash here SEGFAULT
-  SD_CORE_ASSERT(cmd != VK_NULL_HANDLE, "Invalid cmd buffer");
-  SD_CORE_ASSERT(activePipe != VK_NULL_HANDLE, "Invalid pipeline");
-  SD_CORE_ASSERT(mLayout != VK_NULL_HANDLE, "Invalid layout");
+  SD_DEBUG_ASSERT(mPipelineFactory, "PipelineFactory must be valid");
+
+  // Resolve handles to actual pipelines (stable across hot-reloads)
+  VkPipeline activePipe = (mView->GetRenderMode() == SD::RenderMode::Wireframe)
+                              ? mPipelineFactory->GetPipeline(mWireframeHandle)
+                              : mPipelineFactory->GetPipeline(mPipelineHandle);
+
+  SD_DEBUG_ASSERT(cmd != VK_NULL_HANDLE, "Invalid cmd buffer");
+  SD_DEBUG_ASSERT(activePipe != VK_NULL_HANDLE, "Invalid pipeline - was it destroyed or recreated?");
+  SD_DEBUG_ASSERT(mLayout != VK_NULL_HANDLE, "Invalid layout");
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, activePipe);
 
@@ -75,7 +79,7 @@ void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
   bool inside = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 
   for (auto [entity, transform, renderable] : mScene->em.View<SD::Transform, SD::Renderable>()) {
-    if ((renderable.viewMask & 1u << mViewId) == 0 || renderable.renderStage != mStageId)
+    if ((renderable.viewMask & 1u << static_cast<uint32_t>(mViewId)) == 0 || renderable.renderStage != mStageId)
       continue;
 
     Push push;

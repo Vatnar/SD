@@ -4,6 +4,7 @@
 #include "Core/Events/window/KeyboardEvents.hpp"
 #include "Core/Events/window/MouseEvents.hpp"
 #include "Core/Events/window/WindowEvents.hpp"
+#include "Core/Logging.hpp"
 #include "Core/Vulkan/VulkanConfig.hpp"
 #include "Utils/Utils.hpp"
 
@@ -15,8 +16,7 @@ SD::Window::Window(int width, int height, const std::string& title) {
   if (!mHandle) {
     const char* error = nullptr;
     glfwGetError(&error);
-    if (const auto logger = spdlog::get("engine"))
-      logger->error("Failed to create GLFW window with error: ", error);
+    SD::Log::Engine::Error("Failed to create GLFW window with error: {}", error ? error : "unknown");
     Abort("Failed to create GLFW window");
   }
 
@@ -43,8 +43,7 @@ SD::Window::Window(const WindowDesc& desc) {
   if (!mHandle) {
     const char* error = nullptr;
     glfwGetError(&error);
-    if (const auto logger = spdlog::get("engine"))
-      logger->error("Failed to create GLFW window with error: ", error);
+    SD::Log::Engine::Error("Failed to create GLFW window with error: {}", error ? error : "unknown");
     Abort("Failed to create GLFW window");
   }
   glfwSetWindowUserPointer(mHandle, this);

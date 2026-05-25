@@ -23,7 +23,6 @@ public:
   void Serialize(Serializer& serializer) const override { serializer.Write(mHandle.id); }
   void Deserialize(Serializer& serializer) override { mHandle.id = serializer.Read<u32>(); }
 };
-REGISTER_COMMAND_FACTORY(CreateEntityCmd);
 
 class DestroyEntityCmd : public Command {
   COMMAND_ID(DestroyEntityCmd)
@@ -42,7 +41,6 @@ public:
     mEntity.generation = serializer.Read<u32>();
   }
 };
-REGISTER_COMMAND_FACTORY(DestroyEntityCmd);
 
 template<SerializableComponent T>
 class AddComponentCmd : public Command {

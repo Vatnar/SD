@@ -7,6 +7,7 @@
 #include "Core/Base.hpp"
 #include "Core/LayerList.hpp"
 #include "Core/Window.hpp"
+#include "Core/IdTypes.hpp"
 #include "Core/Vulkan/VulkanWindow.hpp"
 
 #include <memory>
@@ -16,14 +17,6 @@
 namespace SD {
 
 class ViewManager;
-
-// TODO(strong-typedef): Change from `using` to struct for type safety
-//   using WindowId = u32;
-// becomes:
-//   struct WindowId { u32 value; };
-// This prevents accidental mixing of WindowId with ViewId or raw u32.
-// Zero performance cost, compiler catches type errors.
-using WindowId = u32;
 
 // TODO(docs): Document WindowProps struct
 //   - Each field's purpose
@@ -76,7 +69,7 @@ private:
   void DrawWindow(WindowId id, WindowData& data, ViewManager& viewManager);
 
   std::unordered_map<WindowId, WindowData> mWindows;
-  WindowId mNextWindowId = 0;
+  WindowId mNextWindowId;
   std::vector<WindowId> mPendingClose;
 };
 

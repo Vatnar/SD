@@ -44,21 +44,19 @@ class SparseEntitySet : public SparseEntitySetBase {
   // 1. denseEntities.size() == denseData.size() (parallel arrays)
   // 2. sparse[page][offset] is either valid dense index OR sentinel (max usize)
   // 3. For each i in [0, denseEntities.size()): sparse[denseEntities[i]] points back to i
-  //
-  // TODO(invariants): Add ValidateInvariants() debug function:
-  //   #ifndef NDEBUG
-  //   void ValidateInvariants() const {
-  //     assert(denseEntities.size() == denseData.size());
-  //     for (size_t i = 0; i < denseEntities.size(); ++i) {
-  //       Entity e = denseEntities[i];
-  //       usize page = e.index >> SHIFT;
-  //       usize offset = e.index & MASK;
-  //       assert(page < sparse.size() && sparse[page]);
-  //       assert(sparse[page][offset] == i);
-  //     }
-  //   }
-  //   #endif
-  // Call at end of Add(), Remove(), and DeserializeFrom() in debug builds.
+
+#ifndef NDEBUG
+  void ValidateInvariants() const {
+    assert(denseEntities.size() == denseData.size());
+    for (size_t i = 0; i < denseEntities.size(); ++i) {
+      Entity e = denseEntities[i];
+      usize page = e.index >> SHIFT;
+      usize offset = e.index & MASK;
+      assert(page < sparse.size() && sparse[page]);
+      assert(sparse[page][offset] == i);
+    }
+  }
+#endif
 
   std::vector<std::unique_ptr<usize[]>> sparse;
   std::vector<T> denseData;
@@ -136,6 +134,9 @@ public:
       }
       sparse[page][offset] = i;
     }
+#ifndef NDEBUG
+    ValidateInvariants();
+#endif
   }
 
   void Serialize(Serializer& s) const override {

@@ -15,6 +15,14 @@ target_link_libraries(SDGTest PRIVATE
         SD
         GTest::gtest
 )
-target_link_options(SDGTest PRIVATE -fsanitize=address)
+
+# Tests need exceptions (GoogleTest requirement); override -fno-exceptions inherited from SD
+target_compile_options(SDGTest PRIVATE -fexceptions)
+
+# AddressSanitizer - Debug builds only
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(SDGTest PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(SDGTest PRIVATE -fsanitize=address)
+endif()
 include(GoogleTest)
 gtest_discover_tests(SDGTest)

@@ -7,6 +7,10 @@ extern SD::Application* CreateApplication(int, char**);
 int main(int argc, char** argv) {
   SD::Log::Init();
   auto app = CreateApplication(argc, argv);
+  if (!app) {
+    SD::Log::Engine::Error("CreateApplication returned null");
+    return 1;
+  }
   app->Run(nullptr);
   delete app;
 }

@@ -29,13 +29,13 @@ public:
   bool CompileShader(const std::string& source, std::vector<uint32_t>& output,
                      const std::string& profile) const {
     if (!dxcUtils || !dxcCompiler) {
-      std::cerr << "Shader compiler not initialised" << std::endl;
+      SD::Log::Engine::Error("Shader compiler not initialised");
       return false;
     }
 
     CComPtr<IDxcBlobEncoding> pSource;
     if (FAILED(dxcUtils->LoadFile(CA2W(source.c_str()), nullptr, &pSource))) {
-      std::cerr << "Failed to load shader source: " << source << std::endl;
+      SD::Log::Engine::Error("Failed to load shader source: {}", source);
       return false;
     }
 
@@ -71,21 +71,20 @@ public:
     CComPtr<IDxcResult> pResults;
     if (FAILED(dxcCompiler->Compile(&Source, pszArgs.data(), pszArgs.size(), nullptr,
                                     IID_PPV_ARGS(&pResults)))) {
-      std::cerr << "Failed to compile shader" << std::endl;
+      SD::Log::Engine::Error("Failed to compile shader");
       return false;
     }
 
     CComPtr<IDxcBlobUtf8> pErrors = nullptr;
     pResults->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr);
     if (pErrors != nullptr && pErrors->GetStringLength() != 0) {
-      std::cerr << "Shader compilation errors/warnings:\n"
-                << pErrors->GetStringPointer() << std::endl;
+      SD::Log::Engine::Error("Shader compilation errors/warnings:\n{}", pErrors->GetStringPointer());
     }
 
     HRESULT hrStatus;
     pResults->GetStatus(&hrStatus);
     if (FAILED(hrStatus)) {
-      std::cerr << "Shader compilation failed." << std::endl;
+      SD::Log::Engine::Error("Shader compilation failed");
       return false;
     }
 
@@ -94,7 +93,7 @@ public:
       return false;
     }
 
-    output.resize(pShader->GetBufferSize() / 4);
+    output.resize((pShader->GetBufferSize() + 3) / 4);
     memcpy(output.data(), pShader->GetBufferPointer(), pShader->GetBufferSize());
 
     return true;

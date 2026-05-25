@@ -22,18 +22,21 @@
       "displayName": "Release",
       "inherits": "base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
       }
     }
   ],
   "buildPresets": [
     {
       "name": "debug",
-      "configurePreset": "debug"
+      "configurePreset": "debug",
+      "jobs": 0
     },
     {
       "name": "release",
-      "configurePreset": "release"
+      "configurePreset": "release",
+      "jobs": 0
     }
   ]
 }

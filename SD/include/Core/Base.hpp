@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
+#include "Core/Logging.hpp"
 #include "Core/types.hpp"
 
 namespace SD {
@@ -36,12 +37,8 @@ consteval usize log2_int(std::unsigned_integral auto n) {
  * @param message
  */
 [[noreturn]] inline void Abort(const std::string& message) {
-  if (const auto logger = spdlog::get("engine")) {
-    logger->critical("Fatal error: {}", message);
-    spdlog::shutdown();
-  } else {
-    std::cerr << "Fatal error: " << message << '\n';
-  }
+  SD::Log::Engine::Critical("Fatal error: {}", message);
+  spdlog::shutdown();
   std::abort();
 }
 [[noreturn]] inline void Abort() {
@@ -72,7 +69,7 @@ auto CheckVulkanResVal(T&& result, std::string_view message,
     if (!result.has_value()) {
       CheckVulkanRes(result.error(), message, loc);
     }
-    return std::move(result.value());
+    return std::move(*result);
   } else {
     // Fallback or assume it's already a value (though this shouldn't happen with this name)
     return std::forward<T>(result);
@@ -81,12 +78,10 @@ auto CheckVulkanResVal(T&& result, std::string_view message,
 
 inline u32 FindMemoryType(const vk::PhysicalDevice& physicalDevice, u32 typeFilter,
                           vk::MemoryPropertyFlags properties) {
-  VkPhysicalDeviceMemoryProperties memProperties;
-  vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+  vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
   for (u32 i = 0; i < memProperties.memoryTypeCount; i++) {
-    if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags &
-                                    static_cast<VkMemoryPropertyFlags>(properties)) ==
-                                       static_cast<VkMemoryPropertyFlags>(properties))
+    if ((typeFilter & (1 << i)) &&
+        (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
       return i;
   }
   Abort("Failed to find memory type");

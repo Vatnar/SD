@@ -26,6 +26,9 @@ void SparseEntitySet<T>::Add(Entity entity, Args&&... args) {
     denseData.push_back(T{std::forward<Args>(args)...});
     denseEntities.push_back(entity);
   }
+#ifndef NDEBUG
+  ValidateInvariants();
+#endif
 }
 template<typename T>
 bool SparseEntitySet<T>::Remove(Entity entity) {
@@ -60,7 +63,9 @@ bool SparseEntitySet<T>::Remove(Entity entity) {
   // remove duplicated last
   denseData.pop_back();
   denseEntities.pop_back();
-
+#ifndef NDEBUG
+  ValidateInvariants();
+#endif
 
   return true;
 }

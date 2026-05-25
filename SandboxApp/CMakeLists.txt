@@ -34,12 +34,14 @@ add_custom_command(TARGET SandboxAppStandalone POST_BUILD
 )
 
 
-target_compile_options(SandboxApp PRIVATE
-        -fsanitize=address -Wall -Wextra -Werror)
-target_link_options(SandboxApp PRIVATE
-        -fsanitize=address)
+# AddressSanitizer - Debug builds only
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(SandboxApp PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(SandboxApp PRIVATE -fsanitize=address)
 
-target_compile_options(SandboxAppStandalone PRIVATE
-        -fsanitize=address -Wall -Wextra -Werror)
-target_link_options(SandboxAppStandalone PRIVATE
-        -fsanitize=address)
+    target_compile_options(SandboxAppStandalone PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(SandboxAppStandalone PRIVATE -fsanitize=address)
+endif()
+
+target_compile_options(SandboxApp PRIVATE -Wall -Wextra -Werror -fno-exceptions)
+target_compile_options(SandboxAppStandalone PRIVATE -Wall -Wextra -Werror -fno-exceptions)

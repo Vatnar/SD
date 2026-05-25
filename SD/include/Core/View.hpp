@@ -12,12 +12,11 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
+#include "Core/IdTypes.hpp"
 #include "Core/LayerList.hpp"
 #include "VLA/Matrix.hpp"
 
 namespace SD {
-
-using ViewId = uint32_t;
 
 // TODO(docs): Document ViewError enum
 //   - Each error code's meaning
@@ -55,7 +54,7 @@ public:
   explicit View(const std::string& name) : mName(name) {
     mCameraViewProjection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
   }
-  virtual ~View() = default;
+  virtual ~View();
 
   void OnUpdate(float dt) { mLayers.Update(dt); }
   virtual void OnGuiRender();
@@ -87,7 +86,7 @@ public:
 
   // --- Identity ---
   const std::string& GetName() const { return mName; }
-  [[nodiscard]] u32 ViewId() const { return mViewId; }
+  [[nodiscard]] ViewId GetViewId() const { return mViewId; }
   [[nodiscard]] bool IsOpen() const { return mOpen; }
   void SetOpen(bool open) { mOpen = open; }
 
@@ -123,7 +122,7 @@ public:
 
   // --- Rendering setup ---
   static VkExtent2D GetImGuiExtent();
-  VkFormat FindDepthFormat();
+  static VkFormat FindDepthFormat();
   [[nodiscard]] vk::RenderPass GetLayeredRenderPass() const { return mLayeredRP.get(); }
   Layer* GetLayerByStage(u32 stage);
 
@@ -136,7 +135,7 @@ private:
   std::string mName;
   LayerList mLayers;
   bool mOpen = true;
-  u32 mViewId = 0;
+  ViewId mViewId;
 
   // ImGui content region (updated each frame in OnGuiRender)
   ImVec2 mContentRegionPos{0, 0};

@@ -1,8 +1,11 @@
-// TODO(docs): Add file-level Doxygen header
-//   - @file RuntimeStateManager.hpp
-//   - @brief State persistence for hot reload support
-//   - Explain the hot reload flow: Serialize -> DLL reload -> Restore
-//   - What state is preserved vs lost during hot reload
+/**
+ * @file RuntimeStateManager.hpp
+ * @brief State persistence for hot reload support
+ *
+ * @note Game state (scenes, entities, components) is externally owned and auto-persists
+ *       across hot reloads. This class does NOT serialize/deserialize ECS state.
+ *       It exists primarily to provide a hook point for future engine-level state transitions.
+ */
 #pragma once
 #include <string>
 #include <unordered_map>
@@ -13,11 +16,10 @@ namespace SD {
 class Application;
 class Scene;
 
-// TODO(docs): Document RuntimeStateManager
-//   - Purpose: Enables game state survival across DLL hot reloads
-//   - Usage pattern (when to call Serialize/Restore)
-//   - Limitations (what cannot be serialized)
-//   - Example integration with hot reload system
+/**
+ * Provides hooks for hot-reload state transitions.
+ * Game state is externally owned and auto-persists across reloads.
+ */
 class RuntimeStateManager {
 public:
   RuntimeStateManager();

@@ -4,6 +4,8 @@
 //   - Overview of the entity-identifier system (index + generation)
 //   - Example usage in context of ECS
 #pragma once
+#include <functional>
+
 #include "Core/types.hpp"
 
 
@@ -20,5 +22,13 @@ struct Entity {
   bool operator==(Entity other) const {
     return index == other.index && generation == other.generation;
   }
+  bool operator!=(Entity other) const { return !(*this == other); }
 };
 } // namespace SD
+
+template<>
+struct std::hash<SD::Entity> {
+  inline std::size_t operator()(SD::Entity e) const noexcept {
+    return std::hash<uint32_t>{}(e.index) ^ (std::hash<uint32_t>{}(e.generation) << 1);
+  }
+};

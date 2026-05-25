@@ -1,10 +1,7 @@
 #pragma once
 
-#include <string>
-#include <optional>
 #include <filesystem>
-
-#include <toml++/toml.h>
+#include <string>
 
 struct HotReloadConfig {
     std::string buildDir = "../build";
@@ -17,7 +14,7 @@ struct HotReloadConfig {
 
 class ConfigLoader {
 public:
-    ConfigLoader(int argc = 0, char* argv[] = nullptr);
+    ConfigLoader(int argc = 0, char** argv = nullptr);
 
     const HotReloadConfig& GetConfig() const { return mConfig; }
 
@@ -26,11 +23,11 @@ private:
     void LoadEngineConfig(const std::filesystem::path& engineDir);
     void LoadCwdConfig();
     void LoadEnvConfig();
-    void LoadCliConfig(int argc, char* argv[]);
+    void LoadCliConfig(int argc, char** argv);
 
     void OverrideFromFile(const std::filesystem::path& path);
     void OverrideFromEnv();
-    void OverrideFromCli(int argc, char* argv[]);
+    void OverrideFromCli(int argc, char** argv);
     
     void ResolvePaths();
 

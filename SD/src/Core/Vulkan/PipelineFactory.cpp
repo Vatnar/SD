@@ -7,28 +7,98 @@
 namespace SD {
 PipelineFactory::PipelineFactory(VkDevice device, ShaderLibrary& shaders) :
   mDevice(device), mShaders(shaders) {
-  SD_ASSERT(device, "Device must be valid");
-  // Use default constructor (which is empty/null) for UniqueHandle with dynamic dispatcher
+  SD_ALWAYS_ASSERT(device, "Device must be valid");
+  // Reserve index 0 as null/invalid
+  mTrackedPipelines.emplace_back(); // Entry 0 is null
+  
+  // Create pipeline cache for better performance
+  vk::PipelineCacheCreateInfo cacheInfo{};
+  auto cacheResult = mDevice.createPipelineCacheUnique(cacheInfo);
+  if (cacheResult.result == vk::Result::eSuccess) {
+    mPipelineCache = std::move(cacheResult.value);
+  } else {
+    SD::Log::Engine::Warn("Failed to create pipeline cache, continuing without caching");
+  }
 }
 
 PipelineFactory::~PipelineFactory() = default;
 
-VkPipeline PipelineFactory::CreateGraphicsPipeline(const PipelineDesc& desc,
-                                                   VkPipelineLayout layout) {
-  SD_ASSERT(desc.renderPass, "Render pass must be valid");
-  SD_ASSERT(layout, "Pipeline layout must be valid");
+PipelineFactory::Handle PipelineFactory::CreateGraphicsPipeline(const PipelineDesc& desc,
+                                                                VkPipelineLayout layout) {
+  SD_ALWAYS_ASSERT(desc.renderPass, "Render pass must be valid");
+  SD_ALWAYS_ASSERT(layout, "Pipeline layout must be valid");
 
   vk::UniquePipeline pipeline;
   VK_CHECK(CreatePipelineInstance(desc, layout, &pipeline));
 
-  VkPipeline raw = pipeline.get();
-  mTrackedPipelines.push_back({std::move(pipeline), desc, layout});
-  return raw;
+  uint32_t index;
+  
+  // Reuse a free slot if available
+  if (!mFreeSlots.empty()) {
+    index = mFreeSlots.back();
+    mFreeSlots.pop_back();
+    
+    // Reuse the slot, increment generation
+    auto& entry = mTrackedPipelines[index];
+    entry.pipeline = std::move(pipeline);
+    entry.desc = desc;
+    entry.layout = layout;
+    entry.generation++; // Increment generation for new use
+    entry.active = true;
+  } else {
+    // Allocate new slot
+    index = static_cast<uint32_t>(mTrackedPipelines.size());
+    mTrackedPipelines.push_back({
+      std::move(pipeline),
+      desc,
+      layout,
+      1, // Generation starts at 1
+      true // active
+    });
+  }
+  
+  return Handle{index, mTrackedPipelines[index].generation};
+}
+
+VkPipeline PipelineFactory::GetPipeline(Handle handle) const {
+  if (!handle || handle.index >= mTrackedPipelines.size()) {
+    return VK_NULL_HANDLE;
+  }
+  
+  const auto& entry = mTrackedPipelines[handle.index];
+  if (!entry.active || entry.generation != handle.generation) {
+    return VK_NULL_HANDLE;
+  }
+  
+  return entry.pipeline.get();
+}
+
+bool PipelineFactory::IsValid(Handle handle) const {
+  if (!handle || handle.index >= mTrackedPipelines.size()) {
+    return false;
+  }
+  
+  const auto& entry = mTrackedPipelines[handle.index];
+  return entry.active && entry.generation == handle.generation;
+}
+
+void PipelineFactory::DestroyPipeline(Handle handle) {
+  if (!IsValid(handle)) {
+    return;
+  }
+  
+  auto& entry = mTrackedPipelines[handle.index];
+  entry.pipeline.reset(); // Destroy the Vulkan pipeline
+  entry.active = false;
+  // Note: We don't increment generation here - the handle becomes invalid
+  // because active=false. If we reuse this slot, generation will be incremented.
+  
+  mFreeSlots.push_back(handle.index);
 }
 
 VkPipelineLayout PipelineFactory::CreatePushConstantLayout(VkShaderStageFlags stages, u32 size) {
-  SD_ASSERT(mDevice, "Device must be valid");
-  SD_ASSERT(size > 0, "Push constant size must be > 0");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(size > 0, "Push constant size must be > 0");
 
   vk::PushConstantRange pushConstantRange{static_cast<vk::ShaderStageFlags>(stages), 0, size};
 
@@ -42,29 +112,48 @@ VkPipelineLayout PipelineFactory::CreatePushConstantLayout(VkShaderStageFlags st
   return raw;
 }
 
-void PipelineFactory::RecreateAllPipelines() {
-  SD_ASSERT(mDevice, "Device must be valid");
+std::vector<std::pair<std::string, std::string>> PipelineFactory::RecreateAllPipelines() {
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
 
+  std::vector<std::pair<std::string, std::string>> failures;
   for (auto& entry : mTrackedPipelines) {
-    if (CreatePipelineInstance(entry.desc, entry.layout, &entry.pipeline) != VkResult::VK_SUCCESS) {
-      Abort("Failed to recreate pipeline during hot-reload");
+    if (!entry.active) continue;
+
+    vk::UniquePipeline newPipeline;
+    VkResult result = CreatePipelineInstance(entry.desc, entry.layout, &newPipeline);
+
+    if (result == VK_SUCCESS) {
+      entry.pipeline = std::move(newPipeline);
+      // Note: Generation stays the same, handles remain valid
+    } else {
+      failures.emplace_back(entry.desc.vertPath, entry.desc.fragPath);
+      SD::Log::Engine::Error("Failed to recreate pipeline during hot-reload for shader: {} / {}",
+                   entry.desc.vertPath, entry.desc.fragPath);
+      // Continue with other pipelines instead of aborting
     }
   }
+  return failures;
 }
 
 VkResult PipelineFactory::CreatePipelineInstance(const PipelineDesc& desc,
                                                  vk::PipelineLayout layout,
                                                  vk::UniquePipeline* pipeline) {
-  SD_ASSERT(mDevice, "Device must be valid");
-  SD_ASSERT(pipeline, "Pipeline output pointer must be valid");
-  SD_ASSERT(!desc.vertPath.empty(), "Vertex shader path must be valid");
-  SD_ASSERT(!desc.fragPath.empty(), "Fragment shader path must be valid");
+  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+  SD_ALWAYS_ASSERT(pipeline, "Pipeline output pointer must be valid");
+  SD_ALWAYS_ASSERT(!desc.vertPath.empty(), "Vertex shader path must be valid");
+  SD_ALWAYS_ASSERT(!desc.fragPath.empty(), "Fragment shader path must be valid");
 
   VkShaderModule vertModule = mShaders.Load(desc.vertPath, "vs_6_0");
   VkShaderModule fragModule = mShaders.Load(desc.fragPath, "ps_6_0");
 
-  SD_ASSERT(vertModule, "Vertex shader module must be valid");
-  SD_ASSERT(fragModule, "Fragment shader module must be valid");
+  if (!vertModule) {
+    SD::Log::Engine::Error("Failed to load vertex shader: {}", desc.vertPath);
+    return VK_ERROR_INITIALIZATION_FAILED;
+  }
+  if (!fragModule) {
+    SD::Log::Engine::Error("Failed to load fragment shader: {}", desc.fragPath);
+    return VK_ERROR_INITIALIZATION_FAILED;
+  }
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {
       {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,

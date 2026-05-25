@@ -18,7 +18,7 @@ public:
     VulkanFramebuffer& GetFramebuffer() { return *mFramebuffer; }
     const std::string& GetName() const { return mName; }
     
-    ImTextureID GetImGuiTextureID() const { return (ImTextureID)mTextureID; }
+    ImTextureID GetImGuiTextureID() const { return reinterpret_cast<ImTextureID>(mTextureID); }
 
 private:
     std::string mName;

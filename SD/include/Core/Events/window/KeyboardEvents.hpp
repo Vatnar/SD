@@ -9,7 +9,7 @@ public:
   int scancode{};
   int mods{};
   bool repeat{};
-  KeyPressedEvent(int key, int mods, int scancode, bool repeat) :
+  KeyPressedEvent(int key, int scancode, int mods, bool repeat) :
     key(key), scancode(scancode), mods(mods), repeat(repeat) {}
 
   EVENT_CLASS_TYPE(KeyPressed)
@@ -23,7 +23,7 @@ public:
   int scancode{};
   int mods{};
 
-  KeyReleasedEvent(int key, int mods, int scancode) : key(key), scancode(scancode), mods(mods) {}
+  KeyReleasedEvent(int key, int scancode, int mods) : key(key), scancode(scancode), mods(mods) {}
 
   EVENT_CLASS_TYPE(KeyReleased)
   EVENT_CLASS_CATEGORY(KeyCategory)

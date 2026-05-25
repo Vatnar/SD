@@ -78,7 +78,7 @@ public:
   }
 
   // Write raw bytes
-  void Write(const void* data, const usize size) const {
+  void Write(const void* data, const usize size) {
     const auto bytes = static_cast<const std::byte*>(data);
     mBuffer.insert(mBuffer.end(), bytes, bytes + size);
   }
@@ -141,7 +141,6 @@ public:
   }
 
   // Read Serializable object
-  // TODO: this doesnt increment the read offset
   void Read(Serializable& obj) { obj.Deserialize(*this); }
 
   // Read VLA::Matrix4x4f
@@ -156,7 +155,7 @@ public:
   void SetOffset(usize offset) { mReadOffset = offset; }
 
   [[nodiscard]] usize GetWrittenSize() const { return mBuffer.size(); }
-  void Clear() const { mBuffer.clear(); }
+  void Clear() { mBuffer.clear(); }
 
   [[nodiscard]] std::span<std::byte> GetSpan() const { return {mBuffer.data(), mBuffer.size()}; }
 

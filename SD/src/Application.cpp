@@ -1,13 +1,16 @@
 #include "Application.hpp"
 
+#include <algorithm>
 #include <dlfcn.h>
 #include <filesystem>
-#include <ranges>
 
 #include "Core/Events/app/AppEvents.hpp"
 #include "Core/Layers/PerformanceLayer.hpp"
-#include "Core/Logging.hpp"
+#include "Core/LayoutManager.hpp"
 #include "Core/SDImGuiContext.hpp"
+#include "Core/Vulkan/VulkanRenderer.hpp"
+#include "GameContext.hpp"
+#include "RuntimeStateManager.hpp"
 
 namespace SD {
 
@@ -18,11 +21,11 @@ ImVec4 ApplyTheme() {
   ImGuiStyle& style = ImGui::GetStyle();
   ImVec4* colors = style.Colors;
 
-  const ImVec4 baseBlack = ImVec4(0.05f, 0.05f, 0.07f, 1.00f);
-  const ImVec4 deepGrey = ImVec4(0.09f, 0.09f, 0.11f, 1.00f);
-  const ImVec4 midGrey = ImVec4(0.14f, 0.14f, 0.17f, 1.00f);
-  const ImVec4 accentIndigo = ImVec4(0.18f, 0.22f, 0.35f, 1.00f);
-  const ImVec4 accentHover = ImVec4(0.24f, 0.28f, 0.45f, 1.00f);
+  constexpr auto baseBlack = ImVec4(0.05f, 0.05f, 0.07f, 1.00f);
+  constexpr auto deepGrey = ImVec4(0.09f, 0.09f, 0.11f, 1.00f);
+  constexpr auto midGrey = ImVec4(0.14f, 0.14f, 0.17f, 1.00f);
+  constexpr auto accentIndigo = ImVec4(0.18f, 0.22f, 0.35f, 1.00f);
+  constexpr auto accentHover = ImVec4(0.24f, 0.28f, 0.45f, 1.00f);
 
   colors[ImGuiCol_WindowBg] = baseBlack;
   colors[ImGuiCol_ChildBg] = baseBlack;
@@ -71,7 +74,8 @@ Application::Application(const ApplicationSpecification& spec, RuntimeStateManag
   mSpec(spec), mHotReloadEnabled(spec.enableHotReload), mGlfwCtx(std::make_unique<GlfwContext>()),
   mVulkanCtx(std::make_unique<VulkanContext>(*mGlfwCtx)),
   mImGuiCtx(std::make_unique<SDImGuiContext>()), mWindowManager(std::make_unique<WindowManager>()),
-  mViewManager(std::make_unique<ViewManager>()), mStateManager(stateManager) {
+  mViewManager(std::make_unique<ViewManager>()), mLayoutManager(std::make_unique<LayoutManager>()),
+  mStateManager(stateManager) {
   sInstance = this;
 
   WindowProps props(spec.name, spec.width, spec.height);
@@ -86,23 +90,41 @@ Application::Application(const ApplicationSpecification& spec, RuntimeStateManag
   if (std::filesystem::exists(fontPath)) {
     ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath, 15.0f);
   } else {
-    SPDLOG_WARN("Could not find font file: assets/fonts/Inter_18pt-Regular.ttf. Falling back to "
-                "default font.");
+    Log::Engine::Warn(
+        "Could not find font file: assets/fonts/Inter_18pt-Regular.ttf. Falling back to "
+        "default font.");
   }
 
-  // 3. Init Renderer
   mRenderer = std::make_unique<VulkanRenderer>(*mVulkanCtx);
   mRenderer->SetClearColor({clearColor.x, clearColor.y, clearColor.z, clearColor.w});
+
+  mLayoutManager->Init();
 }
 
 Application::~Application() {
-  if (mVulkanCtx) {
+  // Wait for GPU to finish all work
+  if (mVulkanCtx && mVulkanCtx->GetVulkanDevice()) {
     (void)mVulkanCtx->GetVulkanDevice()->waitIdle();
   }
+
+  // Clear all layers FIRST (before destroying windows/views)
+  // This ensures OnDetach is called while resources are still valid
+  mGlobalLayers.Clear();
+  if (mViewManager) {
+    mViewManager->Clear();
+  }
+  mScenes.clear();
+
   mWindowManager.reset();
+
+  mImGuiCtx.reset();
+
+  mRenderer.reset();
+
+  mVulkanCtx.reset();
 }
 
-void Application::Run(std::atomic<bool>* externalStop) {
+void Application::Run(const std::atomic<bool>* externalStop) {
   while (mRunning) {
     if (externalStop)
       mRunning = !externalStop->load(std::memory_order_acquire);
@@ -117,22 +139,21 @@ void Application::Frame() {
 
   float dt = mTimer.GetFrameTime();
 
-  // 1. Events
   for (auto& e : mAppEventManager) {
     OnAppEvent(*e);
   }
   mAppEventManager.Clear();
 
-  // 2. Fixed Update
   while (mTimer.ConsumeFixedStep()) {
     for (auto& layer : mGlobalLayers)
       layer->OnFixedUpdate(mTimer.GetFixedTimeStep());
   }
 
-  // 3. ImGui Frame
   mImGuiCtx->BeginFrame();
   mImGuiCtx->BeginDockSpace(mSpec.name);
 
+  if (!ImGui::GetCurrentContext())
+    return;
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Exit", "Alt+F4"))
@@ -140,14 +161,13 @@ void Application::Frame() {
       ImGui::EndMenu();
     }
     mGlobalLayers.OnImGuiMenuBar();
-    for (auto& [id, data] : mWindowManager->GetWindows())
+    for (auto& data : mWindowManager->GetWindows() | std::views::values)
       data.viewLayers.OnImGuiMenuBar();
-    for (auto& [id, view] : mViewManager->GetViews())
+    for (auto& view : mViewManager->GetViews() | std::views::values)
       view->GetLayers().OnImGuiMenuBar();
     ImGui::EndMainMenuBar();
   }
 
-  // 4. Update
   for (auto& layer : mGlobalLayers) {
     layer->OnUpdate(dt);
     layer->OnGuiRender();
@@ -159,25 +179,21 @@ void Application::Frame() {
   mImGuiCtx->EndDockSpace();
   mImGuiCtx->EndFrame();
 
-  // 5. Hot Reload Polling
   if (mHotReloadEnabled) {
     mHotReloadTimer += dt;
     if (mHotReloadTimer >= 0.5f) {
       mHotReloadTimer = 0.0f;
       auto changed = mRenderer->GetShaderLibrary().CheckForChanges();
       if (!changed.empty()) {
-        SPDLOG_INFO("Shader changes detected: {}. Reloading...", changed.size());
+        Log::Engine::Info("Shader changes detected: {}. Reloading...", changed.size());
         ReloadShaders();
       }
     }
   }
-
-  // 6. Render
   mWindowManager->DrawWindows(*mViewManager);
 
   mTimer.EndWork();
 
-  // 7. Viewports
   mImGuiCtx->UpdatePlatformWindows();
   mWindowManager->ProcessPendingCloses();
   mViewManager->CleanupClosedViews();
@@ -196,17 +212,17 @@ void Application::OnAppEvent(Event& e) {
 Scene* Application::CreateScene(const std::string& name) {
   for (auto& scene : mScenes) {
     if (scene->GetName() == name) {
-      SPDLOG_WARN("Scene '{}' already exists, returning existing scene", name);
+      SD::Log::Engine::Warn("Scene '{}' already exists, returning existing scene", name);
       return scene.get();
     }
   }
   auto scene = std::make_unique<Scene>(name);
-  Scene* ptr = scene.get();
   mScenes.push_back(std::move(scene));
-  return ptr;
+
+  return mScenes.back().get();
 }
 
-Scene* Application::GetScene(const std::string& name) {
+Scene* Application::GetScene(const std::string& name) const {
   for (auto& scene : mScenes) {
     if (scene->GetName() == name) {
       return scene.get();
@@ -221,13 +237,13 @@ std::vector<Scene*> Application::GetScenes() {
     scenes.push_back(scene.get());
   }
   auto addUnique = [&](Scene* s) {
-    if (s && std::find(scenes.begin(), scenes.end(), s) == scenes.end())
+    if (s && std::ranges::find(scenes, s) == scenes.end())
       scenes.push_back(s);
   };
 
   for (auto& layer : mGlobalLayers)
     addUnique(layer->GetScene());
-  for (auto& [id, data] : mWindowManager->GetWindows()) {
+  for (auto& data : mWindowManager->GetWindows() | std::views::values) {
     for (auto& layer : data.viewLayers)
       addUnique(layer->GetScene());
   }
@@ -243,62 +259,65 @@ void Application::SetGameContext(GameContext* ctx) {
 }
 
 void Application::ClearGameLayers() {
-  try {
-    mGlobalLayers.Clear();
+  mGlobalLayers.Clear();
+  if (mViewManager) {
     mViewManager->Clear();
-    mScenes.clear();
-  } catch (const std::exception& e) {
-    SPDLOG_ERROR("Exception in ClearGameLayers: {}", e.what());
   }
+  mScenes.clear();
 }
 
 void Application::ReloadGame() {
-  SPDLOG_INFO("Starting game reload...");
-  try {
-    if (mGameContext) {
-      mGameContext->OnUnload();
-      delete mGameContext;
-      mGameContext = nullptr;
-    }
+  Log::Engine::Info("Starting game reload...");
 
-    ClearGameLayers();
-
-    // Close old handle BEFORE opening new one, so dlopen loads fresh code
-    if (mGameHandle) {
-      dlclose(mGameHandle);
-      mGameHandle = nullptr;
-    }
-
-    void* handle = dlopen("libSandboxApp.so", RTLD_NOW | RTLD_GLOBAL);
-    if (!handle) {
-      SPDLOG_ERROR("Failed to reload game DLL: {}", dlerror());
-      return;
-    }
-    mGameHandle = handle;
-
-    using CreateGameFn = GameContext* (*)(RuntimeStateManager*);
-    auto* create = reinterpret_cast<CreateGameFn>(dlsym(handle, "CreateGame"));
-    if (!create) {
-      SPDLOG_ERROR("Failed to find CreateGame: {}", dlerror());
-      dlclose(handle);
-      return;
-    }
-
-    mGameContext = create(mStateManager);
-    mGameContext->OnLoad(*this);
-
-    mStateManager->Restore(this);
-
-    SPDLOG_INFO("Game reloaded successfully");
-  } catch (const std::exception& e) {
-    SPDLOG_ERROR("Exception during reload: {}", e.what());
+  if (mGameContext) {
+    mGameContext->OnUnload();
+    delete mGameContext;
+    mGameContext = nullptr;
   }
+
+  ClearGameLayers();
+
+  if (mGameHandle) {
+    dlclose(mGameHandle);
+    mGameHandle = nullptr;
+  }
+
+  void* handle = dlopen(mSpec.gameSoPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  if (!handle) {
+    Log::Engine::Error("Failed to reload game DLL: {}", dlerror());
+    return;
+  }
+  mGameHandle = handle;
+
+  using CreateGameFn = GameContext* (*)(RuntimeStateManager*);
+  auto* create = reinterpret_cast<CreateGameFn>(dlsym(handle, "CreateGame"));
+  if (!create) {
+    Log::Engine::Error("Failed to find CreateGame: {}", dlerror());
+    dlclose(handle);
+    return;
+  }
+
+  mGameContext = create(mStateManager);
+  if (!mGameContext) {
+    Log::Engine::Error("Game DLL returned null from CreateGame");
+    dlclose(handle);
+    mGameHandle = nullptr;
+    return;
+  }
+  mGameContext->OnLoad(*this);
+
+  mStateManager->Restore(this);
+
+  Log::Engine::Info("Game reloaded successfully");
 }
 
-void Application::ReloadShaders() {
+void Application::ReloadShaders() const {
   (void)mVulkanCtx->GetVulkanDevice()->waitIdle();
   mRenderer->GetShaderLibrary().ClearCache();
-  mRenderer->GetPipelineFactory().RecreateAllPipelines();
+  auto failures = mRenderer->GetPipelineFactory().RecreateAllPipelines();
+  if (!failures.empty()) {
+    Log::Engine::Warn("{} pipeline(s) failed to recreate during hot reload", failures.size());
+  }
 }
 
 } // namespace SD

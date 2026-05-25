@@ -68,8 +68,8 @@ Shader2DLayer::Shader2DLayer(Scene& scene, VulkanContext& vulkanCtx, VulkanWindo
                              const std::vector<std::string>& texturePaths) :
   Layer(scene), mVulkanCtx(vulkanCtx), mWindow(window), mTexturePaths(texturePaths),
   mClearColor({0.0f, 0.0f, 0.0f, 1.0f}) {
-  SD_ASSERT(vulkanCtx.GetVulkanDevice(), "VulkanContext must have valid device");
-  SD_ASSERT(window.GetSwapchain(), "Window must have valid swapchain");
+  SD_ALWAYS_ASSERT(vulkanCtx.GetVulkanDevice(), "VulkanContext must have valid device");
+  SD_ALWAYS_ASSERT(window.GetSwapchain(), "Window must have valid swapchain");
 }
 
 
@@ -88,7 +88,7 @@ void Shader2DLayer::OnAttach() {
       mTexturePaths.empty() ? "assets/textures/example.jpg" : mTexturePaths[0];
   auto textureResult = CreateTexture(device.get(), physicalDevice, queue, commandPool, texturePath);
   if (textureResult) {
-    mTexture = std::move(textureResult.value());
+    mTexture = std::move(*textureResult);
   } else {
     Abort(textureResult.error());
   }
@@ -204,8 +204,8 @@ void Shader2DLayer::OnDetach() {
   CheckVulkanRes(device->waitIdle(), "Failed to wait for device to idle");
 }
 void Shader2DLayer::UpdateUniformBuffer(u32 currentImage) const {
-  SD_ASSERT(currentImage < mUniformBuffers.size(), "Frame index out of bounds");
-  SD_ASSERT(mUniformBuffersMapped[currentImage], "Uniform buffer must be mapped");
+  SD_ALWAYS_ASSERT(currentImage < mUniformBuffers.size(), "Frame index out of bounds");
+  SD_ALWAYS_ASSERT(mUniformBuffersMapped[currentImage], "Uniform buffer must be mapped");
 
   ViewProjection vp{};
   std::ranges::fill(vp.proj, 0.0f);
@@ -247,15 +247,15 @@ void Shader2DLayer::UpdateUniformBuffer(u32 currentImage) const {
   memcpy(mUniformBuffersMapped[currentImage], &vp, sizeof(vp));
 }
 void Shader2DLayer::OnRender(vk::CommandBuffer cmd) {
-  SD_ASSERT(mPipeline, "Pipeline must be valid");
-  SD_ASSERT(mPipelineLayout, "Pipeline layout must be valid");
-  SD_ASSERT(mVertexBuffer, "Vertex buffer must be valid");
-  SD_ASSERT(!mDescriptorSets.empty(), "Descriptor sets must not be empty");
+  SD_ALWAYS_ASSERT(mPipeline, "Pipeline must be valid");
+  SD_ALWAYS_ASSERT(mPipelineLayout, "Pipeline layout must be valid");
+  SD_ALWAYS_ASSERT(mVertexBuffer, "Vertex buffer must be valid");
+  SD_ALWAYS_ASSERT(!mDescriptorSets.empty(), "Descriptor sets must not be empty");
 
   // Hack: calculate frame index
   static u32 frameIndex = 0;
   frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-  SD_ASSERT(frameIndex < mDescriptorSets.size(), "Frame index out of bounds");
+  SD_ALWAYS_ASSERT(frameIndex < mDescriptorSets.size(), "Frame index out of bounds");
   UpdateUniformBuffer(frameIndex);
 
 
@@ -269,39 +269,40 @@ void Shader2DLayer::OnRender(vk::CommandBuffer cmd) {
 void Shader2DLayer::OnEvent(Event& e) {
   switch (e.GetEventType()) {
     case EventType::KeyReleased: {
-      if (const auto key = dynamic_cast<KeyReleasedEvent&>(e); GLFW_KEY_SPACE == key.key) {
+      if (const auto* key = dynamic_cast<KeyReleasedEvent*>(&e);
+          key && GLFW_KEY_SPACE == key->key) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     case EventType::MouseReleased: {
-      if (const auto button = dynamic_cast<MouseReleasedEvent&>(e);
-          GLFW_MOUSE_BUTTON_LEFT == button.button) {
+      if (const auto* button = dynamic_cast<MouseReleasedEvent*>(&e);
+          button && GLFW_MOUSE_BUTTON_LEFT == button->button) {
         mClearColor = std::array{0.0f, 0.0f, 0.0f, 1.0f};
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     case EventType::MousePressed: {
-      if (const auto button = dynamic_cast<MousePressedEvent&>(e);
-          GLFW_MOUSE_BUTTON_LEFT == button.button) {
+      if (const auto* button = dynamic_cast<MousePressedEvent*>(&e);
+          button && GLFW_MOUSE_BUTTON_LEFT == button->button) {
         mClearColor = std::array{0.0f, 1.0f, 0.0f, 1.0f};
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     case EventType::KeyPressed: {
-      if (const auto key = dynamic_cast<KeyPressedEvent&>(e);
-          GLFW_KEY_SPACE == key.key && false == key.repeat) {
+      if (const auto* key = dynamic_cast<KeyPressedEvent*>(&e);
+          key && GLFW_KEY_SPACE == key->key && false == key->repeat) {
         mClearColor = std::array{1.0f, 0.0f, 0.0f, 1.0f};
-        e.isHandled = true;
-      } else if (key.key == GLFW_KEY_RIGHT && !key.repeat) {
+        e.MarkHandled();
+      } else if (key && key->key == GLFW_KEY_RIGHT && !key->repeat) {
         mCurrentShaderIndex = (mCurrentShaderIndex + 1) % mShaderPaths.size();
         CreateGraphicsPipeline();
-        e.isHandled = true;
-      } else if (key.key == GLFW_KEY_LEFT && !key.repeat) {
+        e.MarkHandled();
+      } else if (key && key->key == GLFW_KEY_LEFT && !key->repeat) {
         mCurrentShaderIndex =
             (mCurrentShaderIndex == 0) ? mShaderPaths.size() - 1 : mCurrentShaderIndex - 1;
         CreateGraphicsPipeline();
-        e.isHandled = true;
+        e.MarkHandled();
       }
     } break;
     default:

@@ -4,9 +4,18 @@
 #include "Application.hpp"
 #include "Core/ECS/Components.hpp"
 #include "Core/Layers/EngineDebugLayer.hpp"
+#include "Core/Vulkan/VulkanRenderer.hpp"
 #include "GameContext.hpp"
 #include "GameRenderLayer.hpp"
+#include "Logging.hpp"
 #include "RuntimeStateManager.hpp"
+
+static void RegisterGameCategories() {
+  SD::Log::RegisterCategory("Game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+  SD::Log::RegisterCategory("Game/Combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
+  SD::Log::RegisterCategory("Game/UI", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
+  SD::Log::RegisterCategory("Game/Audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
+}
 
 class SandboxGame : public SD::GameContext {
 public:
@@ -15,8 +24,6 @@ public:
   void OnLoad(SD::Application& app) override {
     mSharedScene = app.CreateScene("MainScene");
     mAnotherScene = app.CreateScene("AnotherScene");
-
-    SD::WindowId mainWin = 0;
 
     auto& gameView = app.CreateView<SD::View>("Game");
     auto& renderer = app.GetRenderer();
@@ -30,36 +37,35 @@ public:
     VkPipelineLayout pushLayout =
         pipelines.CreatePushConstantLayout(VK_SHADER_STAGE_VERTEX_BIT, sizeof(Push));
 
-    SD::PipelineFactory::PipelineDesc worldDesc{
-        .vertPath = "assets/engine/shaders/world.vert",
-        .fragPath = "assets/engine/shaders/world.frag",
-        .renderPass = gameView.GetLayeredRenderPass(),
-        .subpass = 1};
+    SD::PipelineFactory::PipelineDesc worldDesc{.vertPath = "assets/engine/shaders/world.vert",
+                                                .fragPath = "assets/engine/shaders/world.frag",
+                                                .renderPass = gameView.GetLayeredRenderPass(),
+                                                .subpass = 1};
     VkRenderPass pass = gameView.GetLayeredRenderPass();
     SD_CORE_ASSERT(pass, "Null renderpass");
 
-    VkPipeline worldPipe = pipelines.CreateGraphicsPipeline(worldDesc, pushLayout);
-    SD_CORE_ASSERT(worldPipe, "Pipeline creation failed");
+    auto worldPipeHandle = pipelines.CreateGraphicsPipeline(worldDesc, pushLayout);
+    SD_CORE_ASSERT(worldPipeHandle, "Pipeline creation failed");
 
     SD::PipelineFactory::PipelineDesc wireDesc = worldDesc;
     wireDesc.polygonMode = VK_POLYGON_MODE_LINE;
-    VkPipeline wirePipe = pipelines.CreateGraphicsPipeline(wireDesc, pushLayout);
+    auto wirePipeHandle = pipelines.CreateGraphicsPipeline(wireDesc, pushLayout);
 
-    gameView.PushLayer<GameRenderLayer>(1, "GameRender", mSharedScene, worldPipe, wirePipe,
-                                        pushLayout);
+    gameView.PushLayer<GameRenderLayer>(1, "GameRender", mSharedScene, worldPipeHandle,
+                                        wirePipeHandle, pushLayout, &pipelines);
     app.PushGlobalLayer<SD::EngineDebugLayer>(mSharedScene);
 
     auto ent = mSharedScene->em.Create();
     mSharedScene->em.AddComponent<SD::DebugName>(ent, "Triangle");
-    mSharedScene->em.AddComponent<SD::Transform>(ent, VLA::Matrix4x4f::Identity);
+    mSharedScene->em.AddComponent<SD::Transform>(ent, VLA::Matrix4x4f::Identity());
     mSharedScene->em.AddComponent<SD::Renderable>(ent, SD::Renderable{0, 0, 1, 1});
 
     auto ent2 = mSharedScene->em.Create();
-    auto mat2 = VLA::Matrix4x4f::Identity;
+    auto mat2 = VLA::Matrix4x4f::Identity();
 
     mat2.Column(3) = {3, 0, 0, 1};
     mSharedScene->em.AddComponent<SD::DebugName>(ent2, "Better triangle");
-    mSharedScene->em.AddComponent<SD::Transform>(ent2, VLA::Matrix4x4f::Identity);
+    mSharedScene->em.AddComponent<SD::Transform>(ent2, VLA::Matrix4x4f::Identity());
     mSharedScene->em.AddComponent<SD::Renderable>(ent2, SD::Renderable{0, 0, 1, 1});
 
     if (mStateManager && mStateManager->HasState()) {
@@ -92,6 +98,8 @@ private:
 int main() {
   SD::Log::Init();
 
+  SD::Log::Game::Info("Starting game");
+
   std::unique_ptr<SD::RuntimeStateManager> stateManager;
   stateManager = std::make_unique<SD::RuntimeStateManager>();
 
@@ -111,9 +119,10 @@ int main() {
 
   app->SetGameContext(game.get());
 
+  RegisterGameCategories();
   game->OnLoad(*app);
 
-  std::atomic<bool> stopFlag{false};
+  std::atomic stopFlag{false};
   app->Run(&stopFlag);
 
   return 0;

@@ -52,10 +52,10 @@ public:
   template<typename T>
     requires std::derived_from<T, Event>
   void ClearType() {
-    auto [new_end, _] = std::ranges::remove_if(
+    auto ret = std::ranges::remove_if(
         mEvents, [](const auto& e) { return e->GetEventType() == T::GetStaticType(); });
 
-    mEvents.erase(new_end, mEvents.end());
+    mEvents.erase(ret.begin(), mEvents.end());
   }
 
 
@@ -75,7 +75,9 @@ public:
   template<typename T, typename F>
   bool Dispatch(const F& func) {
     if (mEvent.GetEventType() == T::GetStaticType()) {
-      mEvent.isHandled |= func(static_cast<T&>(mEvent));
+      if (func(static_cast<T&>(mEvent))) {
+        mEvent.MarkHandled();
+      }
       return true;
     }
     return false;

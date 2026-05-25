@@ -6,6 +6,7 @@
 //   - When to use each subtype
 #pragma once
 
+#include "Core/IdTypes.hpp"
 #include "Events/Event.hpp"
 #include "Scene.hpp"
 #include "Vulkan/VulkanConfig.hpp"
@@ -29,7 +30,7 @@ public:
   virtual ~Layer() = default;
 
   explicit Layer(const std::string& name = "Layer", Scene* scene = nullptr) :
-    mDebugName(name), mScene(scene), mStageId(0), mViewId(0) {}
+    mDebugName(name), mScene(scene), mStageId(0), mViewId{} {}
 
   virtual void OnAttach() {}
   virtual void OnDetach() {}
@@ -58,7 +59,7 @@ protected:
   std::string mDebugName;
   Scene* mScene = nullptr;
   int mStageId;
-  u32 mViewId;
+  ViewId mViewId;
   View* mView = nullptr;
 
   friend class View;

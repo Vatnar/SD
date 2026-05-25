@@ -35,6 +35,64 @@ If you want to redistribute, OEM, or sell a product based on this engine itself 
 
 ---
 
+## Building
+
+### Prerequisites
+
+- CMake 3.25+
+- C++23 compatible compiler (GCC 13+, Clang 16+)
+- Vulkan SDK
+- GLFW dependencies (X11 or Wayland development libraries)
+
+### Quick Build
+
+```bash
+# Configure
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+# Build
+cmake --build build --target HotReloadApp -j$(nproc)
+```
+
+### Using ccache (Recommended)
+
+[ccache](https://ccache.dev) dramatically speeds up incremental builds by caching compiled object files.
+
+**Install:**
+```bash
+sudo apt install ccache    # Debian/Ubuntu
+brew install ccache        # macOS
+```
+
+**Configure:**
+
+ccache is automatically detected and enabled by CMake. To verify:
+```bash
+cmake -S . -B build
+# Look for: -- ccache enabled: /usr/bin/ccache
+```
+
+**Usage:**
+```bash
+# First build populates the cache
+cmake --build build
+
+# Subsequent builds are much faster!
+cmake --build build  # Cache hits: ~1-2s per file vs ~13s
+```
+
+**Expected Speedup:**
+- First build: Same (~9 min)
+- Incremental changes: ~1-2s per file (cache hit)
+- Rebuild same code: ~5-10s total (100% cache hit)
+
+**Clear cache if needed:**
+```bash
+ccache -C
+```
+
+---
+
 ## Hot Reloading
 
 SD supports hot reloading of game code for fast iteration. The system watches your compiled game `.so` and reloads automatically when you rebuild.

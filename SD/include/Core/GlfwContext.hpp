@@ -25,11 +25,8 @@ class GlfwContext {
 public:
   GlfwContext() {
     // Set GLFW error callback
-    sErrorCallback = [this](int errorCode, const char* description) {
-      if (auto logger = spdlog::get("engine")) {
-        std::string desc(description);
-        logger->error("Glfw: ERROR:{}\n{}", errorCode, desc);
-      }
+    sErrorCallback = [](int errorCode, const char* description) {
+      SD::Log::Engine::Error("Glfw: ERROR:{}\n{}", errorCode, description);
     };
     glfwSetErrorCallback(&GlfwContext::GlfwErrorCallbackTrampoline);
 
@@ -45,8 +42,7 @@ public:
   GlfwContext& operator=(GlfwContext&&) = delete;
 
   ~GlfwContext() {
-    if (auto logger = spdlog::get("engine"))
-      logger->info("Shutting down Glfw");
+    SD::Log::Engine::Info("Shutting down Glfw");
 
     glfwTerminate();
   }

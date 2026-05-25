@@ -9,7 +9,6 @@
 #include <iostream>
 #include <limits>
 #include <source_location>
-#include <spdlog/spdlog.h>
 #include <stb_image.h>
 
 #include "Core/Base.hpp"
@@ -35,25 +34,26 @@ namespace SD {
       Abort("Vulkan error: " #x); \
   } while (0)
 
-// TODO(docs): Document SD_CORE_ASSERT and SD_ASSERT macros
-//   - Difference between debug and release behavior
-//   - When to use assertions vs error handling
+// SD_DEBUG_ASSERT — debug builds only. Elided in release (NDEBUG).
+// SD_ALWAYS_ASSERT — always on, even in release.
+// Both accept an optional custom message after the condition.
+// Example: SD_ALWAYS_ASSERT(ptr != nullptr, "Pointer was null after allocation");
 #ifdef NDEBUG
-#define SD_CORE_ASSERT(x, ...) ((void)0)
+#define SD_DEBUG_ASSERT(x, ...) ((void)0)
 #else
-#define SD_CORE_ASSERT(x, ...)                                   \
+#define SD_DEBUG_ASSERT(x, ...)                                   \
   do {                                                           \
     if (!(x)) {                                                  \
-      SD::Log::Error("ASSERT {}:{} {}", __FILE__, __LINE__, #x); \
+      SD::Log::Engine::Error("ASSERT {}:{} {}: {}", __FILE__, __LINE__, #x, ##__VA_ARGS__); \
       SD::Abort();                                               \
     }                                                            \
   } while (0)
 #endif
 
-#define SD_ASSERT(x, ...)                                        \
+#define SD_ALWAYS_ASSERT(x, ...)                                        \
   do {                                                           \
     if (!(x)) {                                                  \
-      SD::Log::Error("ASSERT {}:{} {}", __FILE__, __LINE__, #x); \
+      SD::Log::Engine::Error("ASSERT {}:{} {}: {}", __FILE__, __LINE__, #x, ##__VA_ARGS__); \
       SD::Abort();                                               \
     }                                                            \
   } while (0)
@@ -299,12 +299,15 @@ inline std::expected<Texture, std::string> CreateTexture(const vk::Device& devic
   return Texture{std::move(image), std::move(imageMemory), std::move(imageView)};
 }
 
-// TODO(docs): Document CreateShaderModule function
-//   - Purpose: Create a Vulkan shader module from SPIR-V bytecode
-//   - Input format (vector<char> of SPIR-V)
-//   - Example usage with shader loading
+/**
+ * Create a Vulkan shader module from SPIR-V bytecode.
+ *
+ * @note The input buffer must be 4-byte aligned. SPIR-V files from DXC are,
+ *       but if loading from arbitrary sources, ensure alignment before calling.
+ */
 inline vk::UniqueShaderModule CreateShaderModule(const vk::Device& device,
                                                  const std::vector<char>& code) {
+  SD_ALWAYS_ASSERT(code.size() % 4 == 0, "SPIR-V code size must be a multiple of 4");
   vk::ShaderModuleCreateInfo createInfo({}, code.size(),
                                         reinterpret_cast<const uint32_t*>(code.data()));
   return CheckVulkanResVal(device.createShaderModuleUnique(createInfo),

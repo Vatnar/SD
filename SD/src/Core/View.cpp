@@ -1,18 +1,43 @@
 #include "Core/View.hpp"
 
+#include <limits>
+
 #include "Application.hpp"
+#include "Core/SDImGuiContext.hpp"
 #include "Utils/Utils.hpp"
+
+SD::View::~View() {
+  // Detach layers first while resources are still valid
+  for (auto& layer : mLayersByStage) {
+    if (layer) {
+      layer->OnDetach();
+      layer.reset();
+    }
+  }
+  mLayersByStage.clear();
+
+  CleanupLayeredRender();
+}
 
 VkExtent2D SD::View::GetImGuiExtent() {
   const ImVec2 size = ImGui::GetContentRegionAvail();
-  return {static_cast<u32>(size.x), static_cast<u32>(size.y)};
+
+  auto clampToU32 = [](float v) -> u32 {
+    if (v <= 0.0f)
+      return 1;
+    if (v >= static_cast<float>(std::numeric_limits<u32>::max()))
+      return std::numeric_limits<u32>::max() - 1;
+    return static_cast<u32>(v);
+  };
+
+  return {clampToU32(size.x), clampToU32(size.y)};
 }
 VkFormat SD::View::FindDepthFormat() {
-  std::vector<VkFormat> depthFormats = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+  constexpr std::vector depthFormats = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
                                         VK_FORMAT_D24_UNORM_S8_UINT};
 
   auto physicalDevice = Application::Get().GetVulkanContext().GetPhysicalDevice();
-  SD_ASSERT(physicalDevice, "Physical device must be valid");
+  SD_ALWAYS_ASSERT(physicalDevice, "Physical device must be valid");
 
   for (const auto& format : depthFormats) {
     VkFormatProperties props;
@@ -29,6 +54,8 @@ VkFormat SD::View::FindDepthFormat() {
 void SD::View::OnGuiRender() {
   if (!mOpen)
     return;
+  if (!ImGui::GetCurrentContext())
+    return;
   if (ImGui::Begin(mName.c_str(), &mOpen)) {
     VkExtent2D currentExtent = GetImGuiExtent();
     if (currentExtent.width != mExtent.width || currentExtent.height != mExtent.height) {
@@ -39,7 +66,7 @@ void SD::View::OnGuiRender() {
 
     mLayers.GuiRender();
     if (mDisplayTexDS != VK_NULL_HANDLE) {
-      ImGui::Image((ImTextureID)mDisplayTexDS, ImGui::GetContentRegionAvail());
+      ImGui::Image(reinterpret_cast<ImTextureID>(mDisplayTexDS), ImGui::GetContentRegionAvail());
     }
   }
   ImGui::End();
@@ -50,15 +77,16 @@ void SD::View::OnGuiRender() {
 // }
 
 void SD::View::SetupLayeredRender(u32 maxStages, VkExtent2D initialExtent) {
-  SD_ASSERT(initialExtent.width > 0 && initialExtent.height > 0, "Initial extent must be valid");
-  SD_ASSERT(maxStages > 0, "Must have at least one stage");
+  SD_ALWAYS_ASSERT(initialExtent.width > 0 && initialExtent.height > 0,
+                   "Initial extent must be valid");
+  SD_ALWAYS_ASSERT(maxStages > 0, "Must have at least one stage");
 
   CleanupLayeredRender();
 
   mExtent = initialExtent;
 
   // This ensures projection is set up correctly for the initial extent
-  float aspect = (float)mExtent.width / (float)mExtent.height;
+  float aspect = static_cast<float>(mExtent.width) / static_cast<float>(mExtent.height);
   AspectMode effectiveMode = mAspectMode;
   if (mAspectMode == AspectMode::BestFit) {
     effectiveMode = (aspect > 1.0f) ? AspectMode::FixedHeight : AspectMode::FixedWidth;
@@ -80,11 +108,11 @@ void SD::View::CreateVulkanResources() {
   VmaAllocator allocator = vulkanContext.GetVmaAllocator();
   auto extent = mExtent;
 
-  SD_ASSERT(vulkanContext.GetVulkanDevice(), "Vulkan device must be valid");
-  SD_ASSERT(allocator, "VMA allocator must be valid");
-  SD_ASSERT(extent.width > 0 && extent.height > 0, "Extent must be valid");
+  SD_ALWAYS_ASSERT(vulkanContext.GetVulkanDevice(), "Vulkan device must be valid");
+  SD_ALWAYS_ASSERT(allocator, "VMA allocator must be valid");
+  SD_ALWAYS_ASSERT(extent.width > 0 && extent.height > 0, "Extent must be valid");
 
-  // 1. Color image (device-local)
+  // Color image (device-local)
   VkImageCreateInfo colorInfo{
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .pNext = {},
@@ -109,7 +137,7 @@ void SD::View::CreateVulkanResources() {
 
   VK_CHECK(vmaCreateImage(allocator, &colorInfo, &colorAllocInfo, &mColorImage, &mColorAllocation,
                           nullptr));
-  SD_ASSERT(mColorImage != VK_NULL_HANDLE, "Color image must be created");
+  SD_ALWAYS_ASSERT(mColorImage != VK_NULL_HANDLE, "Color image must be created");
 
   vk::ImageViewCreateInfo colorViewInfo{
       {},
@@ -122,9 +150,9 @@ void SD::View::CreateVulkanResources() {
   mColorView =
       CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createImageViewUnique(colorViewInfo),
                         "Failed to create color view: ");
-  SD_ASSERT(mColorView, "Color view must be created");
+  SD_ALWAYS_ASSERT(mColorView, "Color view must be created");
 
-  // 2. Depth image
+  //  Depth image
   VkFormat depthFormat = FindDepthFormat();
   VkImageCreateInfo depthInfo = colorInfo;
   depthInfo.format = depthFormat;
@@ -132,7 +160,7 @@ void SD::View::CreateVulkanResources() {
 
   VK_CHECK(vmaCreateImage(allocator, &depthInfo, &colorAllocInfo, &mDepthImage, &mDepthAllocation,
                           nullptr));
-  SD_ASSERT(mDepthImage != VK_NULL_HANDLE, "Depth image must be created");
+  SD_ALWAYS_ASSERT(mDepthImage != VK_NULL_HANDLE, "Depth image must be created");
 
   vk::ImageViewCreateInfo depthViewInfo{
       {},
@@ -145,20 +173,19 @@ void SD::View::CreateVulkanResources() {
   mDepthView =
       CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createImageViewUnique(depthViewInfo),
                         "Failed to create depth view: ");
-  SD_ASSERT(mDepthView, "Depth view must be created");
+  SD_ALWAYS_ASSERT(mDepthView, "Depth view must be created");
 
-  // 3. RenderPass attachments
+  //  RenderPass attachments
   vk::AttachmentDescription colorAttach(
       {}, vk::Format::eR8G8B8A8Unorm, vk::SampleCountFlagBits::e1, vk::AttachmentLoadOp::eClear,
       vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
       vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
       vk::ImageLayout::eShaderReadOnlyOptimal);
-
   vk::AttachmentDescription depthAttach(
-      {}, (vk::Format)depthFormat, vk::SampleCountFlagBits::e1, vk::AttachmentLoadOp::eClear,
-      vk::AttachmentStoreOp::eDontCare, vk::AttachmentLoadOp::eDontCare,
-      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eDepthStencilAttachmentOptimal);
+      {}, static_cast<vk::Format>(depthFormat), vk::SampleCountFlagBits::e1,
+      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
+      vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
+      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
   vk::AttachmentDescription attachments[2] = {colorAttach, depthAttach};
 
   // Subpass references
@@ -200,7 +227,7 @@ void SD::View::CreateVulkanResources() {
         subpasses, (u32)std::size(dependencies), dependencies};
     mLayeredRP = CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createRenderPassUnique(rpInfo),
                                    "Failed to create render pass: ");
-    SD_ASSERT(mLayeredRP, "Render pass must be created");
+    SD_ALWAYS_ASSERT(mLayeredRP, "Render pass must be created");
   }
 
   // Framebuffer (now with valid renderPass)
@@ -210,16 +237,16 @@ void SD::View::CreateVulkanResources() {
   mLayeredFramebuffer =
       CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createFramebufferUnique(fbInfo),
                         "Failed to create framebuffer: ");
-  SD_ASSERT(mLayeredFramebuffer, "Framebuffer must be created");
+  SD_ALWAYS_ASSERT(mLayeredFramebuffer, "Framebuffer must be created");
 
   auto& imguiCtx = application.GetImGuiContext();
   mDisplayTexDS = imguiCtx.CreateTextureFromView(mColorView.get());
 }
 
 void SD::View::OnRender(vk::CommandBuffer cmd) {
-  SD_ASSERT(mLayeredRP, "Render pass must be valid");
-  SD_ASSERT(mLayeredFramebuffer, "Framebuffer must be valid");
-  SD_ASSERT(mExtent.width > 0 && mExtent.height > 0, "Extent must be valid");
+  SD_ALWAYS_ASSERT(mLayeredRP, "Render pass must be valid");
+  SD_ALWAYS_ASSERT(mLayeredFramebuffer, "Framebuffer must be valid");
+  SD_ALWAYS_ASSERT(mExtent.width > 0 && mExtent.height > 0, "Extent must be valid");
 
   auto* gameLayer = GetLayerByStage(1);
   if (!gameLayer) {
@@ -241,7 +268,8 @@ void SD::View::OnRender(vk::CommandBuffer cmd) {
   cmd.beginRenderPass(beginInfo, vk::SubpassContents::eInline);
 
   // Viewport/scissor once
-  vk::Viewport viewport{0, 0, (float)mExtent.width, (float)mExtent.height, 0, 1};
+  vk::Viewport viewport{0, 0, static_cast<float>(mExtent.width), static_cast<float>(mExtent.height),
+                        0, 1};
   cmd.setViewport(0, viewport);
   vk::Rect2D scissor{
       {0, 0},
@@ -251,14 +279,30 @@ void SD::View::OnRender(vk::CommandBuffer cmd) {
 
   // Subpass 1: Game layer only (for now)
   cmd.nextSubpass(vk::SubpassContents::eInline);
-  if (auto* gameLayer = GetLayerByStage(1))
-    gameLayer->OnRender(cmd);
+  gameLayer->OnRender(cmd);
 
   cmd.endRenderPass();
 }
 
 void SD::View::CleanupLayeredRender() {
   auto& application = SD::Application::Get();
+
+  // Check if Vulkan context is still valid
+  if (!application.GetVulkanContext().GetVulkanDevice()) {
+    SD::Log::Engine::Warn("Vulkan context invalid during view cleanup, resetting handles only");
+    // Just reset handles, can't properly clean up
+    mColorImage = VK_NULL_HANDLE;
+    mColorAllocation = VK_NULL_HANDLE;
+    mDepthImage = VK_NULL_HANDLE;
+    mDepthAllocation = VK_NULL_HANDLE;
+    mDisplayTexDS = VK_NULL_HANDLE;
+    mLayeredFramebuffer.reset();
+    mColorView.reset();
+    mDepthView.reset();
+    mLayeredRP.reset();
+    return;
+  }
+
   auto& vulkanContext = application.GetVulkanContext();
   VmaAllocator allocator = vulkanContext.GetVmaAllocator();
 
@@ -267,17 +311,23 @@ void SD::View::CleanupLayeredRender() {
     mDisplayTexDS = VK_NULL_HANDLE;
   }
 
-  // Images and allocations
+  // Images and allocations - check allocator validity
   if (mColorImage != VK_NULL_HANDLE) {
-    SD_ASSERT(allocator, "Allocator must be valid for cleanup");
-    vmaDestroyImage(allocator, mColorImage, mColorAllocation);
+    if (allocator) {
+      vmaDestroyImage(allocator, mColorImage, mColorAllocation);
+    } else {
+      SD::Log::Engine::Error("Cannot destroy color image: VMA allocator is null");
+    }
     mColorImage = VK_NULL_HANDLE;
     mColorAllocation = VK_NULL_HANDLE;
   }
 
   if (mDepthImage != VK_NULL_HANDLE) {
-    SD_ASSERT(allocator, "Allocator must be valid for cleanup");
-    vmaDestroyImage(allocator, mDepthImage, mDepthAllocation);
+    if (allocator) {
+      vmaDestroyImage(allocator, mDepthImage, mDepthAllocation);
+    } else {
+      SD::Log::Engine::Error("Cannot destroy depth image: VMA allocator is null");
+    }
     mDepthImage = VK_NULL_HANDLE;
     mDepthAllocation = VK_NULL_HANDLE;
   }
@@ -286,6 +336,7 @@ void SD::View::CleanupLayeredRender() {
   mLayeredFramebuffer.reset();
   mColorView.reset();
   mDepthView.reset();
+  mLayeredRP.reset();
 }
 
 void SD::View::Resize(VkExtent2D extent) {
@@ -298,14 +349,14 @@ void SD::View::Resize(VkExtent2D extent) {
   mExtentChanged = true;
 
   auto& vulkanContext = SD::Application::Get().GetVulkanContext();
-  SD_ASSERT(vulkanContext.GetVulkanDevice(), "Device must be valid");
+  SD_ALWAYS_ASSERT(vulkanContext.GetVulkanDevice(), "Device must be valid");
   CheckVulkanRes(vulkanContext.GetVulkanDevice()->waitIdle(),
                  "Failed to wait for device during resize");
 
   CleanupLayeredRender();
   CreateVulkanResources();
 
-  float aspect = (float)extent.width / (float)extent.height;
+  float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
   AspectMode effectiveMode = mAspectMode;
   if (mAspectMode == AspectMode::BestFit) {
     effectiveMode = (aspect > 1.0f) ? AspectMode::FixedHeight : AspectMode::FixedWidth;

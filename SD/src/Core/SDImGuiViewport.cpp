@@ -3,6 +3,7 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include "Application.hpp"
+#include "Core/SDImGuiContext.hpp"
 #include "Utils/Utils.hpp"
 
 namespace SD {
@@ -27,10 +28,11 @@ SDImGuiViewport::SDImGuiViewport(VulkanContext& ctx, const std::string& name, u3
 }
 
 SDImGuiViewport::~SDImGuiViewport() {
-  // ImGui descriptor sets are usually managed by the backend or the user.
-  // ImGui_ImplVulkan_RemoveTexture might not exist in all versions,
-  // but usually, we don't need to manually free it if we destroy the pool.
-  // However, it's good practice if supported.
+  // Clean up ImGui texture descriptor set
+  if (mTextureID != 0) {
+    Application::Get().GetImGuiContext().RemoveTexture(mTextureID);
+    mTextureID = 0;
+  }
 }
 
 void SDImGuiViewport::Begin() {

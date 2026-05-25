@@ -3,8 +3,6 @@
 //   - @brief Ordered collection of layers with lifecycle management
 //   - Layer ordering and event propagation
 #pragma once
-#include <list>
-#include <spdlog/spdlog.h>
 
 #include "Core/Layer.hpp"
 
@@ -34,7 +32,12 @@ public:
   [[nodiscard]] const_iterator end() const { return mLayers.end(); }
 
   ~LayerList() {
-    std::ranges::for_each(mLayers, [](const auto& layer) { layer->OnDetach(); });
+    // Clear in reverse order (opposite of push)
+    for (auto it = mLayers.rbegin(); it != mLayers.rend(); ++it) {
+      if (*it) {
+        (*it)->OnDetach();
+      }
+    }
   }
 
   void Update(const float dt) const {
@@ -66,7 +69,7 @@ public:
     for (auto it = mLayers.rbegin(); it != mLayers.rend(); ++it) {
       if ((*it)->IsActive()) {
         (*it)->OnEvent(e);
-        if (e.isHandled)
+        if (e.IsHandled())
           break;
       }
     }
@@ -129,8 +132,12 @@ public:
   }
 
   void Clear() {
-    for (auto& layer : mLayers)
-      layer->OnDetach();
+    // Clear in reverse order (opposite of push)
+    for (auto it = mLayers.rbegin(); it != mLayers.rend(); ++it) {
+      if (*it) {
+        (*it)->OnDetach();
+      }
+    }
     mLayers.clear();
   }
 
@@ -147,8 +154,6 @@ public:
         layer->OnRender(cmd);
     });
   }
-
-  int OnEvent(int _cpp_par_);
 
 private:
   std::vector<std::unique_ptr<Layer>> mLayers{};
