@@ -33,6 +33,23 @@ void EngineDebugLayer::on_update(float dt) {
                       view->get_extent().height);
     }
   }
+
+  // Track entity lifecycle changes if logging is enabled
+  if (m_selected_scene && m_log_entity_lifecycle) {
+    if (m_selected_scene != m_prev_scene_for_entity_count) {
+      m_prev_entity_count = m_selected_scene->em.get_alive_entity_count();
+      m_prev_scene_for_entity_count = m_selected_scene;
+    } else {
+      int alive = m_selected_scene->em.get_alive_entity_count();
+      if (alive != m_prev_entity_count) {
+        if (alive > m_prev_entity_count)
+          log::engine::debug("Entity created (count: {} -> {})", m_prev_entity_count, alive);
+        else
+          log::engine::debug("Entity destroyed (count: {} -> {})", m_prev_entity_count, alive);
+        m_prev_entity_count = alive;
+      }
+    }
+  }
 }
 
 void EngineDebugLayer::on_fixed_update(double /*dt*/) {
@@ -117,18 +134,18 @@ void EngineDebugLayer::on_gui_render() {
       
       // Resolve ID to View* safely (prevents dangling pointer)
       View* selected_view = nullptr;
-      if (m_selected_view_id != ViewId{}) {
-        auto view_result = app.get_view(m_selected_view_id);
+      if (m_selected_view_id.has_value()) {
+        auto view_result = app.get_view(m_selected_view_id.value());
         if (view_result) {
           selected_view = &view_result->get();
         } else {
-          m_selected_view_id = ViewId{};  // View was deleted
+          m_selected_view_id.reset();  // View was deleted
         }
       }
       
       if (ImGui::BeginCombo("View Selector",
                             selected_view ? selected_view->get_name().c_str() : "None")) {
-        for (const auto& view : views | std::views::values) {
+        for (const auto& [id, view] : views) {
           if (ImGui::Selectable(view->get_name().c_str(), m_selected_view_id == view->get_view_id())) {
             m_selected_view_id = view->get_view_id();
           }
@@ -460,7 +477,7 @@ void EngineDebugLayer::set_category_visible(CategoryNode& node, bool visible) {
 }
 
 void EngineDebugLayer::display_event_log() {
-  auto& history = log::get_log_history();
+  const auto& history = log::get_log_history();
   auto& categories = log::get_category_registry();
 
   // Initialize filters once

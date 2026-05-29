@@ -29,10 +29,10 @@ typedef struct GameAPI {
 } GameAPI;
 
 // The single exported function from the game DLL
-typedef GameAPI (*GetGameAPIFn)(void);
+typedef GameAPI (*GetGameAPIFn)();
 
 // Name of the exported function
-#define GAME_GET_API_NAME "GetGameAPI"
+#define GAME_GET_API_NAME "get_game_api"
 
 #ifdef __cplusplus
 }

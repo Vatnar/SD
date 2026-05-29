@@ -26,7 +26,7 @@ private:
     struct T## PoolRegistrar {                                             \
       T## PoolRegistrar() {                                                \
         ComponentFactory::register_component(ComponentTraits<T>::id,       \
-          [] { return std::make_unique<SparseEntitySet<(T)>>(); });        \
+          [] { return std::make_unique<SparseEntitySet<T>>(); });        \
       }                                                                    \
     };                                                                     \
     static T## PoolRegistrar T## s_pool_registrar;                         \

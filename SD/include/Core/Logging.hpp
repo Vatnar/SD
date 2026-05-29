@@ -55,7 +55,7 @@ struct CategoryInfo {
   ImVec4 color{};
 };
 
-const std::deque<LogEntry>& get_log_history();
+std::deque<LogEntry> get_log_history();
 void add_log_entry(LogEntry entry);
 
 std::vector<CategoryInfo>& get_category_registry();

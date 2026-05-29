@@ -15,7 +15,8 @@ namespace sd::log {
 static std::deque<LogEntry> s_log_history;
 static std::mutex s_log_mutex;
 
-const std::deque<LogEntry>& get_log_history() {
+std::deque<LogEntry> get_log_history() {
+    std::lock_guard lock(s_log_mutex);
     return s_log_history;
 }
 
@@ -125,7 +126,7 @@ void register_category(const char* name, ImVec4 color) {
     if (it == s_category_registry.end()) {
         s_category_registry.push_back(CategoryInfo{ .name = name, .visible = true, .color = color });
         // Create the logger immediately
-        create_category_logger(name, LogLevel::INFO);
+        create_category_logger(name, LogLevel::TRACE);
     }
 }
 

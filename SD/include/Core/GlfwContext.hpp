@@ -25,7 +25,7 @@ class GlfwContext {
 public:
   GlfwContext() {
     // Set GLFW error callback
-    s_error_callback = [](int error_code, const char* description) {
+    m_error_callback = [](int error_code, const char* description) {
       log::engine::error("Glfw: ERROR:{}\n{}", error_code, description);
     };
     glfwSetErrorCallback(&GlfwContext::glfw_error_callback_trampoline);
@@ -51,19 +51,19 @@ public:
    * Overides the default error callback for Glfw
    * @param callback
    */
-  static void set_error_callback(const glfw_error_callback& callback) { s_error_callback = callback; }
+  static void set_error_callback(const glfw_error_callback& callback) { m_error_callback = callback; }
 
   static std::pair<const char**, uint32_t> get_required_instance_extensions() {
     uint32_t count = 0;
-    const char** glfwExts = glfw_get_required_instance_extensions(&count);
-    return {glfwExts, count};
+    const char** glfw_exts = glfwGetRequiredInstanceExtensions(&count);
+    return {glfw_exts, count};
   }
 
 private:
-  static inline glfw_error_callback s_error_callback;
+  static inline glfw_error_callback m_error_callback;
 
   static void glfw_error_callback_trampoline(int error_code, const char* description) {
-    s_error_callback(error_code, description);
+    m_error_callback(error_code, description);
   }
 };
 } // namespace SD

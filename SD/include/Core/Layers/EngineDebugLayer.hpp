@@ -97,7 +97,11 @@ public:
   int m_prev_update = 0;
 
   Scene* m_selected_scene = nullptr;
-  ViewId m_selected_view_id;  // Store ID instead of pointer to avoid dangling
+  std::optional<ViewId> m_selected_view_id;  // Store ID instead of pointer to avoid dangling
+
+  // Entity lifecycle tracking (for m_log_entity_lifecycle)
+  Scene* m_prev_scene_for_entity_count = nullptr;
+  int m_prev_entity_count = -1;
   
   // Debug shortcut state (was static in HandleDebugShortcuts)
   bool m_debug_mode_active = false;

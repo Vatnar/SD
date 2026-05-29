@@ -40,7 +40,6 @@ set(ENGINE_SOURCES
         src/RuntimeStateManager.cpp
         src/Core/ECS/CommandQueue.cpp
         src/Core/ECS/ComponentFactory.cpp
-        src/Core/IWYU_Test.cpp
         include/Core/ECS/CommandQueue.hpp
         include/Core/ECS/ComponentFactory.hpp
 )
@@ -111,14 +110,14 @@ set_target_properties(SD PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Unity builds - Release only for faster clean builds
 # Debug uses ccache for fast incremental builds
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
     set_target_properties(SD PROPERTIES
-        UNITY_BUILD ON
-        UNITY_BUILD_BATCH_SIZE 8
+            UNITY_BUILD ON
+            UNITY_BUILD_BATCH_SIZE 8
     )
-else()
+else ()
     set_target_properties(SD PROPERTIES UNITY_BUILD OFF)
-endif()
+endif ()
 
 # AddressSanitizer - Debug builds only
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -189,12 +188,12 @@ target_compile_definitions(HotReloadApp PRIVATE TOML_EXCEPTIONS=0)
 find_program(IWYU_TOOL iwyu_tool)
 find_program(IWYU_TOOL_PY iwyu_tool.py)
 
-if(IWYU_TOOL OR IWYU_TOOL_PY)
+if (IWYU_TOOL OR IWYU_TOOL_PY)
     set(IWYU_CMD ${IWYU_TOOL})
-    if(NOT IWYU_CMD)
+    if (NOT IWYU_CMD)
         set(IWYU_CMD ${IWYU_TOOL_PY})
-    endif()
-    
+    endif ()
+
     # Create a convenience script to run IWYU with proper settings
     file(WRITE ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "#!/bin/bash\n")
     file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "# IWYU convenience script\n")
@@ -214,27 +213,27 @@ if(IWYU_TOOL OR IWYU_TOOL_PY)
     file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "\n")
     file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo ''\n")
     file(APPEND ${CMAKE_SOURCE_DIR}/iwyu-apply.sh "echo 'IWYU output saved to: iwyu-output.log'\n")
-    
+
     execute_process(COMMAND chmod +x ${CMAKE_SOURCE_DIR}/iwyu-apply.sh)
-    
+
     # Test target for the IWYU test file
     add_custom_target(iwyu-test
-        COMMAND ${CMAKE_COMMAND} -E echo "Testing IWYU on test file..."
-        COMMAND ${CMAKE_COMMAND} -E echo "File: SD/src/Core/IWYU_Test.cpp"
-        COMMAND ${CMAKE_COMMAND} -E echo ""
-        COMMAND ${IWYU_CMD} -p ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/IWYU_Test.cpp 2>&1 
+            COMMAND ${CMAKE_COMMAND} -E echo "Testing IWYU on test file..."
+            COMMAND ${CMAKE_COMMAND} -E echo "File: SD/src/Core/IWYU_Test.cpp"
+            COMMAND ${CMAKE_COMMAND} -E echo ""
+            COMMAND ${IWYU_CMD} -p ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/IWYU_Test.cpp 2>&1
             | grep -v "bits/unicode-data.h"
             | grep -v "bits/mofunc_impl.h"
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Testing IWYU on IWYU_Test.cpp..."
-        VERBATIM
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Testing IWYU on IWYU_Test.cpp..."
+            VERBATIM
     )
-    
+
     message(STATUS "IWYU available. Usage:")
     message(STATUS "  1. Run ./iwyu-apply.sh from project root")
     message(STATUS "  2. Or: cmake --build . --target iwyu-test")
     message(STATUS "  3. Or manually: cmake -DCMAKE_CXX_INCLUDE_WHAT_YOU_USE=\"iwyu_tool;-p;<build-dir>\" ...")
-else()
+else ()
     message(STATUS "iwyu_tool not found. IWYU will not be available.")
     message(STATUS "Install with: sudo apt install iwyu")
-endif()
+endif ()
