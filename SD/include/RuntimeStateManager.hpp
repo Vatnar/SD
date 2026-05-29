@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace SD {
+namespace sd {
 
 class Application;
 class Scene;
@@ -25,14 +25,14 @@ public:
   RuntimeStateManager();
   ~RuntimeStateManager();
 
-  void Serialize();
-  void Restore(Application* app);
-  void SetApplication(Application* app);
-  bool HasState() const;
+  void serialize();
+  void restore(Application* app);
+  void set_application(Application* app);
+  bool has_state() const;
 
 private:
-  Application* mApp = nullptr;
-  std::unordered_map<std::string, std::vector<char>> mSerializedScenes;
+  Application* m_app = nullptr;
+  std::unordered_map<std::string, std::vector<char>> m_serialized_scenes;
 };
 
 } // namespace SD

@@ -1,16 +1,15 @@
-
 #include "Application.hpp"
 
-extern SD::Application* CreateApplication(int, char**);
+extern sd::Application* CreateApplication(int, char**);
 #include "Core/Logging.hpp"
 
 int main(int argc, char** argv) {
-  SD::Log::Init();
+  sd::log::init();
   auto app = CreateApplication(argc, argv);
   if (!app) {
-    SD::Log::Engine::Error("CreateApplication returned null");
+    sd::log::engine::error("CreateApplication returned null");
     return 1;
   }
-  app->Run(nullptr);
+  app->run(nullptr);
   delete app;
 }

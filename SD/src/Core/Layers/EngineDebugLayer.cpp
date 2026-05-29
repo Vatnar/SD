@@ -10,73 +10,72 @@
 #include "Core/LayoutManager.hpp"
 #include "Core/Logging.hpp"
 #include "Core/View.hpp"
-#include "Utils/Utils.hpp"
 
-namespace SD {
+namespace sd {
 
-void EngineDebugLayer::OnUpdate(float dt) {
-  mUpdateCount++;
-  mTimer += dt;
+void EngineDebugLayer::on_update(float dt) {
+  m_update_count++;
+  m_timer += dt;
 
-  if (mTimer >= 1.0f) {
-    mPrevFixed = mFixedUpdateCount;
-    mPrevUpdate = mUpdateCount;
-    mFixedUpdateCount = 0;
-    mUpdateCount = 0;
-    mTimer = 0.0f;
+  if (m_timer >= 1.0f) {
+    m_prev_fixed = m_fixed_update_count;
+    m_prev_update = m_update_count;
+    m_fixed_update_count = 0;
+    m_update_count = 0;
+    m_timer = 0.0f;
   }
 
   // Capture resizes if logging is enabled
-  auto& app = Application::Get();
-  for (const auto& [id, view] : app.GetViews()) {
-    if (mLogViewResizes && view->ConsumeExtentChanged()) {
-      SD::Log::Engine::Debug("View '{}' resized to {}x{}", view->GetName(), view->GetExtent().width,
-                      view->GetExtent().height);
+  auto& app = Application::get();
+  for (const auto& view : app.get_views() | std::views::values) {
+    if (m_log_view_resizes && view->consume_extent_changed()) {
+      log::engine::debug("View '{}' resized to {}x{}", view->get_name(), view->get_extent().width,
+                      view->get_extent().height);
     }
   }
 }
 
-void EngineDebugLayer::OnFixedUpdate(double /*dt*/) {
-  mFixedUpdateCount++;
+void EngineDebugLayer::on_fixed_update(double /*dt*/) {
+  m_fixed_update_count++;
 }
 
-void EngineDebugLayer::OnEvent(Event& e) {
-  if (mLogEvents) {
+void EngineDebugLayer::on_event(Event& e) {
+  if (m_log_events) {
     std::string detail;
-    switch (e.GetEventType()) {
-      case EventType::KeyPressed: {
+    switch (e.get_event_type()) {
+      case EventType::KEY_PRESSED: {
         if (auto* ke = dynamic_cast<KeyPressedEvent*>(&e)) {
           detail = fmt::format("Key: {} (mods: {}, repeat: {})", ke->key, ke->mods, ke->repeat);
         }
         break;
       }
-      case EventType::KeyReleased: {
+      case EventType::KEY_RELEASED: {
         if (auto* ke = dynamic_cast<KeyReleasedEvent*>(&e)) {
           detail = fmt::format("Key: {} (mods: {})", ke->key, ke->mods);
         }
         break;
       }
-      case EventType::MousePressed: {
+      case EventType::MOUSE_PRESSED: {
         if (auto* me = dynamic_cast<MousePressedEvent*>(&e)) {
           detail = fmt::format("Button: {} (mods: {}, repeat: {})", me->button, me->mods, me->repeat);
         }
         break;
       }
-      case EventType::MouseReleased: {
+      case EventType::MOUSE_RELEASED: {
         if (auto* me = dynamic_cast<MouseReleasedEvent*>(&e)) {
           detail = fmt::format("Button: {} (mods: {})", me->button, me->mods);
         }
         break;
       }
-      case EventType::MouseMoved: {
+      case EventType::MOUSE_MOVED: {
         if (auto* me = dynamic_cast<MouseMovedEvent*>(&e)) {
-          detail = fmt::format("Pos: {:.1f}, {:.1f}", me->xPos, me->yPos);
+          detail = fmt::format("Pos: {:.1f}, {:.1f}", me->x_pos, me->y_pos);
         }
         break;
       }
-      case EventType::MouseScrolled: {
+      case EventType::MOUSE_SCROLLED: {
         if (auto* me = dynamic_cast<MouseScrolledEvent*>(&e)) {
-          detail = fmt::format("Offset: {:.1f}, {:.1f}", me->xOffset, me->yOffset);
+          detail = fmt::format("Offset: {:.1f}, {:.1f}", me->x_offset, me->y_offset);
         }
         break;
       }
@@ -84,82 +83,82 @@ void EngineDebugLayer::OnEvent(Event& e) {
         detail = "Generic Event";
         break;
     }
-    SD::Log::Engine::Trace("Event: {} [{}]", e.GetName(), detail);
+    log::engine::trace("Event: {} [{}]", e.get_name(), detail);
   }
 }
 
-void EngineDebugLayer::OnImGuiMenuBar() {
+void EngineDebugLayer::on_im_gui_menu_bar() {
   // Apply pending layout once dockspace is ready
-  Application::Get().GetLayoutManager().ApplyPendingLayout();
+  Application::get().get_layout_manager().apply_pending_layout();
   
   if (ImGui::BeginMenu("Debug")) {
-    ImGui::MenuItem("View Inspector", nullptr, &mShowViewInspector);
-    ImGui::MenuItem("Scene Inspector", nullptr, &mShowSceneInspector);
-    ImGui::MenuItem("Renderer Info", nullptr, &mShowRendererInfo);
-    ImGui::MenuItem("Context Overlay", nullptr, &mShowContextOverlay);
+    ImGui::MenuItem("View Inspector", nullptr, &m_show_view_inspector);
+    ImGui::MenuItem("Scene Inspector", nullptr, &m_show_scene_inspector);
+    ImGui::MenuItem("Renderer Info", nullptr, &m_show_renderer_info);
+    ImGui::MenuItem("Context Overlay", nullptr, &m_show_context_overlay);
     
     ImGui::Separator();
-    DisplayLayoutMenu();
+    display_layout_menu();
     
     ImGui::Separator();
     if (ImGui::MenuItem("Reload Shaders", "Ctrl+Shift+D, R")) {
-      Application::Get().ReloadShaders();
+      Application::get().reload_shaders();
     }
     
     ImGui::EndMenu();
   }
 }
 
-void EngineDebugLayer::OnGuiRender() {
-  if (mShowViewInspector) {
-    if (ImGui::Begin("View Inspector", &mShowViewInspector)) {
-      auto& app = Application::Get();
-      const auto& views = app.GetViews();
+void EngineDebugLayer::on_gui_render() {
+  if (m_show_view_inspector) {
+    if (ImGui::Begin("View Inspector", &m_show_view_inspector)) {
+      auto& app = Application::get();
+      const auto& views = app.get_views();
       
       // Resolve ID to View* safely (prevents dangling pointer)
-      View* selectedView = nullptr;
-      if (mSelectedViewId != ViewId{}) {
-        auto viewResult = app.GetView(mSelectedViewId);
-        if (viewResult) {
-          selectedView = &viewResult->get();
+      View* selected_view = nullptr;
+      if (m_selected_view_id != ViewId{}) {
+        auto view_result = app.get_view(m_selected_view_id);
+        if (view_result) {
+          selected_view = &view_result->get();
         } else {
-          mSelectedViewId = ViewId{};  // View was deleted
+          m_selected_view_id = ViewId{};  // View was deleted
         }
       }
       
       if (ImGui::BeginCombo("View Selector",
-                            selectedView ? selectedView->GetName().c_str() : "None")) {
-        for (const auto& [id, view] : views) {
-          if (ImGui::Selectable(view->GetName().c_str(), mSelectedViewId == view->GetViewId())) {
-            mSelectedViewId = view->GetViewId();
+                            selected_view ? selected_view->get_name().c_str() : "None")) {
+        for (const auto& view : views | std::views::values) {
+          if (ImGui::Selectable(view->get_name().c_str(), m_selected_view_id == view->get_view_id())) {
+            m_selected_view_id = view->get_view_id();
           }
         }
         ImGui::EndCombo();
       }
-      if (selectedView)
-        DisplayViewInfo(selectedView);
+      if (selected_view)
+        display_view_info(selected_view);
     }
     ImGui::End();
   }
 
-  if (mShowSceneInspector) {
-    if (ImGui::Begin("Scene Inspector", &mShowSceneInspector)) {
-      DisplaySceneSelector();
+  if (m_show_scene_inspector) {
+    if (ImGui::Begin("Scene Inspector", &m_show_scene_inspector)) {
+      display_scene_selector();
       ImGui::Separator();
-      DisplayECSInspector();
+      display_ecs_inspector();
     }
     ImGui::End();
   }
 
-  if (mShowEventLog) {
-    if (ImGui::Begin("Engine Log", &mShowEventLog)) {
-      DisplayEventLog();
+  if (m_show_event_log) {
+    if (ImGui::Begin("Engine Log", &m_show_event_log)) {
+      display_event_log();
     }
     ImGui::End();
   }
 
-  if (mShowRendererInfo) {
-    if (ImGui::Begin("Renderer Info", &mShowRendererInfo)) {
+  if (m_show_renderer_info) {
+    if (ImGui::Begin("Renderer Info", &m_show_renderer_info)) {
       ImGui::Text("App Performance: %.1f FPS", ImGui::GetIO().Framerate);
       ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
       ImGui::Separator();
@@ -171,52 +170,52 @@ void EngineDebugLayer::OnGuiRender() {
         ImGui::TableNextColumn();
         ImGui::Text("Fixed Updates/s");
         ImGui::TableNextColumn();
-        ImGui::Text("%4d (60 Hz expected)", mPrevFixed);
+        ImGui::Text("%4d (60 Hz expected)", m_prev_fixed);
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         ImGui::Text("Render Frames/s");
         ImGui::TableNextColumn();
-        ImGui::Text("%4d FPS", mPrevUpdate);
+        ImGui::Text("%4d FPS", m_prev_update);
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         ImGui::Text("Frame Work Time");
         ImGui::TableNextColumn();
-        ImGui::Text("%.3f ms", Application::Get().GetFrameWorkTime() * 1000.0f);
+        ImGui::Text("%.3f ms", Application::get().get_frame_work_time() * 1000.0f);
 
         ImGui::EndTable();
       }
 
       ImGui::Separator();
-      auto& app = Application::Get();
-      bool autoReload = app.IsHotReloadEnabled();
-      if (ImGui::Checkbox("Auto-Reload Shaders", &autoReload)) {
-        app.SetHotReloadEnabled(autoReload);
+      auto& app = Application::get();
+      bool auto_reload = app.is_hot_reload_enabled();
+      if (ImGui::Checkbox("Auto-Reload Shaders", &auto_reload)) {
+        app.set_hot_reload_enabled(auto_reload);
       }
       if (ImGui::Button("Force Reload Shaders")) {
-        app.ReloadShaders();
+        app.reload_shaders();
       }
     }
     ImGui::End();
   }
 
-  if (mShowContextOverlay) {
-    auto mousePos = ImGui::GetMousePos();
-    auto& app = Application::Get();
-    for (const auto& [id, view] : app.GetViews()) {
-      ImVec2 regionPos = view->GetContentRegionPos();
-      ImVec2 regionExtent = view->GetContentRegionExtent();
-      if (mousePos.x >= regionPos.x && mousePos.x <= regionPos.x + regionExtent.x &&
-          mousePos.y >= regionPos.y && mousePos.y <= regionPos.y + regionExtent.y) {
-        ImGui::SetNextWindowPos(ImVec2(mousePos.x + 15, mousePos.y + 15));
+  if (m_show_context_overlay) {
+    auto mouse_pos = ImGui::GetMousePos();
+    auto& app = Application::get();
+    for (const auto& view : app.get_views() | std::views::values) {
+      ImVec2 region_pos = view->get_content_region_pos();
+      ImVec2 region_extent = view->get_content_region_extent();
+      if (mouse_pos.x >= region_pos.x && mouse_pos.x <= region_pos.x + region_extent.x &&
+          mouse_pos.y >= region_pos.y && mouse_pos.y <= region_pos.y + region_extent.y) {
+        ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 15, mouse_pos.y + 15));
         if (ImGui::Begin("##ContextOverlay", nullptr,
                          ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar |
                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_AlwaysAutoResize |
                              ImGuiWindowFlags_NoSavedSettings)) {
-          float ndcX = ((mousePos.x - regionPos.x) / regionExtent.x) * 2.0f - 1.0f;
-          float ndcY = ((mousePos.y - regionPos.y) / regionExtent.y) * 2.0f - 1.0f;
-          ImGui::Text("View: %s", view->GetName().c_str());
-          ImGui::Text("NDC: %.3f, %.3f", ndcX, ndcY);
+          float ndc_x = ((mouse_pos.x - region_pos.x) / region_extent.x) * 2.0f - 1.0f;
+          float ndc_y = ((mouse_pos.y - region_pos.y) / region_extent.y) * 2.0f - 1.0f;
+          ImGui::Text("View: %s", view->get_name().c_str());
+          ImGui::Text("NDC: %.3f, %.3f", ndc_x, ndc_y);
           ImGui::End();
         }
       }
@@ -224,66 +223,66 @@ void EngineDebugLayer::OnGuiRender() {
   }
   
   // Display dialogs
-  DisplaySaveLayoutDialog();
-  DisplayDeleteLayoutDialog();
-  DisplayOverwriteConfirmationDialog();
+  display_save_layout_dialog();
+  display_delete_layout_dialog();
+  display_overwrite_confirmation_dialog();
   
   // Handle shortcuts
-  HandleLayoutShortcuts();
-  HandleDebugShortcuts();
+  handle_layout_shortcuts();
+  handle_debug_shortcuts();
 }
 
-void EngineDebugLayer::DisplayViewInfo(View* selectedView) {
-  if (!selectedView) return;  // Defensive null check
+void EngineDebugLayer::display_view_info(View* selected_view) {
+  if (!selected_view) return;  // Defensive null check
   
   if (ImGui::TreeNodeEx("Logging", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::Checkbox("Log Window Events", &mLogEvents);
-    ImGui::Checkbox("Log View Resizes", &mLogViewResizes);
-    ImGui::Checkbox("Show Context Overlay", &mShowContextOverlay);
+    ImGui::Checkbox("Log Window Events", &m_log_events);
+    ImGui::Checkbox("Log View Resizes", &m_log_view_resizes);
+    ImGui::Checkbox("Show Context Overlay", &m_show_context_overlay);
     ImGui::TreePop();
   }
   ImGui::Separator();
-  ImGui::Text("ID: %u | Extent: %ux%u", static_cast<uint32_t>(selectedView->GetViewId()),
-              selectedView->GetExtent().width, selectedView->GetExtent().height);
+  ImGui::Text("ID: %u | Extent: %ux%u", static_cast<uint32_t>(selected_view->get_view_id()),
+              selected_view->get_extent().width, selected_view->get_extent().height);
 
-  AspectMode currentMode = selectedView->GetAspectMode();
-  int modeInt = (int)currentMode;
+  AspectMode current_mode = selected_view->get_aspect_mode();
+  int modeInt = static_cast<int>(current_mode);
   ImGui::Text("Aspect Mode:");
   ImGui::SameLine();
   if (ImGui::RadioButton("Fixed Height", &modeInt, 0))
-    selectedView->SetAspectMode(AspectMode::FixedHeight);
+    selected_view->set_aspect_mode(AspectMode::FIXED_HEIGHT);
   ImGui::SameLine();
   if (ImGui::RadioButton("Fixed Width", &modeInt, 1))
-    selectedView->SetAspectMode(AspectMode::FixedWidth);
+    selected_view->set_aspect_mode(AspectMode::FIXED_WIDTH);
   ImGui::SameLine();
   if (ImGui::RadioButton("Best Fit", &modeInt, 2))
-    selectedView->SetAspectMode(AspectMode::BestFit);
+    selected_view->set_aspect_mode(AspectMode::BEST_FIT);
 
   ImGui::Separator();
-  RenderMode currentRMode = selectedView->GetRenderMode();
-  const char* rModes[] = {"Shaded", "Wireframe"};
-  int rModeInt = (int)currentRMode;
-  if (ImGui::Combo("Render Mode", &rModeInt, rModes, IM_ARRAYSIZE(rModes))) {
-    selectedView->SetRenderMode((RenderMode)rModeInt);
+  RenderMode current_r_mode = selected_view->get_render_mode();
+  const char* r_modes[] = {"Shaded", "Wireframe"};
+  int r_mode_int = static_cast<int>(current_r_mode);
+  if (ImGui::Combo("Render Mode", &r_mode_int, r_modes, IM_ARRAYSIZE(r_modes))) {
+    selected_view->set_render_mode((RenderMode)r_mode_int);
   }
 
-  ImVec2 mousePos = ImGui::GetMousePos();
-  ImVec2 regionPos = selectedView->GetContentRegionPos();
-  ImVec2 regionExtent = selectedView->GetContentRegionExtent();
+  ImVec2 mouse_pos = ImGui::GetMousePos();
+  ImVec2 region_pos = selected_view->get_content_region_pos();
+  ImVec2 region_extent = selected_view->get_content_region_extent();
 
-  bool isHovered = (mousePos.x >= regionPos.x && mousePos.x <= regionPos.x + regionExtent.x &&
-                    mousePos.y >= regionPos.y && mousePos.y <= regionPos.y + regionExtent.y);
+  bool is_hovered = (mouse_pos.x >= region_pos.x && mouse_pos.x <= region_pos.x + region_extent.x &&
+                    mouse_pos.y >= region_pos.y && mouse_pos.y <= region_pos.y + region_extent.y);
 
-  ImGui::Text("Hovered: %s", isHovered ? "YES" : "NO");
+  ImGui::Text("Hovered: %s", is_hovered ? "YES" : "NO");
 
   // Calculate cursor NDC relative to the specific view bounds
-  float ndcX = ((mousePos.x - regionPos.x) / regionExtent.x) * 2.0f - 1.0f;
-  float ndcY = ((mousePos.y - regionPos.y) / regionExtent.y) * 2.0f - 1.0f;
+  float ndc_x = ((mouse_pos.x - region_pos.x) / region_extent.x) * 2.0f - 1.0f;
+  float ndc_y = ((mouse_pos.y - region_pos.y) / region_extent.y) * 2.0f - 1.0f;
 
-  ImGui::Text("Cursor NDC: %.3f, %.3f", ndcX, ndcY);
+  ImGui::Text("Cursor NDC: %.3f, %.3f", ndc_x, ndc_y);
 
   if (ImGui::TreeNode("Matrix Data")) {
-    const auto& m = selectedView->GetProjection();
+    const auto& m = selected_view->get_projection();
     for (int i = 0; i < 4; i++) {
       ImGui::Text("%.3f %.3f %.3f %.3f", m(i, 0), m(i, 1), m(i, 2), m(i, 3));
     }
@@ -291,65 +290,65 @@ void EngineDebugLayer::DisplayViewInfo(View* selectedView) {
   }
 }
 
-void EngineDebugLayer::DisplaySceneSelector() {
+void EngineDebugLayer::display_scene_selector() {
   if (ImGui::TreeNodeEx("Logging", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::Checkbox("Log Scene Activity", &mLogSceneChanges);
-    ImGui::Checkbox("Log Entity Lifecycle", &mLogEntityLifecycle);
+    ImGui::Checkbox("Log Scene Activity", &m_log_scene_changes);
+    ImGui::Checkbox("Log Entity Lifecycle", &m_log_entity_lifecycle);
     ImGui::TreePop();
   }
   ImGui::Separator();
-  auto scenes = Application::Get().GetScenes();
-  if (!mSelectedScene && !scenes.empty())
-    mSelectedScene = scenes[0];
+  auto scenes = Application::get().get_scenes();
+  if (!m_selected_scene && !scenes.empty())
+    m_selected_scene = scenes[0];
 
-  std::string currentLabel = mSelectedScene ? mSelectedScene->GetName() : "None";
-  if (ImGui::BeginCombo("Inspect Scene", currentLabel.c_str())) {
+  std::string current_label = m_selected_scene ? m_selected_scene->get_name() : "None";
+  if (ImGui::BeginCombo("Inspect Scene", current_label.c_str())) {
     for (auto* s : scenes) {
-      if (ImGui::Selectable(s->GetName().c_str(), mSelectedScene == s)) {
-        mSelectedScene = s;
+      if (ImGui::Selectable(s->get_name().c_str(), m_selected_scene == s)) {
+        m_selected_scene = s;
       }
     }
     ImGui::EndCombo();
   }
 }
 
-void EngineDebugLayer::DisplayECSInspector() {
-  if (!mSelectedScene) {
+void EngineDebugLayer::display_ecs_inspector() {
+  if (!m_selected_scene) {
     ImGui::Text("No Scene selected.");
     return;
   }
 
-  for (auto [entity, transform] : mSelectedScene->em.View<Transform>()) {
+  for (auto [entity, transform] : m_selected_scene->em.view<Transform>()) {
     std::string label = "Entity " + std::to_string(entity.index);
-    if (auto* name = mSelectedScene->em.TryGetComponent<DebugName>(entity)) {
+    if (auto* name = m_selected_scene->em.try_get_component<DebugName>(entity)) {
       label = name->name + " (ID: " + std::to_string(entity.index) + ")";
     }
 
     if (ImGui::TreeNode(label.c_str())) {
-      if (auto* transformPtr = mSelectedScene->em.TryGetComponent<Transform>(entity)) {
+      if (auto* transform_ptr = m_selected_scene->em.try_get_component<Transform>(entity)) {
         if (ImGui::TreeNode("Transform")) {
           for (int i = 0; i < 4; i++) {
             if (ImGui::DragFloat4(("row " + std::to_string(i)).c_str(),
-                                  &transformPtr->worldMatrix(i, 0), 0.01f)) {
-              if (mLogSceneChanges) {
-                SD::Log::Engine::Debug("Entity {} transform changed", entity.index);
+                                  &transform_ptr->world_matrix(i, 0), 0.01f)) {
+              if (m_log_scene_changes) {
+                log::engine::debug("Entity {} transform changed", entity.index);
               }
             }
           }
           ImGui::TreePop();
         }
       }
-      if (auto* renderable = mSelectedScene->em.TryGetComponent<Renderable>(entity)) {
+      if (auto* renderable = m_selected_scene->em.try_get_component<Renderable>(entity)) {
         if (ImGui::TreeNode("Renderable")) {
           if (ImGui::ColorEdit4("Color", renderable->color)) {
-            if (mLogSceneChanges) {
-              SD::Log::Engine::Debug("Entity {} color changed", entity.index);
+            if (m_log_scene_changes) {
+              log::engine::debug("Entity {} color changed", entity.index);
             }
           }
-          if (ImGui::DragInt("Stage", (int*)&renderable->renderStage, 1, 0, 10)) {
-            if (mLogSceneChanges) {
-              SD::Log::Engine::Debug("Entity {} render stage changed to {}", entity.index,
-                              renderable->renderStage);
+          if (ImGui::DragInt("Stage", (int*)&renderable->render_stage, 1, 0, 10)) {
+            if (m_log_scene_changes) {
+              log::engine::debug("Entity {} render stage changed to {}", entity.index,
+                              renderable->render_stage);
             }
           }
           ImGui::TreePop();
@@ -360,12 +359,12 @@ void EngineDebugLayer::DisplayECSInspector() {
   }
 }
 
-void EngineDebugLayer::BuildCategoryTree() {
-  auto& categories = Log::GetCategoryRegistry();
-  mCategoryRoot = CategoryNode{"", "", true, {}};
+void EngineDebugLayer::build_category_tree() {
+  auto& categories = log::get_category_registry();
+  m_category_root = CategoryNode{"", "", true, {}};
 
   for (auto& cat : categories) {
-    CategoryNode* node = &mCategoryRoot;
+    CategoryNode* node = &m_category_root;
     size_t start = 0;
     while (start < cat.name.size()) {
       size_t end = cat.name.find('/', start);
@@ -387,14 +386,14 @@ void EngineDebugLayer::BuildCategoryTree() {
       start = end + 1;
     }
   }
-  mCategoryTreeBuilt = true;
+  m_category_tree_built = true;
 }
 
-void EngineDebugLayer::RenderCategoryNode(CategoryNode& node) {
+void EngineDebugLayer::render_category_node(CategoryNode& node) {
   if (node.name.empty()) {
     // Root node — just render children
     for (auto& child : node.children) {
-      RenderCategoryNode(child);
+      render_category_node(child);
     }
     return;
   }
@@ -403,7 +402,7 @@ void EngineDebugLayer::RenderCategoryNode(CategoryNode& node) {
     // Leaf node
     bool visible = node.visible;
     if (ImGui::Checkbox(node.name.c_str(), &visible)) {
-      SetCategoryVisible(node, visible);
+      set_category_visible(node, visible);
     }
   } else {
     // Parent node — TreeNode + Checkbox
@@ -412,20 +411,20 @@ void EngineDebugLayer::RenderCategoryNode(CategoryNode& node) {
     ImGui::SameLine();
     bool visible = node.visible;
     if (ImGui::Checkbox("##vis", &visible)) {
-      SetCategoryVisible(node, visible);
+      set_category_visible(node, visible);
     }
     if (open) {
       for (auto& child : node.children) {
-        RenderCategoryNode(child);
+        render_category_node(child);
       }
       ImGui::TreePop();
     }
   }
 }
 
-bool EngineDebugLayer::IsLogVisible(const std::string& category) {
+bool EngineDebugLayer::is_log_visible(const std::string& category) {
   // Walk the tree to find the category node
-  CategoryNode* node = &mCategoryRoot;
+  CategoryNode* node = &m_category_root;
   size_t start = 0;
   while (start < category.size()) {
     size_t end = category.find('/', start);
@@ -446,45 +445,45 @@ bool EngineDebugLayer::IsLogVisible(const std::string& category) {
   return node->visible;
 }
 
-void EngineDebugLayer::SetCategoryVisible(CategoryNode& node, bool visible) {
+void EngineDebugLayer::set_category_visible(CategoryNode& node, bool visible) {
   node.visible = visible;
   for (auto& child : node.children) {
-    SetCategoryVisible(child, visible);
+    set_category_visible(child, visible);
   }
   // Sync back to the flat registry
-  auto& categories = Log::GetCategoryRegistry();
+  auto& categories = log::get_category_registry();
   for (auto& cat : categories) {
-    if (cat.name == node.fullPath || Log::IsCategoryUnder(cat.name, node.fullPath)) {
+    if (cat.name == node.full_path || log::is_category_under(cat.name, node.full_path)) {
       cat.visible = visible;
     }
   }
 }
 
-void EngineDebugLayer::DisplayEventLog() {
-  auto& history = Log::GetLogHistory();
-  auto& categories = Log::GetCategoryRegistry();
+void EngineDebugLayer::display_event_log() {
+  auto& history = log::get_log_history();
+  auto& categories = log::get_category_registry();
 
   // Initialize filters once
-  if (!mLogFilterInitialized) {
-    mLogSearchBuffer[0] = '\0';
-    mLogFilterInitialized = true;
+  if (!m_log_filter_initialized) {
+    m_log_search_buffer[0] = '\0';
+    m_log_filter_initialized = true;
   }
 
   // Search bar
-  ImGui::InputText("Search", mLogSearchBuffer, sizeof(mLogSearchBuffer));
+  ImGui::InputText("Search", m_log_search_buffer, sizeof(m_log_search_buffer));
   ImGui::SameLine();
 
   // Level filter
-  const char* levelItems[] = { "All", "Debug+", "Info+", "Warn+", "Error+" };
-  ImGui::Combo("Level", &mLogLevelFilter, levelItems, IM_ARRAYSIZE(levelItems));
+  const char* level_items[] = { "All", "Debug+", "Info+", "Warn+", "Error+" };
+  ImGui::Combo("Level", &m_log_level_filter, level_items, IM_ARRAYSIZE(level_items));
 
   // Category tree filters
-  if (!mCategoryTreeBuilt || categories.size() != mCategoryRoot.children.size()) {
-    BuildCategoryTree();
+  if (!m_category_tree_built || categories.size() != m_category_root.children.size()) {
+    build_category_tree();
   }
   if (ImGui::TreeNode("Categories")) {
-    for (auto& child : mCategoryRoot.children) {
-      RenderCategoryNode(child);
+    for (auto& child : m_category_root.children) {
+      render_category_node(child);
     }
     ImGui::TreePop();
   }
@@ -492,70 +491,71 @@ void EngineDebugLayer::DisplayEventLog() {
   ImGui::Separator();
 
   // Determine minimum level to show
-  Log::LogLevel minLevel = Log::LogLevel::Trace;
-  switch (mLogLevelFilter) {
-    case 1: minLevel = Log::LogLevel::Debug; break;
-    case 2: minLevel = Log::LogLevel::Info; break;
-    case 3: minLevel = Log::LogLevel::Warn; break;
-    case 4: minLevel = Log::LogLevel::Error; break;
+  log::LogLevel min_level = log::LogLevel::TRACE;
+  switch (m_log_level_filter) {
+    case 1: min_level = log::LogLevel::DEBUG; break;
+    case 2: min_level = log::LogLevel::INFO; break;
+    case 3: min_level = log::LogLevel::WARN; break;
+    case 4: min_level = log::LogLevel::ERROR; break;
+      default: break;
   }
 
-  std::string search = mLogSearchBuffer;
-  std::transform(search.begin(), search.end(), search.begin(), ::tolower);
+  std::string search = m_log_search_buffer;
+  std::ranges::transform(search, search.begin(), tolower);
 
   for (const auto& log : history) {
     // Level filter
-    if (static_cast<int>(log.level) < static_cast<int>(minLevel))
+    if (static_cast<int>(log.level) < static_cast<int>(min_level))
       continue;
 
     // Category filter (using tree visibility)
-    if (!IsLogVisible(log.category)) continue;
+    if (!is_log_visible(log.category)) continue;
 
     // Search filter
     if (!search.empty()) {
-      std::string msgLower = log.message;
-      std::transform(msgLower.begin(), msgLower.end(), msgLower.begin(), ::tolower);
-      if (msgLower.find(search) == std::string::npos) continue;
+      std::string msg_lower = log.message;
+      std::ranges::transform(msg_lower, msg_lower.begin(), tolower);
+      if (msg_lower.find(search) == std::string::npos) continue;
     }
 
     // Category color
-    ImVec4 catColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    ImVec4 cat_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     for (auto& cat : categories) {
       if (cat.name == log.category) {
-        catColor = cat.color;
+        cat_color = cat.color;
         break;
       }
     }
 
     // Level color for the tag
-    ImVec4 levelColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    ImVec4 level_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     switch (log.level) {
-      case Log::LogLevel::Trace:    levelColor = ImVec4(0.7f, 0.7f, 0.7f, 1.0f); break;
-      case Log::LogLevel::Debug:    levelColor = ImVec4(0.0f, 0.8f, 1.0f, 1.0f); break;
-      case Log::LogLevel::Info:     levelColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); break;
-      case Log::LogLevel::Warn:     levelColor = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); break;
-      case Log::LogLevel::Error:    levelColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); break;
-      case Log::LogLevel::Critical: levelColor = ImVec4(1.0f, 0.0f, 1.0f, 1.0f); break;
+      case log::LogLevel::TRACE:    level_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f); break;
+      case log::LogLevel::DEBUG:    level_color = ImVec4(0.0f, 0.8f, 1.0f, 1.0f); break;
+      case log::LogLevel::INFO:     level_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); break;
+      case log::LogLevel::WARN:     level_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); break;
+      case log::LogLevel::ERROR:    level_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); break;
+      case log::LogLevel::CRITICAL: level_color = ImVec4(1.0f, 0.0f, 1.0f, 1.0f); break;
       default: break;
     }
 
     // Format: [+sec] [Category] [level] message
-    ImGui::Text("[+%.3fs] ", log.uptimeSec);
+    ImGui::Text("[+%.3fs] ", log.uptime_sec);
     ImGui::SameLine();
-    ImGui::TextColored(catColor, "[%s]", log.category.c_str());
+    ImGui::TextColored(cat_color, "[%s]", log.category.c_str());
     ImGui::SameLine();
 
-    const char* levelStr = "?";
+    const char* level_str = "?";
     switch (log.level) {
-      case Log::LogLevel::Trace:    levelStr = "trace"; break;
-      case Log::LogLevel::Debug:    levelStr = "debug"; break;
-      case Log::LogLevel::Info:     levelStr = "info"; break;
-      case Log::LogLevel::Warn:     levelStr = "warn"; break;
-      case Log::LogLevel::Error:    levelStr = "error"; break;
-      case Log::LogLevel::Critical: levelStr = "critical"; break;
+      case log::LogLevel::TRACE:    level_str = "trace"; break;
+      case log::LogLevel::DEBUG:    level_str = "debug"; break;
+      case log::LogLevel::INFO:     level_str = "info"; break;
+      case log::LogLevel::WARN:     level_str = "warn"; break;
+      case log::LogLevel::ERROR:    level_str = "error"; break;
+      case log::LogLevel::CRITICAL: level_str = "critical"; break;
       default: break;
     }
-    ImGui::TextColored(levelColor, "[%s]", levelStr);
+    ImGui::TextColored(level_color, "[%s]", level_str);
     ImGui::SameLine();
     ImGui::Text("%s", log.message.c_str());
   }
@@ -564,34 +564,34 @@ void EngineDebugLayer::DisplayEventLog() {
     ImGui::SetScrollHereY(1.0f);
 }
 
-void EngineDebugLayer::DisplayLayoutMenu() {
+void EngineDebugLayer::display_layout_menu() {
   if (ImGui::BeginMenu("Layout")) {
-    auto& layoutManager = Application::Get().GetLayoutManager();
-    const std::string& currentLayout = layoutManager.GetCurrentLayout();
+    auto& layout_manager = Application::get().get_layout_manager();
+    const std::string& current_layout = layout_manager.get_current_layout();
     
     // Presets
-    bool isMinimal = (currentLayout == "Minimal");
-    if (ImGui::MenuItem("Minimal", "Alt+1", isMinimal)) {
-      layoutManager.ApplyPreset(LayoutManager::Preset::Minimal);
+    bool is_minimal = current_layout == "Minimal";
+    if (ImGui::MenuItem("Minimal", "Alt+1", is_minimal)) {
+      layout_manager.apply_preset(LayoutManager::Preset::MINIMAL);
     }
     
-    bool isDefault = (currentLayout == "Default");
+    bool isDefault = current_layout == "Default";
     if (ImGui::MenuItem("Default", "Alt+2", isDefault)) {
-      layoutManager.ApplyPreset(LayoutManager::Preset::Default);
+      layout_manager.apply_preset(LayoutManager::Preset::DEFAULT);
     }
     
     // Custom layouts
-    auto layouts = layoutManager.GetUserLayoutNames();
+    auto layouts = layout_manager.get_user_layout_names();
     if (!layouts.empty()) {
       ImGui::Separator();
-      int shortcutNum = 3;
+      int shortcut_num = 3;
       for (const auto& name : layouts) {
-        bool isCurrent = (name == currentLayout);
-        std::string shortcut = (shortcutNum <= 9) ? "Alt+" + std::to_string(shortcutNum) : "";
-        if (ImGui::MenuItem(name.c_str(), shortcut.c_str(), isCurrent)) {
-          layoutManager.LoadLayout(name);
+        bool is_current = name == current_layout;
+        std::string shortcut = (shortcut_num <= 9) ? "Alt+" + std::to_string(shortcut_num) : "";
+        if (ImGui::MenuItem(name.c_str(), shortcut.c_str(), is_current)) {
+          layout_manager.load_layout(name);
         }
-        shortcutNum++;
+        shortcut_num++;
       }
     }
     
@@ -599,52 +599,52 @@ void EngineDebugLayer::DisplayLayoutMenu() {
     
     // Save and Delete options
     if (ImGui::MenuItem("Save Layout...", "Alt+0")) {
-      mShowSaveLayoutDialog = true;
+      m_show_save_layout_dialog = true;
     }
     if (ImGui::MenuItem("Delete Layout...")) {
-      mShowDeleteLayoutDialog = true;
+      m_show_delete_layout_dialog = true;
     }
     
     ImGui::EndMenu();
   }
 }
 
-void EngineDebugLayer::DisplaySaveLayoutDialog() {
-  if (!mShowSaveLayoutDialog) {
-    mSaveDialogInitialized = false;
+void EngineDebugLayer::display_save_layout_dialog() {
+  if (!m_show_save_layout_dialog) {
+    m_save_dialog_initialized = false;
     return;
   }
   
   // Clear buffer only once when dialog first opens
-  if (!mSaveDialogInitialized) {
-    mLayoutNameBuffer.fill('\0');
-    mSaveDialogInitialized = true;
+  if (!m_save_dialog_initialized) {
+    m_layout_name_buffer.fill('\0');
+    m_save_dialog_initialized = true;
   }
   ImGui::OpenPopup("Save Layout");
   
-  if (ImGui::BeginPopupModal("Save Layout", &mShowSaveLayoutDialog)) {
-    ImGui::InputText("Layout Name", mLayoutNameBuffer.data(), mLayoutNameBuffer.size());
+  if (ImGui::BeginPopupModal("Save Layout", &m_show_save_layout_dialog)) {
+    ImGui::InputText("Layout Name", m_layout_name_buffer.data(), m_layout_name_buffer.size());
     
     ImGui::Spacing();
     
-    bool saveClicked = ImGui::Button("Save");
+    bool save_clicked = ImGui::Button("Save");
     ImGui::SameLine();
     if (ImGui::Button("Cancel")) {
-      mShowSaveLayoutDialog = false;
+      m_show_save_layout_dialog = false;
     }
     
-    if (saveClicked && mLayoutNameBuffer[0] != '\0') {
-      auto& layoutManager = Application::Get().GetLayoutManager();
-      std::string layoutName(mLayoutNameBuffer.data());
+    if (save_clicked && m_layout_name_buffer[0] != '\0') {
+      auto& layout_manager = Application::get().get_layout_manager();
+      std::string layout_name(m_layout_name_buffer.data());
       
-      if (layoutManager.HasLayout(layoutName)) {
+      if (layout_manager.has_layout(layout_name)) {
         // Show overwrite confirmation
-        mPendingLayoutName = layoutName;
-        mShowOverwriteConfirmation = true;
-        mShowSaveLayoutDialog = false;
+        m_pending_layout_name = layout_name;
+        m_show_overwrite_confirmation = true;
+        m_show_save_layout_dialog = false;
       } else {
-        layoutManager.SaveLayout(layoutName);
-        mShowSaveLayoutDialog = false;
+        layout_manager.save_layout(layout_name);
+        m_show_save_layout_dialog = false;
       }
     }
     
@@ -652,14 +652,14 @@ void EngineDebugLayer::DisplaySaveLayoutDialog() {
   }
 }
 
-void EngineDebugLayer::DisplayDeleteLayoutDialog() {
-  if (!mShowDeleteLayoutDialog) return;
+void EngineDebugLayer::display_delete_layout_dialog() {
+  if (!m_show_delete_layout_dialog) return;
   
   ImGui::OpenPopup("Delete Layout");
   
-  if (ImGui::BeginPopupModal("Delete Layout", &mShowDeleteLayoutDialog)) {
-    auto& layoutManager = Application::Get().GetLayoutManager();
-    auto layouts = layoutManager.GetUserLayoutNames();
+  if (ImGui::BeginPopupModal("Delete Layout", &m_show_delete_layout_dialog)) {
+    auto& layout_manager = Application::get().get_layout_manager();
+    auto layouts = layout_manager.get_user_layout_names();
     
     ImGui::Text("Select layout to delete:");
     ImGui::Spacing();
@@ -667,7 +667,7 @@ void EngineDebugLayer::DisplayDeleteLayoutDialog() {
     for (const auto& name : layouts) {
       ImGui::PushID(name.c_str());
       if (ImGui::Button("Delete", ImVec2(200, 0))) {
-        layoutManager.DeleteLayout(name);
+        layout_manager.delete_layout(name);
       }
       ImGui::SameLine();
       ImGui::Text("\"%s\"", name.c_str());
@@ -680,76 +680,76 @@ void EngineDebugLayer::DisplayDeleteLayoutDialog() {
     
     ImGui::Spacing();
     if (ImGui::Button("Close")) {
-      mShowDeleteLayoutDialog = false;
+      m_show_delete_layout_dialog = false;
     }
     
     ImGui::EndPopup();
   }
 }
 
-void EngineDebugLayer::DisplayOverwriteConfirmationDialog() {
-  if (!mShowOverwriteConfirmation) return;
+void EngineDebugLayer::display_overwrite_confirmation_dialog() {
+  if (!m_show_overwrite_confirmation) return;
   
   ImGui::OpenPopup("Confirm Overwrite");
   
-  if (ImGui::BeginPopupModal("Confirm Overwrite", &mShowOverwriteConfirmation)) {
-    ImGui::Text("Layout \"%s\" already exists.", mPendingLayoutName.c_str());
+  if (ImGui::BeginPopupModal("Confirm Overwrite", &m_show_overwrite_confirmation)) {
+    ImGui::Text("Layout \"%s\" already exists.", m_pending_layout_name.c_str());
     ImGui::Text("Do you want to overwrite it?");
     ImGui::Spacing();
     
     if (ImGui::Button("Yes")) {
-      auto& layoutManager = Application::Get().GetLayoutManager();
-      layoutManager.SaveLayout(mPendingLayoutName);
-      mShowOverwriteConfirmation = false;
-      mPendingLayoutName.clear();
+      auto& layout_manager = Application::get().get_layout_manager();
+      layout_manager.save_layout(m_pending_layout_name);
+      m_show_overwrite_confirmation = false;
+      m_pending_layout_name.clear();
     }
     
     ImGui::SameLine();
     if (ImGui::Button("No")) {
-      mShowOverwriteConfirmation = false;
-      mPendingLayoutName.clear();
+      m_show_overwrite_confirmation = false;
+      m_pending_layout_name.clear();
     }
     
     ImGui::EndPopup();
   }
 }
 
-void EngineDebugLayer::HandleLayoutShortcuts() {
+void EngineDebugLayer::handle_layout_shortcuts() {
   // Alt+Number shortcuts for layouts
   ImGuiIO& io = ImGui::GetIO();
   
   if (io.KeyAlt && !io.KeyCtrl && !io.KeyShift) {
-    auto& layoutManager = Application::Get().GetLayoutManager();
+    auto& layout_manager = Application::get().get_layout_manager();
     
     // Check each number key individually
     if (ImGui::IsKeyPressed(ImGuiKey_1)) {
-      layoutManager.ApplyPreset(LayoutManager::Preset::Minimal);
+      layout_manager.apply_preset(LayoutManager::Preset::MINIMAL);
     } else if (ImGui::IsKeyPressed(ImGuiKey_2)) {
-      layoutManager.ApplyPreset(LayoutManager::Preset::Default);
+      layout_manager.apply_preset(LayoutManager::Preset::DEFAULT);
     } else if (ImGui::IsKeyPressed(ImGuiKey_0)) {
-      mShowSaveLayoutDialog = true;
+      m_show_save_layout_dialog = true;
     } else {
       // Alt+3 through Alt+9 for custom layouts
-      int customIndex = -1;
-      if (ImGui::IsKeyPressed(ImGuiKey_3)) customIndex = 0;
-      else if (ImGui::IsKeyPressed(ImGuiKey_4)) customIndex = 1;
-      else if (ImGui::IsKeyPressed(ImGuiKey_5)) customIndex = 2;
-      else if (ImGui::IsKeyPressed(ImGuiKey_6)) customIndex = 3;
-      else if (ImGui::IsKeyPressed(ImGuiKey_7)) customIndex = 4;
-      else if (ImGui::IsKeyPressed(ImGuiKey_8)) customIndex = 5;
-      else if (ImGui::IsKeyPressed(ImGuiKey_9)) customIndex = 6;
+      int custom_index = -1;
+      if (ImGui::IsKeyPressed(ImGuiKey_3)) custom_index = 0;
+      else if (ImGui::IsKeyPressed(ImGuiKey_4)) custom_index = 1;
+      else if (ImGui::IsKeyPressed(ImGuiKey_5)) custom_index = 2;
+      else if (ImGui::IsKeyPressed(ImGuiKey_6)) custom_index = 3;
+      else if (ImGui::IsKeyPressed(ImGuiKey_7)) custom_index = 4;
+      else if (ImGui::IsKeyPressed(ImGuiKey_8)) custom_index = 5;
+      else if (ImGui::IsKeyPressed(ImGuiKey_9)) custom_index = 6;
       
-      if (customIndex >= 0) {
-        auto layouts = layoutManager.GetUserLayoutNames();
-        if (customIndex < static_cast<int>(layouts.size())) {
-          layoutManager.LoadLayout(layouts[customIndex]);
+      if (custom_index >= 0) {
+        auto layouts = layout_manager.get_user_layout_names();
+        if (custom_index < static_cast<int>(layouts.size())) {
+          layout_manager.load_layout(layouts[custom_index]);
         }
       }
     }
   }
 }
 
-void EngineDebugLayer::HandleDebugShortcuts() {
+void EngineDebugLayer::handle_debug_shortcuts() {
   // Ctrl+Shift+D prefix for debug shortcuts
   // Uses member variables mDebugModeActive and mDebugModeTimer (not static, for thread safety)
   
@@ -757,39 +757,39 @@ void EngineDebugLayer::HandleDebugShortcuts() {
   
   // Check for Ctrl+Shift+D
   if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D)) {
-    mDebugModeActive = true;
-    mDebugModeTimer = 0.5f; // 500ms timeout
+    m_debug_mode_active = true;
+    m_debug_mode_timer = 0.5f; // 500ms timeout
   }
   
-  if (mDebugModeActive) {
+  if (m_debug_mode_active) {
     // Decrement timer
-    mDebugModeTimer -= io.DeltaTime;
+    m_debug_mode_timer -= io.DeltaTime;
     
     // Check for second key
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-      Application::Get().ReloadShaders();
-      mDebugModeActive = false;
+      Application::get().reload_shaders();
+      m_debug_mode_active = false;
     } else if (ImGui::IsKeyPressed(ImGuiKey_H)) {
-      auto& app = Application::Get();
-      app.SetHotReloadEnabled(!app.IsHotReloadEnabled());
-      mDebugModeActive = false;
+      auto& app = Application::get();
+      app.set_hot_reload_enabled(!app.is_hot_reload_enabled());
+      m_debug_mode_active = false;
     } else if (ImGui::IsKeyPressed(ImGuiKey_L)) {
-      mShowContextOverlay = !mShowContextOverlay;
-      mDebugModeActive = false;
-    } else if (mDebugModeTimer <= 0.0f) {
+      m_show_context_overlay = !m_show_context_overlay;
+      m_debug_mode_active = false;
+    } else if (m_debug_mode_timer <= 0.0f) {
       // Timer expired - open debug wheel (placeholder)
-      SD::Log::Engine::Info("Debug wheel placeholder - coming soon!");
-      mDebugModeActive = false;
+      log::engine::info("Debug wheel placeholder - coming soon!");
+      m_debug_mode_active = false;
     }
   }
 }
 
-void EngineDebugLayer::ApplyPresetConfiguration(bool inspectorsVisible, bool logVisible,
-                                                bool rendererVisible) {
-  mShowViewInspector = inspectorsVisible;
-  mShowSceneInspector = inspectorsVisible;
-  mShowEventLog = logVisible;
-  mShowRendererInfo = rendererVisible;
+void EngineDebugLayer::apply_preset_configuration(bool inspectors_visible, bool log_visible,
+                                                bool renderer_visible) {
+  m_show_view_inspector = inspectors_visible;
+  m_show_scene_inspector = inspectors_visible;
+  m_show_event_log = log_visible;
+  m_show_renderer_info = renderer_visible;
 }
 
 } // namespace SD

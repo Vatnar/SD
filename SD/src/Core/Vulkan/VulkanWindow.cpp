@@ -4,217 +4,217 @@
 #include "Core/Window.hpp"
 #include "Utils/Utils.hpp"
 
-namespace SD {
-VulkanWindow::VulkanWindow(Window& mWindow, VulkanContext& vulkanContext) :
-  mVulkanCtx(vulkanContext), mDevice(vulkanContext.GetVulkanDevice().get()), mWindow(mWindow),
-  mFrameSyncs(false), mIsMinimized(false) {
-  SD_ALWAYS_ASSERT(mVulkanCtx.GetVulkanDevice(), "VulkanContext must have valid device");
-  SD_ALWAYS_ASSERT(mVulkanCtx.GetInstance(), "VulkanContext must have valid instance");
+namespace sd {
+VulkanWindow::VulkanWindow(Window& window, VulkanContext& vulkan_context) :
+  m_vulkan_ctx(vulkan_context), m_device(vulkan_context.get_vulkan_device().get()), m_window(window),
+  m_frame_syncs(false), m_is_minimized(false) {
+  assert(m_vulkan_ctx.get_vulkan_device()&& "VulkanContext must have valid device");
+  assert(m_vulkan_ctx.get_instance()&& "VulkanContext must have valid instance");
 
-  mSurface = mWindow.CreateWindowSurface(mVulkanCtx.GetInstance(), nullptr);
-  SD_ALWAYS_ASSERT(mSurface, "Failed to create window surface");
-  CreateCommandPool();
-  SD_ALWAYS_ASSERT(mCommandPool, "Failed to create command pool");
-  CreateSwapchain();
-  SD_ALWAYS_ASSERT(mSwapchain, "Failed to create swapchain");
-  CreateRenderPass();
-  SD_ALWAYS_ASSERT(mRenderPass, "Failed to create render pass");
-  CreateSwapchainDependentResources();
+  m_surface = window.create_window_surface(m_vulkan_ctx.get_instance(), nullptr);
+  assert(m_surface&& "Failed to create window surface");
+  create_command_pool();
+  assert(m_command_pool&& "Failed to create command pool");
+  create_swapchain();
+  assert(m_swapchain&& "Failed to create swapchain");
+  create_render_pass();
+  assert(m_render_pass&& "Failed to create render pass");
+  create_swapchain_dependent_resources();
 
-  std::generate_n(std::back_inserter(mFrameSyncs), MAX_FRAMES_IN_FLIGHT, [&] {
+  std::generate_n(std::back_inserter(m_frame_syncs), MAX_FRAMES_IN_FLIGHT, [&] {
     FrameSync f;
-    f.imageAcquired =
-        CheckVulkanResVal(mDevice.createSemaphoreUnique({}), "Failed to create unique semaphore");
-    f.inFlight = CheckVulkanResVal(mDevice.createFenceUnique({vk::FenceCreateFlagBits::eSignaled}),
+    f.image_acquired =
+        check_vulkan_res_val(m_device.createSemaphoreUnique({}), "Failed to create unique semaphore");
+    f.in_flight = check_vulkan_res_val(m_device.createFenceUnique({vk::FenceCreateFlagBits::eSignaled}),
                                    "Failed to create unique fence: ");
     return f;
   });
 
-  std::generate_n(std::back_inserter(mSwapchainSyncs), GetSwapchainImages().size(), [&] {
+  std::generate_n(std::back_inserter(m_swapchain_syncs), get_swapchain_images().size(), [&] {
     SwapchainSync s;
-    s.renderComplete =
-        CheckVulkanResVal(mDevice.createSemaphoreUnique({}), "Failed to create unique semaphore");
+    s.render_complete =
+        check_vulkan_res_val(m_device.createSemaphoreUnique({}), "Failed to create unique semaphore");
     return s;
   });
 }
 VulkanWindow::~VulkanWindow() {
   // Use raw call to avoid Vulkan-Hpp assertions during shutdown
-  (void)mDevice.waitIdle();
+  (void)m_device.waitIdle();
 
-  mFramebuffers.clear();
-  mSwapchainImageViews.clear();
-  mSwapchain.reset();
-  mSurface.reset();
+  m_framebuffers.clear();
+  m_swapchain_image_views.clear();
+  m_swapchain.reset();
+  m_surface.reset();
 }
 
-void VulkanWindow::RecreateSwapchain(LayerList& layers) {
-  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
-  u32 oldWidth = mSwapchainExtent.width;
-  u32 oldHeight = mSwapchainExtent.height;
+void VulkanWindow::recreate_swapchain(LayerList& layers) {
+  assert(m_device&& "Device must be valid");
+  u32 old_width = m_swapchain_extent.width;
+  u32 old_height = m_swapchain_extent.height;
 
-  auto [fbWidth, fbHeight] = mWindow.GetFramebufferSize();
+  auto [fb_width, fb_height] = m_window.get_framebuffer_size();
 
   // Handle minimization or zero size
-  if (fbWidth == 0 || fbHeight == 0) {
-    mIsMinimized = true;
+  if (fb_width == 0 || fb_height == 0) {
+    m_is_minimized = true;
     return;
   }
-  mIsMinimized = false;
+  m_is_minimized = false;
 
-  if (static_cast<u32>(fbWidth) == oldWidth && static_cast<u32>(fbHeight) == oldHeight) {
+  if (static_cast<u32>(fb_width) == old_width && static_cast<u32>(fb_height) == old_height) {
     // Already correct size
     return;
   }
 
-  (void)mDevice.waitIdle();
+  (void)m_device.waitIdle();
 
-  mFramebuffers.clear();
-  mSwapchainImageViews.clear();
+  m_framebuffers.clear();
+  m_swapchain_image_views.clear();
 
-  CreateSwapchain();
-  CreateSwapchainDependentResources();
+  create_swapchain();
+  create_swapchain_dependent_resources();
 
-  layers.OnSwapchainRecreated();
+  layers.on_swapchain_recreated();
 }
-const Window& VulkanWindow::GetWindow() const {
-  return mWindow;
+const Window& VulkanWindow::get_window() const {
+  return m_window;
 }
-FrameSync& VulkanWindow::GetFrameSync() {
-  SD_ALWAYS_ASSERT(CurrentFrame < MAX_FRAMES_IN_FLIGHT, "CurrentFrame index out of bounds");
-  SD_ALWAYS_ASSERT(CurrentFrame < mFrameSyncs.size(), "CurrentFrame exceeds frame syncs size");
-  return mFrameSyncs[CurrentFrame];
+FrameSync& VulkanWindow::get_frame_sync() {
+  assert(current_frame < MAX_FRAMES_IN_FLIGHT&& "CurrentFrame index out of bounds");
+  assert(current_frame < m_frame_syncs.size()&& "CurrentFrame exceeds frame syncs size");
+  return m_frame_syncs[current_frame];
 }
-SwapchainSync& VulkanWindow::GetSwapchainSync(const u32 imageIndex) {
-  SD_ALWAYS_ASSERT(imageIndex < mSwapchainSyncs.size(), "Image index out of bounds");
-  return mSwapchainSyncs[imageIndex];
+SwapchainSync& VulkanWindow::get_swapchain_sync(const u32 image_index) {
+  assert(image_index < m_swapchain_syncs.size()&& "Image index out of bounds");
+  return m_swapchain_syncs[image_index];
 }
-vk::UniqueSwapchainKHR& VulkanWindow::GetSwapchain() {
-  return mSwapchain;
+vk::UniqueSwapchainKHR& VulkanWindow::get_swapchain() {
+  return m_swapchain;
 }
-vk::SwapchainCreateInfoKHR& VulkanWindow::GetSwapchainCreateInfo() {
-  return mSwapchainCreateInfo;
+vk::SwapchainCreateInfoKHR& VulkanWindow::get_swapchain_create_info() {
+  return m_swapchain_create_info;
 }
-const std::vector<vk::Image>& VulkanWindow::GetSwapchainImages() const {
-  return mSwapchainImages;
+const std::vector<vk::Image>& VulkanWindow::get_swapchain_images() const {
+  return m_swapchain_images;
 }
-vk::SurfaceFormatKHR& VulkanWindow::GetSurfaceFormat() {
-  return mSurfaceFormat;
+vk::SurfaceFormatKHR& VulkanWindow::get_surface_format() {
+  return m_surface_format;
 }
-vk::Extent2D& VulkanWindow::GetSwapchainExtent() {
-  return mSwapchainExtent;
+vk::Extent2D& VulkanWindow::get_swapchain_extent() {
+  return m_swapchain_extent;
 }
-const std::vector<vk::UniqueImageView>& VulkanWindow::GetSwapchainImageViews() const {
-  return mSwapchainImageViews;
-}
-
-const std::vector<vk::UniqueFramebuffer>& VulkanWindow::GetFramebuffers() const {
-  return mFramebuffers;
-}
-vk::RenderPass VulkanWindow::GetRenderPass() const {
-  return *mRenderPass;
+const std::vector<vk::UniqueImageView>& VulkanWindow::get_swapchain_image_views() const {
+  return m_swapchain_image_views;
 }
 
-std::expected<u32, vk::Result> VulkanWindow::GetVulkanImages(vk::UniqueSemaphore& imageAcquired) {
-  SD_ALWAYS_ASSERT(mSwapchain, "Swapchain must be valid");
-  SD_ALWAYS_ASSERT(imageAcquired, "Semaphore must be valid");
-  u32 imageIndex;
+const std::vector<vk::UniqueFramebuffer>& VulkanWindow::get_framebuffers() const {
+  return m_framebuffers;
+}
+vk::RenderPass VulkanWindow::get_render_pass() const {
+  return *m_render_pass;
+}
+
+std::expected<u32, vk::Result> VulkanWindow::get_vulkan_images(vk::UniqueSemaphore& image_acquired) {
+  assert(m_swapchain&& "Swapchain must be valid");
+  assert(image_acquired&& "Semaphore must be valid");
+  u32 image_index;
   vk::Result res =
-      mDevice.acquireNextImageKHR(*mSwapchain, UINT64_MAX, *imageAcquired, nullptr, &imageIndex);
+      m_device.acquireNextImageKHR(*m_swapchain, UINT64_MAX, *image_acquired, nullptr, &image_index);
 
-  CurrentImageIndex = imageIndex;
+  current_image_index = image_index;
   if (res == vk::Result::eSuccess || res == vk::Result::eSuboptimalKHR) {
-    return imageIndex;
+    return image_index;
   }
   return std::unexpected(res);
 }
 
-vk::Result VulkanWindow::PresentImage(u32 imageIndex) {
-  SD_ALWAYS_ASSERT(mSwapchain, "Swapchain must be valid");
-  SD_ALWAYS_ASSERT(imageIndex < mSwapchainSyncs.size(), "Image index out of bounds");
-  SD_ALWAYS_ASSERT(mSwapchainSyncs[imageIndex].renderComplete, "Render complete semaphore must be valid");
+vk::Result VulkanWindow::present_image(u32 image_index) {
+  assert(m_swapchain&& "Swapchain must be valid");
+  assert(image_index < m_swapchain_syncs.size()&& "Image index out of bounds");
+  assert(m_swapchain_syncs[image_index].render_complete&& "Render complete semaphore must be valid");
 
-  vk::PresentInfoKHR presentInfo{};
-  presentInfo.setWaitSemaphores(*mSwapchainSyncs[imageIndex].renderComplete);
-  presentInfo.setSwapchainCount(1);
-  presentInfo.setPSwapchains(&*mSwapchain);
-  presentInfo.setPImageIndices(&imageIndex);
+  vk::PresentInfoKHR present_info{};
+  present_info.setWaitSemaphores(*m_swapchain_syncs[image_index].render_complete);
+  present_info.setSwapchainCount(1);
+  present_info.setPSwapchains(&*m_swapchain);
+  present_info.setPImageIndices(&image_index);
 
   // Use the raw C API to avoid Vulkan-Hpp assertions on exit
-  VkPresentInfoKHR presentInfoRaw = presentInfo;
+  VkPresentInfoKHR present_info_raw = present_info;
   return static_cast<vk::Result>(
-      vkQueuePresentKHR(static_cast<VkQueue>(mVulkanCtx.GetGraphicsQueue()), &presentInfoRaw));
+      vkQueuePresentKHR(static_cast<VkQueue>(m_vulkan_ctx.get_graphics_queue()), &present_info_raw));
 }
 
 
-void VulkanWindow::RebuildPerImageSync() {
-  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
-  SD_ALWAYS_ASSERT(!mSwapchainImages.empty(), "Swapchain images must not be empty");
+void VulkanWindow::rebuild_per_image_sync() {
+  assert(m_device&& "Device must be valid");
+  assert(!m_swapchain_images.empty()&& "Swapchain images must not be empty");
 
-  const auto imageCount = GetSwapchainImages().size();
-  mSwapchainSyncs.clear();
-  mSwapchainSyncs.reserve(imageCount);
+  const auto image_count = get_swapchain_images().size();
+  m_swapchain_syncs.clear();
+  m_swapchain_syncs.reserve(image_count);
 
-  std::ranges::generate_n(std::back_inserter(mSwapchainSyncs), static_cast<int>(imageCount), [&] {
+  std::ranges::generate_n(std::back_inserter(m_swapchain_syncs), static_cast<int>(image_count), [&] {
     SwapchainSync sync;
-    sync.renderComplete =
-        CheckVulkanResVal(mDevice.createSemaphoreUnique({}), "Failed to create unique semaphore: ");
+    sync.render_complete =
+        check_vulkan_res_val(m_device.createSemaphoreUnique({}), "Failed to create unique semaphore: ");
     return sync;
   });
 }
-void VulkanWindow::Resize(int width, int height) {
+void VulkanWindow::resize(int width, int height) {
   if (width == 0 || height == 0) {
-    mIsMinimized = true;
+    m_is_minimized = true;
     return;
   }
 
-  mIsMinimized = false;
-  mFramebufferResized = true;
+  m_is_minimized = false;
+  m_is_framebuffer_resized = true;
 }
-void VulkanWindow::CreateSwapchain() {
-  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
-  SD_ALWAYS_ASSERT(mSurface, "Surface must be valid");
+void VulkanWindow::create_swapchain() {
+  assert(m_device&& "Device must be valid");
+  assert(m_surface&& "Surface must be valid");
 
-  auto& physDev = mVulkanCtx.GetPhysicalDevice();
-  mSurfaceCapabilities = CheckVulkanResVal(physDev.getSurfaceCapabilitiesKHR(mSurface.get()),
+  auto& physical_device = m_vulkan_ctx.get_physical_device();
+  m_surface_capabilities = check_vulkan_res_val(physical_device.getSurfaceCapabilitiesKHR(m_surface.get()),
                                            "Failed to get sufrace capabilities");
-  auto& caps = mSurfaceCapabilities;
-  auto [windowWidth, windowHeight] = mWindow.GetWindowSize();
+  auto& caps = m_surface_capabilities;
+  auto [window_width, window_height] = m_window.get_window_size();
 
   if (caps.currentExtent.width != UINT32_MAX) {
-    mSwapchainExtent = caps.currentExtent;
+    m_swapchain_extent = caps.currentExtent;
   } else {
-    mSwapchainExtent.width = std::clamp(static_cast<u32>(windowWidth), caps.minImageExtent.width,
+    m_swapchain_extent.width = std::clamp(static_cast<u32>(window_width), caps.minImageExtent.width,
                                         caps.maxImageExtent.width);
-    mSwapchainExtent.height = std::clamp(static_cast<u32>(windowHeight), caps.minImageExtent.height,
+    m_swapchain_extent.height = std::clamp(static_cast<u32>(window_height), caps.minImageExtent.height,
                                          caps.maxImageExtent.height);
   }
 
-  u32 desiredImageCount = caps.minImageCount + 1;
-  if (caps.maxImageCount > 0 && desiredImageCount > caps.maxImageCount)
-    desiredImageCount = caps.maxImageCount;
+  u32 desired_image_count = caps.minImageCount + 1;
+  if (caps.maxImageCount > 0 && desired_image_count > caps.maxImageCount)
+    desired_image_count = caps.maxImageCount;
 
-  auto surfaceFormats = CheckVulkanResVal(physDev.getSurfaceFormatsKHR(mSurface.get()),
+  auto surface_formats = check_vulkan_res_val(physical_device.getSurfaceFormatsKHR(m_surface.get()),
                                           "Failed to get surface formats: ");
-  if (surfaceFormats.size() == 1 && surfaceFormats[0].format == vk::Format::eUndefined) {
-    mSurfaceFormat.format = vk::Format::eB8G8R8A8Srgb;
-    mSurfaceFormat.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+  if (surface_formats.size() == 1 && surface_formats[0].format == vk::Format::eUndefined) {
+    m_surface_format.format = vk::Format::eB8G8R8A8Srgb;
+    m_surface_format.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
   } else {
-    mSurfaceFormat = surfaceFormats[0];
-    for (auto& f : surfaceFormats) {
+    m_surface_format = surface_formats[0];
+    for (auto& f : surface_formats) {
       if (f.format == vk::Format::eB8G8R8A8Srgb &&
           f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-        mSurfaceFormat = f;
+        m_surface_format = f;
         break;
       }
     }
   }
 
-  auto presentModes = CheckVulkanResVal(physDev.getSurfacePresentModesKHR(mSurface.get()),
+  auto present_modes = check_vulkan_res_val(physical_device.getSurfacePresentModesKHR(m_surface.get()),
                                         "Failed to get surface present modes: ");
-  vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
-  for (auto m : presentModes) {
+  vk::PresentModeKHR present_mode = vk::PresentModeKHR::eFifo;
+  for (auto m : present_modes) {
     if (m == vk::PresentModeKHR::eMailbox) {
-      presentMode = m;
+      present_mode = m;
       break;
     }
   }
@@ -222,39 +222,39 @@ void VulkanWindow::CreateSwapchain() {
   vk::ImageUsageFlags usage =
       vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
 
-  vk::SurfaceTransformFlagBitsKHR preTransform =
-      (caps.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity)
+  vk::SurfaceTransformFlagBitsKHR pre_transform =
+      caps.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity
           ? vk::SurfaceTransformFlagBitsKHR::eIdentity
           : caps.currentTransform;
 
-  vk::SwapchainKHR oldSwapchain = mSwapchain.get();
+  vk::SwapchainKHR old_swapchain = m_swapchain.get();
 
-  mSwapchainCreateInfo.setSurface(mSurface.get())
-      .setMinImageCount(desiredImageCount)
-      .setImageFormat(mSurfaceFormat.format)
-      .setImageColorSpace(mSurfaceFormat.colorSpace)
-      .setImageExtent(mSwapchainExtent)
+  m_swapchain_create_info.setSurface(m_surface.get())
+      .setMinImageCount(desired_image_count)
+      .setImageFormat(m_surface_format.format)
+      .setImageColorSpace(m_surface_format.colorSpace)
+      .setImageExtent(m_swapchain_extent)
       .setImageArrayLayers(1)
       .setImageUsage(usage)
-      .setPreTransform(preTransform)
-      .setPresentMode(presentMode)
+      .setPreTransform(pre_transform)
+      .setPresentMode(present_mode)
       .setClipped(true)
-      .setOldSwapchain(oldSwapchain)
+      .setOldSwapchain(old_swapchain)
       .setImageSharingMode(vk::SharingMode::eExclusive);
 
-  mSwapchain = CheckVulkanResVal(mDevice.createSwapchainKHRUnique(mSwapchainCreateInfo),
+  m_swapchain = check_vulkan_res_val(m_device.createSwapchainKHRUnique(m_swapchain_create_info),
                                  "Failed to create unique swapchain: ");
-  mSwapchainImages = CheckVulkanResVal(mDevice.getSwapchainImagesKHR(*mSwapchain),
+  m_swapchain_images = check_vulkan_res_val(m_device.getSwapchainImagesKHR(*m_swapchain),
                                        "Failed to get swapchain images");
-  SD_ALWAYS_ASSERT(!mSwapchainImages.empty(), "Swapchain must have at least one image");
+  assert(!m_swapchain_images.empty()&& "Swapchain must have at least one image");
 }
-void VulkanWindow::CreateRenderPass() {
-  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
-  SD_ALWAYS_ASSERT(mSurfaceFormat.format != vk::Format::eUndefined, "Surface format must be valid");
+void VulkanWindow::create_render_pass() {
+  assert(m_device&& "Device must be valid");
+  assert(m_surface_format.format != vk::Format::eUndefined&& "Surface format must be valid");
 
   // TODO: Use dynamic rendering (VK_KHR_dynamic_rendering) to simplify render pass management
-  vk::AttachmentDescription colorAttachment{};
-  colorAttachment.setFormat(mSurfaceFormat.format)
+  vk::AttachmentDescription color_attachment{};
+  color_attachment.setFormat(m_surface_format.format)
       .setSamples(vk::SampleCountFlagBits::e1)
       .setLoadOp(vk::AttachmentLoadOp::eClear)
       .setStoreOp(vk::AttachmentStoreOp::eStore)
@@ -263,12 +263,12 @@ void VulkanWindow::CreateRenderPass() {
       .setInitialLayout(vk::ImageLayout::eUndefined)
       .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
 
-  vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
+  vk::AttachmentReference color_attachment_ref(0, vk::ImageLayout::eColorAttachmentOptimal);
 
   vk::SubpassDescription subpass{};
   subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
       .setColorAttachmentCount(1)
-      .setPColorAttachments(&colorAttachmentRef);
+      .setPColorAttachments(&color_attachment_ref);
 
   vk::SubpassDependency dependency{};
   dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL)
@@ -278,83 +278,83 @@ void VulkanWindow::CreateRenderPass() {
       .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
       .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 
-  vk::RenderPassCreateInfo renderPassInfo({}, 1, &colorAttachment, 1, &subpass, 1, &dependency);
+  vk::RenderPassCreateInfo render_pass_info({}, 1, &color_attachment, 1, &subpass, 1, &dependency);
 
-  mRenderPass = CheckVulkanResVal(mDevice.createRenderPassUnique(renderPassInfo),
+  m_render_pass = check_vulkan_res_val(m_device.createRenderPassUnique(render_pass_info),
                                   "Failed to create unique renderpass");
 }
-void VulkanWindow::CreateSwapchainDependentResources() {
-  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
-  SD_ALWAYS_ASSERT(!mSwapchainImages.empty(), "Swapchain images must not be empty");
+void VulkanWindow::create_swapchain_dependent_resources() {
+  assert(m_device&& "Device must be valid");
+  assert(!m_swapchain_images.empty()&& "Swapchain images must not be empty");
 
-  mSwapchainImageViews.clear();
-  mFramebuffers.clear();
+  m_swapchain_image_views.clear();
+  m_framebuffers.clear();
 
-  mSwapchainImageViews.reserve(mSwapchainImages.size());
-  for (const auto& image : mSwapchainImages) {
-    vk::ImageViewCreateInfo createInfo{};
-    createInfo.setImage(image)
+  m_swapchain_image_views.reserve(m_swapchain_images.size());
+  for (const auto& image : m_swapchain_images) {
+    vk::ImageViewCreateInfo create_info{};
+    create_info.setImage(image)
         .setViewType(vk::ImageViewType::e2D)
-        .setFormat(mSurfaceFormat.format)
+        .setFormat(m_surface_format.format)
         .setComponents({vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity,
                         vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity})
         .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-    mSwapchainImageViews.push_back(CheckVulkanResVal(mDevice.createImageViewUnique(createInfo),
+    m_swapchain_image_views.push_back(check_vulkan_res_val(m_device.createImageViewUnique(create_info),
                                                      "Failed to create unique imageview: "));
   }
 
-  CreateFramebuffers();
+  create_framebuffers();
 }
 
-void VulkanWindow::CreateFramebuffers() {
-  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
-  SD_ALWAYS_ASSERT(mRenderPass, "Render pass must be valid");
-  SD_ALWAYS_ASSERT(!mSwapchainImageViews.empty(), "Image views must not be empty");
-  SD_ALWAYS_ASSERT(mSwapchainExtent.width > 0 && mSwapchainExtent.height > 0,
+void VulkanWindow::create_framebuffers() {
+  assert(m_device&& "Device must be valid");
+  assert(m_render_pass&& "Render pass must be valid");
+  assert(!m_swapchain_image_views.empty()&& "Image views must not be empty");
+  assert(m_swapchain_extent.width > 0 && m_swapchain_extent.height > 0&&
             "Swapchain extent must be valid");
 
-  mFramebuffers.resize(mSwapchainImageViews.size());
+  m_framebuffers.resize(m_swapchain_image_views.size());
 
-  for (usize i = 0; i < mSwapchainImageViews.size(); i++) {
-    vk::ImageView attachments[] = {*mSwapchainImageViews[i]};
+  for (usize i = 0; i < m_swapchain_image_views.size(); i++) {
+    vk::ImageView attachments[] = {*m_swapchain_image_views[i]};
 
-    vk::FramebufferCreateInfo framebufferInfo{};
-    framebufferInfo.setRenderPass(*mRenderPass)
+    vk::FramebufferCreateInfo framebuffer_info{};
+    framebuffer_info.setRenderPass(*m_render_pass)
         .setAttachmentCount(1)
         .setPAttachments(attachments)
-        .setWidth(mSwapchainExtent.width)
-        .setHeight(mSwapchainExtent.height)
+        .setWidth(m_swapchain_extent.width)
+        .setHeight(m_swapchain_extent.height)
         .setLayers(1);
 
-    mFramebuffers[i] = CheckVulkanResVal(mDevice.createFramebufferUnique(framebufferInfo),
+    m_framebuffers[i] = check_vulkan_res_val(m_device.createFramebufferUnique(framebuffer_info),
                                          "Failed to create unique framebuffer: ");
   }
 }
 
-void VulkanWindow::CreateCommandPool() {
-  SD_ALWAYS_ASSERT(mDevice, "Device must be valid");
+void VulkanWindow::create_command_pool() {
+  assert(m_device&& "Device must be valid");
 
   // 1. Create Pool
-  vk::CommandPoolCreateInfo poolInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                                     mVulkanCtx.GetGraphicsFamilyIndex());
-  mCommandPool = CheckVulkanResVal(mDevice.createCommandPoolUnique(poolInfo),
+  vk::CommandPoolCreateInfo pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+                                     m_vulkan_ctx.get_graphics_family_index());
+  m_command_pool = check_vulkan_res_val(m_device.createCommandPoolUnique(pool_info),
                                    "Failed to create unique command pool");
 
   // 2. Allocate Buffers (CRITICAL MISSING STEP)
-  vk::CommandBufferAllocateInfo allocInfo{};
-  allocInfo.setCommandPool(*mCommandPool)
+  vk::CommandBufferAllocateInfo alloc_info{};
+  alloc_info.setCommandPool(*m_command_pool)
       .setLevel(vk::CommandBufferLevel::ePrimary)
       .setCommandBufferCount(MAX_FRAMES_IN_FLIGHT);
 
-  mCommandBuffers = CheckVulkanResVal(mDevice.allocateCommandBuffersUnique(allocInfo),
+  m_command_buffers = check_vulkan_res_val(m_device.allocateCommandBuffersUnique(alloc_info),
                                       "Failed to allocate command buffers");
-  SD_ALWAYS_ASSERT(mCommandBuffers.size() == MAX_FRAMES_IN_FLIGHT,
+  assert(m_command_buffers.size() == MAX_FRAMES_IN_FLIGHT&&
             "Must allocate MAX_FRAMES_IN_FLIGHT command buffers");
 }
 
 
-vk::CommandPool VulkanWindow::GetCommandPool() const {
-  return *mCommandPool;
+vk::CommandPool VulkanWindow::get_command_pool() const {
+  return *m_command_pool;
 }
 } // namespace SD

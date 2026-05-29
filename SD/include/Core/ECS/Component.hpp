@@ -39,7 +39,7 @@
 #include <Core/types.hpp>
 #include <Utils/Serialization.hpp>
 
-namespace SD {
+namespace sd {
 template<typename... Ts>
 struct ComponentGroup {};
 
@@ -48,8 +48,8 @@ struct ComponentTraits;
 
 template<typename T>
 struct ComponentSerializer {
-  static void Serialize(const T& component, Serializer& s) = delete;
-  static void Deserialize(T& component, Serializer& s) = delete;
+  static void serialize(const T& component, Serializer& s) = delete;
+  static void deserialize(T& component, Serializer& s) = delete;
 };
 
 namespace detail {
@@ -59,7 +59,7 @@ struct ComponentIdGenerator {
   ComponentIdGenerator(const ComponentIdGenerator&) = delete;
   ComponentIdGenerator& operator=(const ComponentIdGenerator&) = delete;
 
-  static usize Next() { return counter++; }
+  static usize next() { return counter++; }
 
 private:
   static inline usize counter = 0;
@@ -69,7 +69,7 @@ private:
 
 template<typename T>
 struct ComponentTraits {
-  static constexpr bool IsRegistered = false;
+  static constexpr bool s_is_registered = false;
 };
 
 /**
@@ -80,9 +80,9 @@ struct ComponentTraits {
 #define REGISTER_SD_COMPONENT(Type)                                          \
   template<>                                                                 \
   struct ComponentTraits<Type> {                                             \
-    static constexpr bool IsRegistered = true;                               \
-    static constexpr const char* Name = "SD_" #Type;                         \
-    static inline const usize Id = SD::detail::ComponentIdGenerator::Next(); \
+    static constexpr bool s_is_registered = true;                               \
+    static constexpr const char* name = "SD_" #Type;                         \
+    static inline const usize id = detail::ComponentIdGenerator::next(); \
   };
 
 /**
@@ -92,9 +92,9 @@ struct ComponentTraits {
 #define REGISTER_COMPONENT(Type)                                             \
   template<>                                                                 \
   struct ComponentTraits<Type> {                                             \
-    static constexpr bool IsRegistered = true;                               \
-    static constexpr const char* Name = #Type;                               \
-    static inline const usize Id = SD::detail::ComponentIdGenerator::Next(); \
+    static constexpr bool s_is_registered = true;                               \
+    static constexpr const char* name = #Type;                               \
+    static inline const usize id = detail::ComponentIdGenerator::next(); \
   };
 
 struct ComponentDebugInfo {
@@ -105,8 +105,8 @@ struct ComponentDebugInfo {
 
 template<typename T>
 concept SerializableComponent = requires(T& t, Serializer& s) {
-  ComponentSerializer<T>::Serialize(t, s);
-  ComponentSerializer<T>::Deserialize(t, s);
+  ComponentSerializer<T>::serialize(t, s);
+  ComponentSerializer<T>::deserialize(t, s);
 };
 
 } // namespace SD

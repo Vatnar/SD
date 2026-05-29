@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace SD {
+namespace sd {
 
 // TODO(docs): Document ViewManager class
 //   - Purpose: Factory and registry for View objects
@@ -29,52 +29,52 @@ public:
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<View, T>
-  T& Create(std::string name, Args&&... args) {
-    if (mViewNameToId.contains(name))
-      Abort("View name already exists: " + name);
+  T& create(std::string name, Args&&... args) {
+    if (m_view_name_to_id.contains(name))
+      engine_abort("View name already exists: " + name);
 
-    ViewId id = mNextViewId++;
+    ViewId id = m_next_view_id++;
     auto view = std::make_unique<T>(std::move(name), std::forward<Args>(args)...);
-    view->mViewId = id;
+    view->m_view_id = id;
 
     auto& ref = *view;
-    mViewsById.emplace(id, std::move(view));
-    mViewNameToId.emplace(ref.GetName(), id);
+    m_views_by_id.emplace(id, std::move(view));
+    m_view_name_to_id.emplace(ref.get_name(), id);
     return ref;
   }
 
   using ViewResult = std::expected<std::reference_wrapper<View>, ViewError>;
 
-  ViewResult Get(ViewId id);
-  ViewResult Get(const std::string& name);
+  ViewResult get(ViewId id);
+  ViewResult get(const std::string& name);
   std::expected<ViewId, ViewError> GetId(const std::string& name) const;
 
-  ViewError Remove(ViewId id);
-  ViewError Remove(const std::string& name);
+  ViewError remove(ViewId id);
+  ViewError remove(const std::string& name);
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
-  std::expected<std::reference_wrapper<T>, ViewError> PushLayer(ViewId id, Args&&... args) {
-    auto it = mViewsById.find(id);
-    if (it == mViewsById.end())
-      return std::unexpected(ViewDoesNotExist);
-    return it->second->PushLayer<T>(std::forward<Args>(args)...);
+  std::expected<std::reference_wrapper<T>, ViewError> push_layer(ViewId id, Args&&... args) {
+    auto it = m_views_by_id.find(id);
+    if (it == m_views_by_id.end())
+      return std::unexpected(VIEW_DOES_NOT_EXIST);
+    return it->second->push_layer<T>(std::forward<Args>(args)...);
   }
 
-  const std::unordered_map<ViewId, std::unique_ptr<View>>& GetViews() const { return mViewsById; }
-  auto& GetViews() { return mViewsById; }
+  const std::unordered_map<ViewId, std::unique_ptr<View>>& get_views() const { return m_views_by_id; }
+  auto& get_views() { return m_views_by_id; }
 
-  std::vector<Scene*> GetScenes();
+  std::vector<Scene*> get_scenes();
 
-  void UpdateViews(float dt);
-  void RenderViews(vk::CommandBuffer cmd);
-  void CleanupClosedViews();
-  void Clear();
+  void update_views(float dt);
+  void render_views(vk::CommandBuffer cmd);
+  void cleanup_closed_views();
+  void clear();
 
 private:
-  std::unordered_map<ViewId, std::unique_ptr<View>> mViewsById;
-  std::unordered_map<std::string, ViewId> mViewNameToId;
-  ViewId mNextViewId;
+  std::unordered_map<ViewId, std::unique_ptr<View>> m_views_by_id;
+  std::unordered_map<std::string, ViewId> m_view_name_to_id;
+  ViewId m_next_view_id;
 };
 
 } // namespace SD

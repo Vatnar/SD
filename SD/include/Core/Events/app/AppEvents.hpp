@@ -1,11 +1,11 @@
 #pragma once
 #include "Core/Events/Event.hpp"
 
-namespace SD {
+namespace sd {
 class AppTerminateEvent : public Event {
 public:
   AppTerminateEvent() = default;
-  EVENT_CLASS_TYPE(AppTerminate)
-  EVENT_CLASS_CATEGORY(EventCategoryApplication)
+  EVENT_CLASS_TYPE(APP_TERMINATE)
+  EVENT_CLASS_CATEGORY(EventCategory::EVENT_CATEGORY_APPLICATION)
 };
 } // namespace SD

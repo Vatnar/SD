@@ -1,24 +1,21 @@
 #include "Core/SDImGuiContext.hpp"
 
-#include "Core/Events/window/KeyboardEvents.hpp"
-#include "Core/Events/window/MouseEvents.hpp"
-#include "Utils/Utils.hpp"
 #include "Application.hpp"
 
-namespace SD {
+namespace sd {
 
 SDImGuiContext::~SDImGuiContext() {
-  Shutdown();
+  shutdown();
 }
 
-void SDImGuiContext::Init(Window& window, VulkanWindow& vw) {
-  if (mVulkanInitialized)
+void SDImGuiContext::init(Window& window, VulkanWindow& vw) {
+  if (m_is_vulkan_initialized)
     return;
 
   // 1. Create Context
   IMGUI_CHECKVERSION();
-  mContext = ImGui::CreateContext();
-  ImGui::SetCurrentContext(mContext);
+  m_context = ImGui::CreateContext();
+  ImGui::SetCurrentContext(m_context);
 
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -32,85 +29,85 @@ void SDImGuiContext::Init(Window& window, VulkanWindow& vw) {
 
   ImGui::StyleColorsDark();
 
-  VulkanContext& ctx = vw.GetVulkanContext();
-  CreateDescriptorPool(ctx);
+  VulkanContext& ctx = vw.get_vulkan_context();
+  create_descriptor_pool(ctx);
 
   // 2. Init GLFW
-  ImGui_ImplGlfw_InitForVulkan(window.GetNativeHandle(), true);
+  ImGui_ImplGlfw_InitForVulkan(window.get_native_handle(), true);
 
-  CreateCompatibleRenderPass(ctx, vw.GetSurfaceFormat().format);
+  create_compatible_render_pass(ctx, vw.get_surface_format().format);
 
   // 3. Renderer Init (Vulkan)
   ImGui_ImplVulkan_InitInfo init_info{};
-  init_info.Instance = *ctx.GetInstance();
-  init_info.PhysicalDevice = ctx.GetPhysicalDevice();
-  init_info.Device = *ctx.GetVulkanDevice();
-  init_info.QueueFamily = ctx.GetGraphicsFamilyIndex();
-  init_info.Queue = ctx.GetGraphicsQueue();
-  init_info.DescriptorPool = *mDescriptorPool;
+  init_info.Instance = *ctx.get_instance();
+  init_info.PhysicalDevice = ctx.get_physical_device();
+  init_info.Device = *ctx.get_vulkan_device();
+  init_info.QueueFamily = ctx.get_graphics_family_index();
+  init_info.Queue = ctx.get_graphics_queue();
+  init_info.DescriptorPool = *m_descriptor_pool;
   init_info.MinImageCount = 2;
   init_info.ImageCount = MAX_FRAMES_IN_FLIGHT;
 
-  init_info.PipelineInfoMain.RenderPass = *mRenderPass;
+  init_info.PipelineInfoMain.RenderPass = *m_render_pass;
   init_info.PipelineInfoMain.Subpass = 0;
   init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
   ImGui_ImplVulkan_Init(&init_info);
 
   // Create default sampler for textures
-  vk::SamplerCreateInfo samplerInfo{};
-  samplerInfo.magFilter = vk::Filter::eLinear;
-  samplerInfo.minFilter = vk::Filter::eLinear;
-  samplerInfo.addressModeU = vk::SamplerAddressMode::eRepeat;
-  samplerInfo.addressModeV = vk::SamplerAddressMode::eRepeat;
-  samplerInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
-  samplerInfo.anisotropyEnable = VK_FALSE;
-  samplerInfo.maxAnisotropy = 1.0f;
-  samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
-  samplerInfo.unnormalizedCoordinates = VK_FALSE;
-  samplerInfo.compareEnable = VK_FALSE;
-  samplerInfo.compareOp = vk::CompareOp::eAlways;
-  samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
+  vk::SamplerCreateInfo sampler_info{};
+  sampler_info.magFilter = vk::Filter::eLinear;
+  sampler_info.minFilter = vk::Filter::eLinear;
+  sampler_info.addressModeU = vk::SamplerAddressMode::eRepeat;
+  sampler_info.addressModeV = vk::SamplerAddressMode::eRepeat;
+  sampler_info.addressModeW = vk::SamplerAddressMode::eRepeat;
+  sampler_info.anisotropyEnable = VK_FALSE;
+  sampler_info.maxAnisotropy = 1.0f;
+  sampler_info.borderColor = vk::BorderColor::eIntOpaqueBlack;
+  sampler_info.unnormalizedCoordinates = VK_FALSE;
+  sampler_info.compareEnable = VK_FALSE;
+  sampler_info.compareOp = vk::CompareOp::eAlways;
+  sampler_info.mipmapMode = vk::SamplerMipmapMode::eLinear;
 
-  mDefaultSampler = CheckVulkanResVal(ctx.GetVulkanDevice()->createSamplerUnique(samplerInfo),
+  m_default_sampler = check_vulkan_res_val(ctx.get_vulkan_device()->createSamplerUnique(sampler_info),
                                       "Failed to create ImGui sampler");
 
-  mVulkanInitialized = true;
+  m_is_vulkan_initialized = true;
 }
 
-void SDImGuiContext::Shutdown() {
-  if (mVulkanInitialized) {
-    ImGui::SetCurrentContext(mContext);
+void SDImGuiContext::shutdown() {
+  if (m_is_vulkan_initialized) {
+    ImGui::SetCurrentContext(m_context);
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
-    mVulkanInitialized = false;
+    m_is_vulkan_initialized = false;
   }
 
-  if (mContext) {
-    ImGui::DestroyContext(mContext);
-    mContext = nullptr;
+  if (m_context) {
+    ImGui::DestroyContext(m_context);
+    m_context = nullptr;
   }
 
-  mRenderPass.reset();
-  mDescriptorPool.reset();
+  m_render_pass.reset();
+  m_descriptor_pool.reset();
 }
 
-void SDImGuiContext::BeginFrame() {
-  ImGui::SetCurrentContext(mContext);
+void SDImGuiContext::begin_frame() {
+  ImGui::SetCurrentContext(m_context);
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 }
 
-void SDImGuiContext::EndFrame() {
+void SDImGuiContext::end_frame() {
   ImGui::Render();
 }
 
-void SDImGuiContext::RenderDrawData(vk::CommandBuffer cmd) {
+void SDImGuiContext::render_draw_data(vk::CommandBuffer cmd) {
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 }
 
-void SDImGuiContext::UpdatePlatformWindows() {
+void SDImGuiContext::update_platform_windows() {
   ImGuiIO& io = ImGui::GetIO();
   if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
     ImGui::UpdatePlatformWindows();
@@ -118,8 +115,8 @@ void SDImGuiContext::UpdatePlatformWindows() {
   }
 }
 
-void SDImGuiContext::BeginDockSpace(const std::string& title) {
-  static bool dockspaceOpen = true;
+void SDImGuiContext::begin_dock_space(const std::string& title) {
+  static bool dockspace_open = true;
   static bool opt_fullscreen_persistant = true;
   bool opt_fullscreen = opt_fullscreen_persistant;
   static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
@@ -141,7 +138,7 @@ void SDImGuiContext::BeginDockSpace(const std::string& title) {
     window_flags |= ImGuiWindowFlags_NoBackground;
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-  ImGui::Begin(title.c_str(), &dockspaceOpen, window_flags);
+  ImGui::Begin(title.c_str(), &dockspace_open, window_flags);
   ImGui::PopStyleVar();
 
   if (opt_fullscreen)
@@ -153,7 +150,7 @@ void SDImGuiContext::BeginDockSpace(const std::string& title) {
       if (ImGui::MenuItem("New Project", "Ctrl+N")) {}
       if (ImGui::MenuItem("Open...", "Ctrl+O")) {}
       ImGui::Separator();
-      if (ImGui::MenuItem("Exit", "Alt+F4")) { Application::Get().Close(); }
+      if (ImGui::MenuItem("Exit", "Alt+F4")) { Application::get().close(); }
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Edit")) {
@@ -176,11 +173,11 @@ void SDImGuiContext::BeginDockSpace(const std::string& title) {
   }
 }
 
-void SDImGuiContext::EndDockSpace() {
+void SDImGuiContext::end_dock_space() {
   ImGui::End();
 }
 
-void SDImGuiContext::CreateDescriptorPool(VulkanContext& ctx) {
+void SDImGuiContext::create_descriptor_pool(VulkanContext& ctx) {
   vk::DescriptorPoolSize pool_sizes[] = {
       {             vk::DescriptorType::eSampler, 1000},
       {vk::DescriptorType::eCombinedImageSampler, 1000},
@@ -199,11 +196,11 @@ void SDImGuiContext::CreateDescriptorPool(VulkanContext& ctx) {
                                          1000 * std::size(pool_sizes), std::size(pool_sizes),
                                          pool_sizes);
 
-  mDescriptorPool = CheckVulkanResVal(ctx.GetVulkanDevice()->createDescriptorPoolUnique(pool_info),
+  m_descriptor_pool = check_vulkan_res_val(ctx.get_vulkan_device()->createDescriptorPoolUnique(pool_info),
                                       "Failed to create ImGui descriptor pool");
 }
 
-void SDImGuiContext::CreateCompatibleRenderPass(VulkanContext& ctx, vk::Format format) {
+void SDImGuiContext::create_compatible_render_pass(VulkanContext& ctx, vk::Format format) {
   vk::AttachmentDescription attachment{};
   attachment.setFormat(format)
       .setSamples(vk::SampleCountFlagBits::e1)
@@ -231,16 +228,16 @@ void SDImGuiContext::CreateCompatibleRenderPass(VulkanContext& ctx, vk::Format f
 
   vk::RenderPassCreateInfo info({}, 1, &attachment, 1, &subpass, 1, &dependency);
 
-  mRenderPass = CheckVulkanResVal(ctx.GetVulkanDevice()->createRenderPassUnique(info),
+  m_render_pass = check_vulkan_res_val(ctx.get_vulkan_device()->createRenderPassUnique(info),
                                   "Failed to create ImGui RenderPass");
 }
 
-VkDescriptorSet SDImGuiContext::CreateTextureFromView(VkImageView view, VkImageLayout layout) {
-  return ImGui_ImplVulkan_AddTexture(*mDefaultSampler, view, (VkImageLayout)layout);
+VkDescriptorSet SDImGuiContext::create_texture_from_view(VkImageView view, VkImageLayout layout) {
+  return ImGui_ImplVulkan_AddTexture(*m_default_sampler, view, (VkImageLayout)layout);
 }
 
-void SDImGuiContext::RemoveTexture(VkDescriptorSet descriptorSet) {
-  ImGui_ImplVulkan_RemoveTexture(descriptorSet);
+void SDImGuiContext::remove_texture(VkDescriptorSet descriptor_set) {
+  ImGui_ImplVulkan_RemoveTexture(descriptor_set);
 }
 
 } // namespace SD

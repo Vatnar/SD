@@ -9,7 +9,7 @@
 #include "Core/types.hpp"
 
 
-namespace SD {
+namespace sd {
 // TODO(docs): Document Entity struct
 //   - Explain index vs generation semantics
 //   - Describe entity lifecycle (created -> alive -> destroyed -> recycled)
@@ -27,8 +27,8 @@ struct Entity {
 } // namespace SD
 
 template<>
-struct std::hash<SD::Entity> {
-  inline std::size_t operator()(SD::Entity e) const noexcept {
+struct std::hash<sd::Entity> {
+  inline std::size_t operator()(sd::Entity e) const noexcept {
     return std::hash<uint32_t>{}(e.index) ^ (std::hash<uint32_t>{}(e.generation) << 1);
   }
 };

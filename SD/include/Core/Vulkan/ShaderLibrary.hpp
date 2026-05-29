@@ -14,7 +14,7 @@
 #include <filesystem>
 #include <set>
 
-namespace SD {
+namespace sd {
 
 // TODO(docs): Document ShaderLibrary class
 //   - Purpose: Compiles HLSL to SPIR-V and caches VkShaderModules
@@ -28,11 +28,11 @@ public:
   explicit ShaderLibrary(VkDevice device);
   ~ShaderLibrary();
 
-  VkShaderModule Load(const std::string& hlslPath, const std::string& profile);
+  VkShaderModule load(const std::string& hlsl_path, const std::string& profile);
   
   /// Checks if any cached shaders have changed on disk.
   /// Returns a set of paths that have been modified.
-  std::set<std::string> CheckForChanges();
+  std::set<std::string> check_for_changes();
 
   /// Destroys all shader modules and clears the cache.
   void ClearCache();
@@ -43,13 +43,13 @@ public:
 private:
   struct ShaderEntry {
     vk::UniqueShaderModule module;
-    std::filesystem::file_time_type lastWriteTime;
+    std::filesystem::file_time_type last_write_time;
     std::string profile;
   };
 
-  VkDevice mDevice;
-  std::unordered_map<std::string, ShaderEntry> mCache;
-  ShaderCompiler mCompiler;
+  VkDevice m_device;
+  std::unordered_map<std::string, ShaderEntry> m_cache;
+  ShaderCompiler m_compiler;
 };
 
 } // namespace SD

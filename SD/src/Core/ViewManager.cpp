@@ -1,114 +1,112 @@
 #include "Core/ViewManager.hpp"
 #include <algorithm>
 
-#include "Utils/Utils.hpp"
-
-namespace SD {
+namespace sd {
 
 ViewManager::ViewManager() = default;
 ViewManager::~ViewManager() = default;
 
-ViewManager::ViewResult ViewManager::Get(ViewId id) {
-  auto it = mViewsById.find(id);
-  if (it == mViewsById.end())
-    return std::unexpected(ViewDoesNotExist);
-  SD_ALWAYS_ASSERT(it->second, "View must be valid");
+ViewManager::ViewResult ViewManager::get(ViewId id) {
+  auto it = m_views_by_id.find(id);
+  if (it == m_views_by_id.end())
+    return std::unexpected(VIEW_DOES_NOT_EXIST);
+  assert(it->second && "View must be valid");
   return std::ref(*it->second);
 }
 
-ViewManager::ViewResult ViewManager::Get(const std::string& name) {
-  SD_ALWAYS_ASSERT(!name.empty(), "View name must not be empty");
-  auto itName = mViewNameToId.find(name);
-  if (itName == mViewNameToId.end())
-    return std::unexpected(ViewDoesNotExist);
-  return Get(itName->second);
+ViewManager::ViewResult ViewManager::get(const std::string& name) {
+  assert(!name.empty() && "View name must not be empty");
+  auto it_name = m_view_name_to_id.find(name);
+  if (it_name == m_view_name_to_id.end())
+    return std::unexpected(VIEW_DOES_NOT_EXIST);
+  return get(it_name->second);
 }
 
 std::expected<ViewId, ViewError> ViewManager::GetId(const std::string& name) const {
-  SD_ALWAYS_ASSERT(!name.empty(), "View name must not be empty");
-  auto itName = mViewNameToId.find(name);
-  if (itName == mViewNameToId.end())
-    return std::unexpected(ViewDoesNotExist);
-  return itName->second;
+  assert(!name.empty() && "View name must not be empty");
+  auto it_name = m_view_name_to_id.find(name);
+  if (it_name == m_view_name_to_id.end())
+    return std::unexpected(VIEW_DOES_NOT_EXIST);
+  return it_name->second;
 }
 
-ViewError ViewManager::Remove(ViewId id) {
-  auto it = mViewsById.find(id);
-  if (it == mViewsById.end())
-    return ViewDoesNotExist;
+ViewError ViewManager::remove(ViewId id) {
+  auto it = m_views_by_id.find(id);
+  if (it == m_views_by_id.end())
+    return VIEW_DOES_NOT_EXIST;
 
-  mViewNameToId.erase(it->second->GetName());
-  mViewsById.erase(it);
-  return Success;
+  m_view_name_to_id.erase(it->second->get_name());
+  m_views_by_id.erase(it);
+  return SUCCESS;
 }
 
-ViewError ViewManager::Remove(const std::string& name) {
-  SD_ALWAYS_ASSERT(!name.empty(), "View name must not be empty");
-  auto itName = mViewNameToId.find(name);
-  if (itName == mViewNameToId.end())
-    return ViewDoesNotExist;
+ViewError ViewManager::remove(const std::string& name) {
+  assert(!name.empty() && "View name must not be empty");
+  auto it_name = m_view_name_to_id.find(name);
+  if (it_name == m_view_name_to_id.end())
+    return VIEW_DOES_NOT_EXIST;
   
   // Avoid second lookup by erasing directly
-  ViewId id = itName->second;
-  auto itView = mViewsById.find(id);
-  if (itView == mViewsById.end())
-    return ViewDoesNotExist;  // Shouldn't happen, but be safe
+  ViewId id = it_name->second;
+  auto it_view = m_views_by_id.find(id);
+  if (it_view == m_views_by_id.end())
+    return VIEW_DOES_NOT_EXIST;  // Shouldn't happen, but be safe
   
-  mViewNameToId.erase(itName);
-  mViewsById.erase(itView);
-  return Success;
+  m_view_name_to_id.erase(it_name);
+  m_views_by_id.erase(it_view);
+  return SUCCESS;
 }
 
-std::vector<Scene*> ViewManager::GetScenes() {
+std::vector<Scene*> ViewManager::get_scenes() {
   std::vector<Scene*> scenes;
-  scenes.reserve(mViewsById.size() * 2);  // Prevent reallocation/iterator invalidation
-  for (auto& [id, view] : mViewsById) {
-    SD_ALWAYS_ASSERT(view, "View must be valid");
-    for (auto& layer : view->GetLayers()) {
-      Scene* s = layer->GetScene();
-      if (s && std::find(scenes.begin(), scenes.end(), s) == scenes.end())
+  scenes.reserve(m_views_by_id.size() * 2);  // Prevent reallocation/iterator invalidation
+  for (auto& view : m_views_by_id | std::views::values) {
+    assert(view && "View must be valid");
+    for (auto& layer : view->get_layers()) {
+      Scene* s = layer->get_scene();
+      if (s && std::ranges::find(scenes, s) == scenes.end())
         scenes.push_back(s);
     }
   }
   return scenes;
 }
 
-void ViewManager::UpdateViews(float dt) {
-  for (auto& [id, view] : mViewsById) {
-    SD_ALWAYS_ASSERT(view, "View must be valid");
-    if (view->IsOpen()) {
-      view->OnUpdate(dt);
-      view->OnGuiRender();
+void ViewManager::update_views(float dt) {
+  for (auto& view : m_views_by_id | std::views::values) {
+    assert(view && "View must be valid");
+    if (view->is_open()) {
+      view->on_update(dt);
+      view->on_gui_render();
     }
   }
 }
 
-void ViewManager::RenderViews(vk::CommandBuffer cmd) {
-  SD_ALWAYS_ASSERT(cmd, "Command buffer must be valid");
-  for (auto& [id, view] : mViewsById) {
-    SD_ALWAYS_ASSERT(view, "View must be valid");
-    if (view->IsOpen()) {
-      view->OnRender(cmd);
+void ViewManager::render_views(vk::CommandBuffer cmd) {
+  assert(cmd && "Command buffer must be valid");
+  for (auto& view : m_views_by_id | std::views::values) {
+    assert(view && "View must be valid");
+    if (view->is_open()) {
+      view->on_render(cmd);
     }
   }
 }
 
-void ViewManager::CleanupClosedViews() {
-  for (auto it = mViewsById.begin(); it != mViewsById.end();) {
-    SD_ALWAYS_ASSERT(it->second, "View must be valid");
-    if (!it->second->IsOpen()) {
-      mViewNameToId.erase(it->second->GetName());
-      it = mViewsById.erase(it);
+void ViewManager::cleanup_closed_views() {
+  for (auto it = m_views_by_id.begin(); it != m_views_by_id.end();) {
+    assert(it->second && "View must be valid");
+    if (!it->second->is_open()) {
+      m_view_name_to_id.erase(it->second->get_name());
+      it = m_views_by_id.erase(it);
     } else {
       ++it;
     }
   }
 }
 
-void ViewManager::Clear() {
-  mViewsById.clear();
-  mViewNameToId.clear();
-  mNextViewId = ViewId{};
+void ViewManager::clear() {
+  m_views_by_id.clear();
+  m_view_name_to_id.clear();
+  m_next_view_id = ViewId{};
 }
 
 } // namespace SD

@@ -12,41 +12,41 @@
 #include "Core/Logging.hpp"
 #include "Core/View.hpp"
 
-namespace SD {
+namespace sd {
 
 LayoutManager::LayoutManager() = default;
 
-void LayoutManager::Init() {
-  if (mInitialized) return;
+void LayoutManager::init() {
+  if (m_is_initialized) return;
 
-  EnsureLayoutsDirectoryExists();
-  RefreshLayoutList();
+  ensure_layouts_directory_exists();
+  refresh_layout_list();
 
   // Load last used layout name if it exists
-  std::ifstream lastLayoutFile("layouts/.current");
-  if (lastLayoutFile.is_open()) {
-    std::getline(lastLayoutFile, mCurrentLayout);
-    lastLayoutFile.close();
+  std::ifstream last_layout_file("layouts/.current");
+  if (last_layout_file.is_open()) {
+    std::getline(last_layout_file, m_current_layout);
+    last_layout_file.close();
   }
 
   // Don't apply layout yet - dockspace doesn't exist
   // Store what layout to apply later
-  if (mCurrentLayout == "Minimal") {
-    mPendingLayout = "Minimal";
-  } else if (mCurrentLayout == "Default") {
-    mPendingLayout = "Default";
-  } else if (!mCurrentLayout.empty() && HasLayout(mCurrentLayout)) {
-    mPendingLayout = mCurrentLayout;
+  if (m_current_layout == "Minimal") {
+    m_pending_layout = "Minimal";
+  } else if (m_current_layout == "Default") {
+    m_pending_layout = "Default";
+  } else if (!m_current_layout.empty() && has_layout(m_current_layout)) {
+    m_pending_layout = m_current_layout;
   } else {
-    mPendingLayout = "Default";
+    m_pending_layout = "Default";
   }
 
-  mInitialized = true;
+  m_is_initialized = true;
 }
 
-void LayoutManager::ApplyPreset(Preset preset) {
+void LayoutManager::apply_preset(Preset preset) {
   if (!ImGui::GetCurrentContext()) {
-    SD::Log::Engine::Warn("Cannot apply preset: ImGui context not available");
+    log::engine::warn("Cannot apply preset: ImGui context not available");
     return;
   }
   
@@ -65,49 +65,49 @@ void LayoutManager::ApplyPreset(Preset preset) {
   };
   DockBuilderGuard guard(dockspace_id);
   
-  auto& app = Application::Get();
+  auto& app = Application::get();
   
   // Find EngineDebugLayer to control inspector windows
-  EngineDebugLayer* debugLayer = nullptr;
-  for (auto& layer : app.GetGlobalLayers()) {
+  EngineDebugLayer* debug_layer = nullptr;
+  for (auto& layer : app.get_global_layers()) {
     if (auto* edl = dynamic_cast<EngineDebugLayer*>(layer.get())) {
-      debugLayer = edl;
+      debug_layer = edl;
       break;
     }
   }
 
-  if (preset == Preset::Minimal) {
+  if (preset == Preset::MINIMAL) {
     // Close all views except Game
-    for (const auto& [id, view] : app.GetViews()) {
-      if (view->GetName() != "Game") {
+    for (const auto& [id, view] : app.get_views()) {
+      if (view->get_name() != "Game") {
         view->SetOpen(false);
       }
     }
 
     // Open Game view
-    auto gameView = app.GetView("Game");
-    if (gameView) {
-      gameView->get().SetOpen(true);
+    auto game_view = app.get_view("Game");
+    if (game_view) {
+      game_view->get().SetOpen(true);
       ImGui::DockBuilderDockWindow("Game", dockspace_id);
     }
 
     // Hide all inspector windows
-    if (debugLayer) {
-      debugLayer->ApplyPresetConfiguration(false, false, false);
+    if (debug_layer) {
+      debug_layer->apply_preset_configuration(false, false, false);
     }
 
-    mCurrentLayout = "Minimal";
-    SD::Log::Engine::Info("Applied Minimal preset");
+    m_current_layout = "Minimal";
+    log::engine::info("Applied Minimal preset");
 
   } else { // Default
     // Ensure all views are open
-    for (const auto& [id, view] : app.GetViews()) {
+    for (const auto& view : app.get_views() | std::views::values) {
       view->SetOpen(true);
     }
 
     // Show all inspector windows
-    if (debugLayer) {
-      debugLayer->ApplyPresetConfiguration(true, true, true);
+    if (debug_layer) {
+      debug_layer->apply_preset_configuration(true, true, true);
     }
 
     // Split: Left side = Game (70%), Right side = inspectors (30%)
@@ -119,8 +119,8 @@ void LayoutManager::ApplyPreset(Preset preset) {
     ImGui::DockBuilderSplitNode(dock_id_right, ImGuiDir_Up, 0.50f, &dock_id_right_top, &dock_id_right_bottom);
 
     // Dock windows
-    auto gameView = app.GetView("Game");
-    if (gameView) {
+    auto game_view = app.get_view("Game");
+    if (game_view) {
       ImGui::DockBuilderDockWindow("Game", dock_id_left);
     }
 
@@ -132,16 +132,16 @@ void LayoutManager::ApplyPreset(Preset preset) {
     ImGui::DockBuilderDockWindow("Renderer Info", dock_id_right_bottom);
     ImGui::DockBuilderDockWindow("Engine Log", dock_id_right_bottom);
 
-    mCurrentLayout = "Default";
-    SD::Log::Engine::Info("Applied Default preset");
+    m_current_layout = "Default";
+    log::engine::info("Applied Default preset");
   }
   
-  SaveCurrentLayoutName();
+  save_current_layout_name();
   // DockBuilderFinish called automatically by guard
 }
 
-void LayoutManager::ApplyPendingLayout() {
-  if (mHasAppliedInitialLayout || mPendingLayout.empty()) return;
+void LayoutManager::apply_pending_layout() {
+  if (m_has_applied_initial_layout || m_pending_layout.empty()) return;
   
   // Check if dockspace exists
   ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
@@ -149,67 +149,67 @@ void LayoutManager::ApplyPendingLayout() {
   if (!node) return; // Dockspace not ready yet
   
   // Apply the pending layout
-  if (mPendingLayout == "Minimal") {
-    ApplyPreset(Preset::Minimal);
-  } else if (mPendingLayout == "Default") {
-    ApplyPreset(Preset::Default);
-  } else if (HasLayout(mPendingLayout)) {
-    LoadLayout(mPendingLayout);
+  if (m_pending_layout == "Minimal") {
+    apply_preset(Preset::MINIMAL);
+  } else if (m_pending_layout == "Default") {
+    apply_preset(Preset::DEFAULT);
+  } else if (has_layout(m_pending_layout)) {
+    load_layout(m_pending_layout);
   }
   
-  mPendingLayout.clear();
-  mHasAppliedInitialLayout = true;
+  m_pending_layout.clear();
+  m_has_applied_initial_layout = true;
 }
 
-void LayoutManager::SaveLayout(const std::string& name) {
-  EnsureLayoutsDirectoryExists();
-  std::string path = GetLayoutPath(name);
+void LayoutManager::save_layout(const std::string& name) {
+  ensure_layouts_directory_exists();
+  std::string path = get_layout_path(name);
   
   // Temporarily change ImGui's INI filename to save to our layout file
   ImGuiIO& io = ImGui::GetIO();
-  const char* oldIniFilename = io.IniFilename;
+  const char* old_ini_filename = io.IniFilename;
   io.IniFilename = path.c_str();
   
   // Save ImGui settings
   ImGui::SaveIniSettingsToDisk(path.c_str());
   
   // Restore original INI filename
-  io.IniFilename = oldIniFilename;
+  io.IniFilename = old_ini_filename;
   
-  mCurrentLayout = name;
-  SaveCurrentLayoutName();
-  RefreshLayoutList();
+  m_current_layout = name;
+  save_current_layout_name();
+  refresh_layout_list();
   
-  SD::Log::Engine::Info("Layout '{}' saved to {}", name, path);
+  log::engine::info("Layout '{}' saved to {}", name, path);
 }
 
-bool LayoutManager::LoadLayout(const std::string& name) {
-  if (!HasLayout(name)) {
-    SD::Log::Engine::Warn("Layout '{}' not found", name);
+bool LayoutManager::load_layout(const std::string& name) {
+  if (!has_layout(name)) {
+    log::engine::warn("Layout '{}' not found", name);
     return false;
   }
   
-  std::string path = mUserLayouts[name];
+  std::string path = m_user_layouts[name];
   
   // Temporarily change ImGui's INI filename
   ImGuiIO& io = ImGui::GetIO();
-  const char* oldIniFilename = io.IniFilename;
+  const char* old_ini_filename = io.IniFilename;
   io.IniFilename = path.c_str();
   
   // Load ImGui settings
   ImGui::LoadIniSettingsFromDisk(path.c_str());
   
   // Restore original INI filename
-  io.IniFilename = oldIniFilename;
+  io.IniFilename = old_ini_filename;
   
   // Update view visibility based on what ImGui knows
-  auto& app = Application::Get();
+  auto& app = Application::get();
   ImGuiContext* ctx = ImGui::GetCurrentContext();
   if (ctx) {
-    for (const auto& [id, view] : app.GetViews()) {
+    for (const auto& view : app.get_views() | std::views::values) {
       // Check if ImGui has this window
-      ImGuiWindow* imguiWindow = ImGui::FindWindowByName(view->GetName().c_str());
-      if (imguiWindow) {
+      ImGuiWindow* imgui_window = ImGui::FindWindowByName(view->get_name().c_str());
+      if (imgui_window) {
         // Sync ImGui's collapsed state to View's open state
         // Note: ImGui doesn't track "closed" vs "collapsed" the same way
         // For now, we'll just ensure the view is open
@@ -218,69 +218,69 @@ bool LayoutManager::LoadLayout(const std::string& name) {
     }
   }
   
-  mCurrentLayout = name;
-  SaveCurrentLayoutName();
+  m_current_layout = name;
+  save_current_layout_name();
   
-  SD::Log::Engine::Info("Layout '{}' loaded from {}", name, path);
+  log::engine::info("Layout '{}' loaded from {}", name, path);
   return true;
 }
 
-void LayoutManager::DeleteLayout(const std::string& name) {
-  if (!HasLayout(name)) return;
+void LayoutManager::delete_layout(const std::string& name) {
+  if (!has_layout(name)) return;
   
-  std::string path = mUserLayouts[name];
+  std::string path = m_user_layouts[name];
   std::error_code ec;
   std::filesystem::remove(path, ec);
   
   if (ec) {
-    SD::Log::Engine::Warn("Failed to delete layout file '{}': {}", path, ec.message());
+    log::engine::warn("Failed to delete layout file '{}': {}", path, ec.message());
     return;
   }
   
-  if (mCurrentLayout == name) {
-    mCurrentLayout = "Default";
-    ApplyPreset(Preset::Default);
+  if (m_current_layout == name) {
+    m_current_layout = "Default";
+    apply_preset(Preset::DEFAULT);
   }
   
-  RefreshLayoutList();
-  SD::Log::Engine::Info("Layout '{}' deleted", name);
+  refresh_layout_list();
+  log::engine::info("Layout '{}' deleted", name);
 }
 
-std::vector<std::string> LayoutManager::GetUserLayoutNames() const {
+std::vector<std::string> LayoutManager::get_user_layout_names() const {
   std::vector<std::string> names;
-  for (const auto& [name, _] : mUserLayouts) {
+  for (const auto& name : m_user_layouts | std::views::keys) {
     names.push_back(name);
   }
   return names;
 }
 
-bool LayoutManager::HasLayout(const std::string& name) const {
-  return mUserLayouts.find(name) != mUserLayouts.end();
+bool LayoutManager::has_layout(const std::string& name) const {
+  return m_user_layouts.find(name) != m_user_layouts.end();
 }
 
-void LayoutManager::EnsureLayoutsDirectoryExists() {
+void LayoutManager::ensure_layouts_directory_exists() {
   std::filesystem::create_directories("layouts");
 }
 
-std::string LayoutManager::GetLayoutPath(const std::string& name) const {
+std::string LayoutManager::get_layout_path(const std::string& name) const {
   return "layouts/" + name + ".ini";
 }
 
-void LayoutManager::SaveCurrentLayoutName() {
-  EnsureLayoutsDirectoryExists();
-  std::ofstream lastLayoutFile("layouts/.current");
-  if (lastLayoutFile.is_open()) {
-    if (!(lastLayoutFile << mCurrentLayout)) {
-      SD::Log::Engine::Warn("Failed to write current layout name to file");
+void LayoutManager::save_current_layout_name() {
+  ensure_layouts_directory_exists();
+  std::ofstream last_layout_file("layouts/.current");
+  if (last_layout_file.is_open()) {
+    if (!(last_layout_file << m_current_layout)) {
+      log::engine::warn("Failed to write current layout name to file");
     }
-    lastLayoutFile.close();
+    last_layout_file.close();
   } else {
-    SD::Log::Engine::Warn("Failed to open .current layout file for writing");
+    log::engine::warn("Failed to open .current layout file for writing");
   }
 }
 
-void LayoutManager::RefreshLayoutList() {
-  mUserLayouts.clear();
+void LayoutManager::refresh_layout_list() {
+  m_user_layouts.clear();
   
   std::error_code ec;
   if (!std::filesystem::exists("layouts")) return;
@@ -293,7 +293,7 @@ void LayoutManager::RefreshLayoutList() {
       // Extract layout name from "<name>.ini"
       std::string name = filename.substr(0, filename.size() - 4);
       if (!name.empty()) {
-        mUserLayouts[name] = entry.path().string();
+        m_user_layouts[name] = entry.path().string();
       }
     }
   }

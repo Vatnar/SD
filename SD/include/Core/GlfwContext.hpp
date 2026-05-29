@@ -9,8 +9,8 @@
 
 #include "Core/Base.hpp"
 
-namespace SD {
-using GlfwErrorCallback = std::function<void(int, const char*)>;
+namespace sd {
+using glfw_error_callback = std::function<void(int, const char*)>;
 
 // TODO(docs): Document GlfwContext class
 //   - Purpose: RAII wrapper for GLFW lifecycle
@@ -25,14 +25,14 @@ class GlfwContext {
 public:
   GlfwContext() {
     // Set GLFW error callback
-    sErrorCallback = [](int errorCode, const char* description) {
-      SD::Log::Engine::Error("Glfw: ERROR:{}\n{}", errorCode, description);
+    s_error_callback = [](int error_code, const char* description) {
+      log::engine::error("Glfw: ERROR:{}\n{}", error_code, description);
     };
-    glfwSetErrorCallback(&GlfwContext::GlfwErrorCallbackTrampoline);
+    glfwSetErrorCallback(&GlfwContext::glfw_error_callback_trampoline);
 
 
     if (glfwInit() == false) {
-      Abort("Failed to initialise GLFW");
+      engine_abort("Failed to initialise GLFW");
     }
   }
 
@@ -42,7 +42,7 @@ public:
   GlfwContext& operator=(GlfwContext&&) = delete;
 
   ~GlfwContext() {
-    SD::Log::Engine::Info("Shutting down Glfw");
+    log::engine::info("Shutting down Glfw");
 
     glfwTerminate();
   }
@@ -51,19 +51,19 @@ public:
    * Overides the default error callback for Glfw
    * @param callback
    */
-  static void SetErrorCallback(const GlfwErrorCallback& callback) { sErrorCallback = callback; }
+  static void set_error_callback(const glfw_error_callback& callback) { s_error_callback = callback; }
 
-  static std::pair<const char**, uint32_t> GetRequiredInstanceExtensions() {
+  static std::pair<const char**, uint32_t> get_required_instance_extensions() {
     uint32_t count = 0;
-    const char** glfwExts = glfwGetRequiredInstanceExtensions(&count);
+    const char** glfwExts = glfw_get_required_instance_extensions(&count);
     return {glfwExts, count};
   }
 
 private:
-  static inline GlfwErrorCallback sErrorCallback;
+  static inline glfw_error_callback s_error_callback;
 
-  static void GlfwErrorCallbackTrampoline(int errorCode, const char* description) {
-    sErrorCallback(errorCode, description);
+  static void glfw_error_callback_trampoline(int error_code, const char* description) {
+    s_error_callback(error_code, description);
   }
 };
 } // namespace SD

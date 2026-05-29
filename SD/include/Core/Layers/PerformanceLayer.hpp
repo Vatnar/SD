@@ -15,59 +15,59 @@
 
 #include "Core/Layer.hpp"
 #include "Core/Logging.hpp"
-namespace SD {
+namespace sd {
 class PerformanceLayer : public Layer {
 public:
-  explicit PerformanceLayer() : Layer("Performance layer") { mLastCycles = __rdtsc(); }
+  explicit PerformanceLayer() : Layer("Performance layer") { m_last_cycles = __rdtsc(); }
 
-  void OnUpdate(const float dt) override {
-    mFrameCount++;
-    mTimeAccumulator += dt;
+  void on_update(const float dt) override {
+    m_frame_count++;
+    m_time_accumulator += dt;
 
-    u64 currentCycles = __rdtsc();
-    if (mLastCycles != 0) {
-      mCycleAccumulator += (currentCycles - mLastCycles);
+    u64 current_cycles{__rdtsc()};
+    if (m_last_cycles != 0) {
+      m_cycle_accumulator += (current_cycles - m_last_cycles);
     }
-    mLastCycles = currentCycles;
+    m_last_cycles = current_cycles;
 
-    if (mTimeAccumulator >= 1.0f) {
-      double fps = mFrameCount / static_cast<double>(mTimeAccumulator);
-      double computeTime = static_cast<double>(mTimeAccumulator) - mSleepTimeAccumulator;
-      double msPerFrame = (computeTime * 1000.0) / mFrameCount;
+    if (m_time_accumulator >= 1.0f) {
+      double fps = m_frame_count / static_cast<double>(m_time_accumulator);
+      double computeTime = static_cast<double>(m_time_accumulator) - m_sleep_time_accumulator;
+      double msPerFrame = (computeTime * 1000.0) / m_frame_count;
       double avgCycles =
-          static_cast<double>(mCycleAccumulator - mSleepCycleAccumulator) / mFrameCount;
+          static_cast<double>(m_cycle_accumulator - m_sleep_cycle_accumulator) / m_frame_count;
 
 
-      SD::Log::Engine::Info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}", fps, msPerFrame, avgCycles);
+      log::engine::info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}", fps, msPerFrame, avgCycles);
 
-      mFrameCount = 0;
-      mTimeAccumulator = 0.0f;
-      mCycleAccumulator = 0;
-      mSleepTimeAccumulator = 0.0f;
-      mSleepCycleAccumulator = 0;
+      m_frame_count = 0;
+      m_time_accumulator = 0.0f;
+      m_cycle_accumulator = 0;
+      m_sleep_time_accumulator = 0.0f;
+      m_sleep_cycle_accumulator = 0;
     }
   }
 
-  void BeginSleep() {
-    mSleepStartCycles = __rdtsc();
-    mSleepStartTime = std::chrono::high_resolution_clock::now();
+  void begin_sleep() {
+    m_sleep_start_cycles = __rdtsc();
+    m_sleep_start_time = std::chrono::high_resolution_clock::now();
   }
 
-  void EndSleep() {
+  void end_sleep() {
     auto now = std::chrono::high_resolution_clock::now();
-    mSleepCycleAccumulator += __rdtsc() - mSleepStartCycles;
-    mSleepTimeAccumulator += std::chrono::duration<float>(now - mSleepStartTime).count();
+    m_sleep_cycle_accumulator += __rdtsc() - m_sleep_start_cycles;
+    m_sleep_time_accumulator += std::chrono::duration<float>(now - m_sleep_start_time).count();
   }
 
 private:
-  u32 mFrameCount = 0;
-  float mTimeAccumulator = 0.0f;
-  u64 mCycleAccumulator = 0;
-  u64 mLastCycles = 0;
+  u32 m_frame_count = 0;
+  float m_time_accumulator = 0.0f;
+  u64 m_cycle_accumulator = 0;
+  u64 m_last_cycles = 0;
 
-  float mSleepTimeAccumulator = 0;
-  u64 mSleepCycleAccumulator = 0;
-  u64 mSleepStartCycles = 0;
-  std::chrono::time_point<std::chrono::high_resolution_clock> mSleepStartTime;
+  float m_sleep_time_accumulator = 0;
+  u64 m_sleep_cycle_accumulator = 0;
+  u64 m_sleep_start_cycles = 0;
+  std::chrono::time_point<std::chrono::high_resolution_clock> m_sleep_start_time;
 };
 } // namespace SD

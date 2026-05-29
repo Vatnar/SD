@@ -12,7 +12,7 @@
 #include "VulkanConfig.hpp"
 #include <vk_mem_alloc.h>
 
-namespace SD {
+namespace sd {
 // TODO(docs): Document VulkanContext class thoroughly
 //   - Purpose: Manages Vulkan instance, physical device, logical device, and VMA allocator
 //   - Initialization order and dependencies
@@ -22,48 +22,48 @@ namespace SD {
 //   - Note about refactoring into smaller classes
 class VulkanContext {
 public:
-  explicit VulkanContext(const GlfwContext& glfwCtx);
-  void Init(const Window& window);
+  explicit VulkanContext(const GlfwContext& glfw_ctx);
+  void init(const Window& window);
   ~VulkanContext();
 
-  vk::UniqueInstance& GetInstance();
-  std::vector<const char*>& GetDeviceExtensions();
-  vk::PhysicalDevice& GetPhysicalDevice();
-  vk::UniqueDevice& GetVulkanDevice();
-  vk::PhysicalDeviceFeatures2& GetFeatures2();
-  vk::PhysicalDeviceVulkan12Features& GetFeatures12();
-  vk::PhysicalDeviceVulkan13Features& GetFeatures13();
-  VmaAllocator GetVmaAllocator() const { return mAllocator; }
+  vk::UniqueInstance& get_instance();
+  std::vector<const char*>& get_device_extensions();
+  vk::PhysicalDevice& get_physical_device();
+  vk::UniqueDevice& get_vulkan_device();
+  vk::PhysicalDeviceFeatures2& get_features2();
+  vk::PhysicalDeviceVulkan12Features& get_features12();
+  vk::PhysicalDeviceVulkan13Features& get_features13();
+  VmaAllocator get_vma_allocator() const { return m_allocator; }
 
-  [[nodiscard]] u32 GetGraphicsFamilyIndex() const;
-  [[nodiscard]] vk::Queue GetGraphicsQueue() const;
-  [[nodiscard]] vk::SurfaceFormatKHR GetSurfaceFormat() const { return mSurfaceFormat; }
-  bool IsInitialized() { return mInstance.get() && mVulkanDevice && mPhysDev; }
+  [[nodiscard]] u32 get_graphics_family_index() const;
+  [[nodiscard]] vk::Queue get_graphics_queue() const;
+  [[nodiscard]] vk::SurfaceFormatKHR get_surface_format() const { return m_surface_format; }
+  bool is_initialized() { return m_instance.get() && m_vulkan_device && m_phys_dev; }
 
 
 private:
-  vk::UniqueInstance CreateVulkanApplicationInstance();
-  void SetupQueues(vk::SurfaceKHR surface);
-  void SetupDeviceExtensions();
-  void CreateVulkanDevice();
+  vk::UniqueInstance create_vulkan_application_instance();
+  void setup_queues(vk::SurfaceKHR surface);
+  void setup_device_extensions();
+  void create_vulkan_device();
 
 
-  const GlfwContext& mGlfwCtx;
-  vk::UniqueInstance mInstance;
-  vk::PhysicalDevice mPhysDev;
-  vk::UniqueDevice mVulkanDevice;
+  const GlfwContext& m_glfw_ctx;
+  vk::UniqueInstance m_instance;
+  vk::PhysicalDevice m_phys_dev;
+  vk::UniqueDevice m_vulkan_device;
 
-  vk::Queue mGraphicsQueue;
-  u32 mGraphicsFamilyIndex{};
-  vk::SurfaceFormatKHR mSurfaceFormat;
+  vk::Queue m_graphics_queue;
+  u32 m_graphics_family_index{};
+  vk::SurfaceFormatKHR m_surface_format;
 
 
-  std::vector<const char*> mDeviceExts;
-  PFN_vkGetInstanceProcAddr mVkGetInstanceProcAddr = nullptr;
-  PFN_vkGetDeviceProcAddr mVkGetDeviceProcAddr = nullptr;
-  VmaAllocator mAllocator = VK_NULL_HANDLE;
-  vk::PhysicalDeviceFeatures2 mFeatures2;
-  vk::PhysicalDeviceVulkan12Features mFeatures12;
-  vk::PhysicalDeviceVulkan13Features mFeatures13;
+  std::vector<const char*> m_device_exts;
+  PFN_vkGetInstanceProcAddr m_vk_get_instance_proc_addr = nullptr;
+  PFN_vkGetDeviceProcAddr m_vk_get_device_proc_addr = nullptr;
+  VmaAllocator m_allocator = VK_NULL_HANDLE;
+  vk::PhysicalDeviceFeatures2 m_features2;
+  vk::PhysicalDeviceVulkan12Features m_features12;
+  vk::PhysicalDeviceVulkan13Features m_features13;
 };
 } // namespace SD

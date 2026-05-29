@@ -7,162 +7,162 @@
 #include "Core/LayerList.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-namespace SD {
+namespace sd {
 class LayerList;
 
 // NOTE: Take in window, since we need it for some initial values, but not to store
-VulkanContext::VulkanContext(const GlfwContext& glfwCtx) : mGlfwCtx(glfwCtx) {
+VulkanContext::VulkanContext(const GlfwContext& glfw_ctx) : m_glfw_ctx(glfw_ctx) {
   static vk::detail::DynamicLoader dl;
-  mVkGetInstanceProcAddr =
+  m_vk_get_instance_proc_addr =
       dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 
-  VULKAN_HPP_DEFAULT_DISPATCHER.init(mVkGetInstanceProcAddr);
+  VULKAN_HPP_DEFAULT_DISPATCHER.init(m_vk_get_instance_proc_addr);
 
-  mInstance = CreateVulkanApplicationInstance();
+  m_instance = create_vulkan_application_instance();
   // Temp surface, dies at end of func
 }
 
-void VulkanContext::Init(const Window& window) {
-  vk::UniqueSurfaceKHR tempSurface = window.CreateWindowSurface(mInstance, nullptr);
-  SetupDeviceExtensions();
-  SetupQueues(tempSurface.get());
+void VulkanContext::init(const Window& window) {
+  vk::UniqueSurfaceKHR temp_surface = window.create_window_surface(m_instance, nullptr);
+  setup_device_extensions();
+  setup_queues(temp_surface.get());
 
-  auto surfaceFormats = CheckVulkanResVal(mPhysDev.getSurfaceFormatsKHR(tempSurface.get()),
+  auto surface_formats = check_vulkan_res_val(m_phys_dev.getSurfaceFormatsKHR(temp_surface.get()),
                                           "Failed to get surface formats: ");
-  if (surfaceFormats.size() == 1 && surfaceFormats[0].format == vk::Format::eUndefined) {
-    mSurfaceFormat.format = vk::Format::eB8G8R8A8Srgb;
-    mSurfaceFormat.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+  if (surface_formats.size() == 1 && surface_formats[0].format == vk::Format::eUndefined) {
+    m_surface_format.format = vk::Format::eB8G8R8A8Srgb;
+    m_surface_format.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
   } else {
-    mSurfaceFormat = surfaceFormats[0];
-    for (auto& f : surfaceFormats) {
+    m_surface_format = surface_formats[0];
+    for (auto& f : surface_formats) {
       if (f.format == vk::Format::eB8G8R8A8Srgb &&
           f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-        mSurfaceFormat = f;
+        m_surface_format = f;
         break;
       }
     }
   }
 
-  CreateVulkanDevice();
+  create_vulkan_device();
 
-  mGraphicsQueue = mVulkanDevice->getQueue(mGraphicsFamilyIndex, 0);
+  m_graphics_queue = m_vulkan_device->getQueue(m_graphics_family_index, 0);
 
   // Initialize VMA
-  VmaVulkanFunctions vulkanFunctions = {};
-  vulkanFunctions.vkGetInstanceProcAddr = mVkGetInstanceProcAddr;
-  vulkanFunctions.vkGetDeviceProcAddr = mVkGetDeviceProcAddr;
+  VmaVulkanFunctions vulkan_functions = {};
+  vulkan_functions.vkGetInstanceProcAddr = m_vk_get_instance_proc_addr;
+  vulkan_functions.vkGetDeviceProcAddr = m_vk_get_device_proc_addr;
 
-  VmaAllocatorCreateInfo allocatorCreateInfo = {};
-  allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-  allocatorCreateInfo.physicalDevice = mPhysDev;
-  allocatorCreateInfo.device = mVulkanDevice.get();
-  allocatorCreateInfo.instance = mInstance.get();
-  allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-  allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+  VmaAllocatorCreateInfo allocator_create_info = {};
+  allocator_create_info.vulkanApiVersion = VK_API_VERSION_1_3;
+  allocator_create_info.physicalDevice = m_phys_dev;
+  allocator_create_info.device = m_vulkan_device.get();
+  allocator_create_info.instance = m_instance.get();
+  allocator_create_info.pVulkanFunctions = &vulkan_functions;
+  allocator_create_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
-  if (vmaCreateAllocator(&allocatorCreateInfo, &mAllocator) != VK_SUCCESS) {
-    Abort("Failed to create VMA allocator");
+  if (vmaCreateAllocator(&allocator_create_info, &m_allocator) != VK_SUCCESS) {
+    engine_abort("Failed to create VMA allocator");
   }
 }
 
 VulkanContext::~VulkanContext() {
   // TODO: might want this to teardown Windows
-  if (mAllocator != VK_NULL_HANDLE) {
-    vmaDestroyAllocator(mAllocator);
-    mAllocator = VK_NULL_HANDLE;
+  if (m_allocator != VK_NULL_HANDLE) {
+    vmaDestroyAllocator(m_allocator);
+    m_allocator = VK_NULL_HANDLE;
   }
-  if (mVulkanDevice) {
-    CheckVulkanRes(mVulkanDevice->waitIdle(), "Failed to wait for vulkan device");
+  if (m_vulkan_device) {
+    check_vulkan_res(m_vulkan_device->waitIdle(), "Failed to wait for vulkan device");
   }
 }
-vk::UniqueInstance& VulkanContext::GetInstance() {
-  return mInstance;
+vk::UniqueInstance& VulkanContext::get_instance() {
+  return m_instance;
 }
 
-std::vector<const char*>& VulkanContext::GetDeviceExtensions() {
-  return mDeviceExts;
+std::vector<const char*>& VulkanContext::get_device_extensions() {
+  return m_device_exts;
 }
 
-vk::PhysicalDevice& VulkanContext::GetPhysicalDevice() {
-  return mPhysDev;
+vk::PhysicalDevice& VulkanContext::get_physical_device() {
+  return m_phys_dev;
 }
 
-vk::UniqueDevice& VulkanContext::GetVulkanDevice() {
-  return mVulkanDevice;
+vk::UniqueDevice& VulkanContext::get_vulkan_device() {
+  return m_vulkan_device;
 }
 
-vk::PhysicalDeviceFeatures2& VulkanContext::GetFeatures2() {
-  return mFeatures2;
+vk::PhysicalDeviceFeatures2& VulkanContext::get_features2() {
+  return m_features2;
 }
 
-vk::PhysicalDeviceVulkan12Features& VulkanContext::GetFeatures12() {
-  return mFeatures12;
+vk::PhysicalDeviceVulkan12Features& VulkanContext::get_features12() {
+  return m_features12;
 }
-vk::PhysicalDeviceVulkan13Features& VulkanContext::GetFeatures13() {
-  return mFeatures13;
-}
-
-u32 VulkanContext::GetGraphicsFamilyIndex() const {
-  return mGraphicsFamilyIndex;
-}
-vk::Queue VulkanContext::GetGraphicsQueue() const {
-  return mGraphicsQueue;
+vk::PhysicalDeviceVulkan13Features& VulkanContext::get_features13() {
+  return m_features13;
 }
 
-vk::UniqueInstance VulkanContext::CreateVulkanApplicationInstance() {
-  vk::ApplicationInfo appInfo("Engine", 1, "NoEngine", 1, VK_API_VERSION_1_3);
+u32 VulkanContext::get_graphics_family_index() const {
+  return m_graphics_family_index;
+}
+vk::Queue VulkanContext::get_graphics_queue() const {
+  return m_graphics_queue;
+}
 
-  auto [glfwExts, extCount] = GlfwContext::GetRequiredInstanceExtensions();
-  std::vector instanceExts(glfwExts, glfwExts + extCount);
+vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
+  vk::ApplicationInfo app_info("Engine", 1, "NoEngine", 1, VK_API_VERSION_1_3);
+
+  auto [glfw_exts, ext_count] = GlfwContext::get_required_instance_extensions();
+  std::vector instance_exts(glfw_exts, glfw_exts + ext_count);
 
   // TODO: Enable validation layers if in debug mode
-  vk::InstanceCreateInfo instInfo({}, &appInfo, {}, instanceExts);
+  vk::InstanceCreateInfo inst_info({}, &app_info, {}, instance_exts);
   vk::UniqueInstance instance =
-      CheckVulkanResVal(vk::createInstanceUnique(instInfo), "Failed to create unique Instance: ");
+      check_vulkan_res_val(vk::createInstanceUnique(inst_info), "Failed to create unique Instance: ");
 
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
 
-  mPhysDev = CheckVulkanResVal(instance->enumeratePhysicalDevices(),
+  m_phys_dev = check_vulkan_res_val(instance->enumeratePhysicalDevices(),
                                "Failed to enumerate physical devices: ")
                  .front();
   return instance;
 }
-void VulkanContext::SetupQueues(vk::SurfaceKHR surface) {
-  auto queueFamilies = mPhysDev.getQueueFamilyProperties();
-  u32 graphicsFamilyIndex = UINT32_MAX;
+void VulkanContext::setup_queues(vk::SurfaceKHR surface) {
+  auto queue_families = m_phys_dev.getQueueFamilyProperties();
+  u32 graphics_family_index = UINT32_MAX;
 
-  for (u32 i = 0; i < queueFamilies.size(); ++i) {
-    if ((queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) ==
+  for (u32 i = 0; i < queue_families.size(); ++i) {
+    if ((queue_families[i].queueFlags & vk::QueueFlagBits::eGraphics) ==
         vk::QueueFlagBits::eGraphics) {
-      vk::Bool32 supportsPresent = vk::False;
+      vk::Bool32 supports_present = vk::False;
 
       // TODO: here's where we need the init window, i think
       // TODO: Create and delete surface
-      if (mPhysDev.getSurfaceSupportKHR(i, surface, &supportsPresent) == vk::Result::eSuccess &&
-          supportsPresent) {
-        graphicsFamilyIndex = i;
+      if (m_phys_dev.getSurfaceSupportKHR(i, surface, &supports_present) == vk::Result::eSuccess &&
+          supports_present) {
+        graphics_family_index = i;
         break;
       }
     }
   }
 
-  if (graphicsFamilyIndex == UINT32_MAX) {
-    Abort("No queue family supports both graphics and present capabilities");
+  if (graphics_family_index == UINT32_MAX) {
+    engine_abort("No queue family supports both graphics and present capabilities");
   }
 
-  mGraphicsFamilyIndex = graphicsFamilyIndex;
+  m_graphics_family_index = graphics_family_index;
 }
-void VulkanContext::SetupDeviceExtensions() {
+void VulkanContext::setup_device_extensions() {
   // Enable features for wireframe rendering (VK_POLYGON_MODE_LINE)
-  mFeatures2.features.fillModeNonSolid = VK_TRUE;
+  m_features2.features.fillModeNonSolid = VK_TRUE;
   
-  mFeatures12.timelineSemaphore = VK_TRUE;
-  mFeatures12.bufferDeviceAddress = VK_TRUE;
-  mFeatures13.setDynamicRendering(true).setSynchronization2(true);
-  mFeatures12.pNext = &mFeatures13;
-  mFeatures2.setPNext(&mFeatures12);
+  m_features12.timelineSemaphore = VK_TRUE;
+  m_features12.bufferDeviceAddress = VK_TRUE;
+  m_features13.setDynamicRendering(true).setSynchronization2(true);
+  m_features12.pNext = &m_features13;
+  m_features2.setPNext(&m_features12);
 
-  auto available = CheckVulkanResVal(mPhysDev.enumerateDeviceExtensionProperties(),
+  auto available = check_vulkan_res_val(m_phys_dev.enumerateDeviceExtensionProperties(),
                                      "Failed to enumerate device extension properties: ");
   auto supports = [&](const char* name) {
     return std::ranges::any_of(available, [&](const vk::ExtensionProperties& e) {
@@ -170,24 +170,24 @@ void VulkanContext::SetupDeviceExtensions() {
     });
   };
 
-  auto requireExt = [&](const char* name) {
+  auto require_ext = [&](const char* name) {
     if (!supports(name))
-      Abort("Required device extension missing: " + std::string(name));
-    mDeviceExts.push_back(name);
+      engine_abort("Required device extension missing: " + std::string(name));
+    m_device_exts.push_back(name);
   };
 
-  requireExt(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  require_ext(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 }
-void VulkanContext::CreateVulkanDevice() {
+void VulkanContext::create_vulkan_device() {
   float priority = 1.0f;
-  vk::DeviceQueueCreateInfo queueInfo({}, mGraphicsFamilyIndex, 1, &priority);
+  vk::DeviceQueueCreateInfo queue_info({}, m_graphics_family_index, 1, &priority);
 
-  vk::DeviceCreateInfo devInfo({}, queueInfo, {}, mDeviceExts);
-  devInfo.setPNext(&mFeatures2);
+  vk::DeviceCreateInfo dev_info({}, queue_info, {}, m_device_exts);
+  dev_info.setPNext(&m_features2);
 
-  mVulkanDevice =
-      CheckVulkanResVal(mPhysDev.createDeviceUnique(devInfo), "Failed to create unique device: ");
-  mVkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(mVulkanDevice->getProcAddr("vkGetDeviceProcAddr"));
-  VULKAN_HPP_DEFAULT_DISPATCHER.init(*mInstance, mVulkanDevice.get());
+  m_vulkan_device =
+      check_vulkan_res_val(m_phys_dev.createDeviceUnique(dev_info), "Failed to create unique device: ");
+  m_vk_get_device_proc_addr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(m_vulkan_device->getProcAddr("vkGetDeviceProcAddr"));
+  VULKAN_HPP_DEFAULT_DISPATCHER.init(*m_instance, m_vulkan_device.get());
 }
 } // namespace SD

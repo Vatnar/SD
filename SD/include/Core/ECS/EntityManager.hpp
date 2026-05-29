@@ -14,7 +14,7 @@
 #include "SparseEntitySet.hpp"
 
 
-namespace SD {
+namespace sd {
 class EntityManager;
 
 // TODO(docs): Document ViewImpl class
@@ -24,8 +24,8 @@ class EntityManager;
 //   - Example: Iterating over entities with Transform and Velocity
 template<typename... Components>
 class ViewImpl {
-  EntityManager& mManager;
-  const std::vector<Entity>* mSmallestPool = nullptr;
+  EntityManager& m_manager;
+  const std::vector<Entity>* m_smallest_pool = nullptr;
 
 public:
   explicit ViewImpl(EntityManager& manager);
@@ -40,7 +40,7 @@ public:
     using pointer = void;
     using reference = value_type;
 
-    Iterator(EntityManager& em, const std::vector<Entity>* denseEntities, usize idx);
+    Iterator(EntityManager& em, const std::vector<Entity>* dense_entities, usize idx);
     Iterator& operator++();
 
     bool operator==(const Iterator& other) const {
@@ -52,9 +52,9 @@ public:
     std::tuple<Entity, Components&...> operator*() const;
 
   private:
-    void Next();
+    void next();
 
-    [[nodiscard]] bool IsValid() const;
+    [[nodiscard]] bool is_valid() const;
   };
 
   Iterator begin();
@@ -64,7 +64,7 @@ public:
 
 private:
   template<typename Component>
-  void CheckSize(usize& minSize);
+  void check_size(usize& minSize);
 };
 
 
@@ -81,13 +81,13 @@ private:
  */
 class EntityManager : public Serializable {
 public:
-  Entity Create();
+  Entity create();
 
   template<typename T, typename... Args>
-  T* AddComponent(Entity e, Args&&... args);
+  T* add_component(Entity e, Args&&... args);
 
   template<typename T>
-  T* TryGetComponent(Entity e);
+  T* try_get_component(Entity e);
 
   /**
    * @brief See TryGetComponent for safe pointer version
@@ -96,23 +96,23 @@ public:
    * @return
    */
   template<typename T>
-  T& GetComponent(Entity e);
+  T& get_component(Entity e);
   template<typename T>
-  const T& GetComponent(Entity e) const;
-  void Serialize(Serializer& s) const override;
-  void Deserialize(Serializer& s) override;
+  const T& get_component(Entity e) const;
+  void serialize(Serializer& s) const override;
+  void deserialize(Serializer& s) override;
   template<typename T>
-  bool TryRemoveComponent(Entity e);
+  bool try_remove_component(Entity e);
 
-  void Destroy(Entity e);
-  [[nodiscard]] std::vector<ComponentDebugInfo> GetAllComponentInfo(Entity e) const;
+  void destroy(Entity e);
+  [[nodiscard]] std::vector<ComponentDebugInfo> get_all_component_info(Entity e) const;
 
-  [[nodiscard]] bool IsAlive(Entity e) const;
-  [[nodiscard]] int GetEntityCount() const { return mEntityMasks.Size(); }
-  [[nodiscard]] int GetAliveEntityCount() const {
+  [[nodiscard]] bool is_alive(Entity e) const;
+  [[nodiscard]] int get_entity_count() const { return m_entity_masks.size(); }
+  [[nodiscard]] int get_alive_entity_count() const {
     int alive = 0;
-    for (Entity e : mEntityMasks.GetDenseEntities()) {
-      if (IsAlive(e)) ++alive;
+    for (Entity e : m_entity_masks.get_dense_entities()) {
+      if (is_alive(e)) ++alive;
     }
     return alive;
   }
@@ -120,59 +120,59 @@ public:
 
   template<typename T>
   struct UnpackGroup {
-    static constexpr bool IsGroup = false;
+    static constexpr bool is_group = false;
   };
   template<typename... Ts>
   struct UnpackGroup<std::tuple<Ts...>> {
     using type = ViewImpl<Ts...>;
-    static constexpr bool IsGroup = true;
+    static constexpr bool is_group = true;
   };
   template<typename... Ts>
   struct UnpackGroup<ComponentGroup<Ts...>> {
     using type = ViewImpl<Ts...>;
-    static constexpr bool IsGroup = true;
+    static constexpr bool is_group = true;
   };
 
   template<typename... Args>
-  auto View();
+  auto view();
 
   template<typename T>
-  [[nodiscard]] bool HasComponent(Entity e) const;
+  [[nodiscard]] bool has_component(Entity e) const;
 
   template<typename... Components>
-  std::tuple<Components&...> GetComponentGroup(Entity e);
+  std::tuple<Components&...> get_component_group(Entity e);
 
   template<typename... Components>
-  std::tuple<const Components&...> GetComponentGroup(Entity e) const;
+  std::tuple<const Components&...> get_component_group(Entity e) const;
 
   template<typename T>
-  SparseEntitySet<T>* GetComponentPool();
+  SparseEntitySet<T>* get_component_pool();
 
   template<typename T>
-  bool HasComponentPool();
+  bool has_component_pool();
 
 
 private:
-  u32 PopFreeList();
-  std::vector<u32> mGenerations;
-  std::vector<u32> mFreeList;
+  u32 pop_free_list();
+  std::vector<u32> m_generations;
+  std::vector<u32> m_free_list;
 
-  std::vector<std::unique_ptr<SparseEntitySetBase>> mComponentPools;
+  std::vector<std::unique_ptr<SparseEntitySetBase>> m_component_pools;
   // NOTE: Hard capped at 256 for now, shouldn't really be a problem. Change in future if needed
   using ComponentMask = std::bitset<256>;
-  SparseEntitySet<ComponentMask> mEntityMasks;
+  SparseEntitySet<ComponentMask> m_entity_masks;
 
   // INVARIANTS:
-  // 1. For alive entity e: mGenerations[e.index] == e.generation
+  // 1. For alive entity e: m_generations[e.index] == e.generation
   // 2. mFreeList contains only indices of destroyed entities (not in use)
-  // 3. mEntityMasks has entry for every index in mGenerations
+  // 3. m_entity_masks has entry for every index in m_generations
   // 4. Component mask bit is set iff component exists in corresponding pool
 
 #ifndef NDEBUG
   void ValidateInvariants() const {
-    assert(mEntityMasks.Size() == mGenerations.size());
-    for (u32 idx : mFreeList) {
-      assert(idx < mGenerations.size());
+    assert(m_entity_masks.size() == m_generations.size());
+    for (u32 idx : m_free_list) {
+      assert(idx < m_generations.size());
     }
   }
 #endif

@@ -5,40 +5,40 @@
 #include "Entity.hpp"
 #include "EntityManager.hpp"
 
-namespace SD {
+namespace sd {
 
 class CreateEntityCmd : public Command {
   COMMAND_ID(CreateEntityCmd)
 public:
   CreateEntityCmd() = default;
-  explicit CreateEntityCmd(EntityHandle handle) : mHandle(handle) {}
+  explicit CreateEntityCmd(EntityHandle handle) : m_handle(handle) {}
 
-  EntityHandle mHandle;
-  Entity mCreatedEntity = {};
+  EntityHandle m_handle;
+  Entity m_created_entity = {};
 
-  void Execute(EntityManager& em, CommandQueue& queue) override {
-    mCreatedEntity = em.Create();
-    queue.SetEntityForHandle(mHandle, mCreatedEntity);
+  void execute(EntityManager& em, CommandQueue& queue) override {
+    m_created_entity = em.create();
+    queue.set_entity_for_handle(m_handle, m_created_entity);
   }
-  void Serialize(Serializer& serializer) const override { serializer.Write(mHandle.id); }
-  void Deserialize(Serializer& serializer) override { mHandle.id = serializer.Read<u32>(); }
+  void serialize(Serializer& serializer) const override { serializer.write(m_handle.id); }
+  void deserialize(Serializer& serializer) override { m_handle.id = serializer.read<u32>(); }
 };
 
 class DestroyEntityCmd : public Command {
   COMMAND_ID(DestroyEntityCmd)
 public:
-  Entity mEntity;
+  Entity m_entity;
   DestroyEntityCmd() = default;
-  explicit DestroyEntityCmd(Entity e) : mEntity(e) {}
+  explicit DestroyEntityCmd(Entity e) : m_entity(e) {}
 
-  void Execute(EntityManager& em, CommandQueue&) override { em.Destroy(mEntity); }
-  void Serialize(Serializer& serializer) const override {
-    serializer.Write<u32>(mEntity.index);
-    serializer.Write<u32>(mEntity.generation);
+  void execute(EntityManager& em, CommandQueue&) override { em.destroy(m_entity); }
+  void serialize(Serializer& serializer) const override {
+    serializer.write<u32>(m_entity.index);
+    serializer.write<u32>(m_entity.generation);
   }
-  void Deserialize(Serializer& serializer) override {
-    mEntity.index = serializer.Read<u32>();
-    mEntity.generation = serializer.Read<u32>();
+  void deserialize(Serializer& serializer) override {
+    m_entity.index = serializer.read<u32>();
+    m_entity.generation = serializer.read<u32>();
   }
 };
 
@@ -46,24 +46,24 @@ template<SerializableComponent T>
 class AddComponentCmd : public Command {
   COMMAND_ID_T(AddComponentCmd, T)
 public:
-  EntityHandle mHandle;
-  T mData;
+  EntityHandle m_handle;
+  T m_data;
   AddComponentCmd() = default;
-  AddComponentCmd(EntityHandle handle, T data) : mHandle(handle), mData(data) {}
+  AddComponentCmd(EntityHandle handle, T data) : m_handle(handle), m_data(data) {}
 
-  void Execute(EntityManager& em, CommandQueue& queue) override {
-    Entity e = queue.GetEntity(mHandle);
-    em.AddComponent<T>(e, mData);
+  void execute(EntityManager& em, CommandQueue& queue) override {
+    Entity e = queue.get_entity(m_handle);
+    em.add_component<T>(e, m_data);
   }
 
-  void Serialize(Serializer& serializer) const override {
-    serializer.Write(mHandle.id);
-    ComponentSerializer<T>::Serialize(mData, serializer);
+  void serialize(Serializer& serializer) const override {
+    serializer.write(m_handle.id);
+    ComponentSerializer<T>::serialize(m_data, serializer);
   }
 
-  void Deserialize(Serializer& serializer) override {
-    mHandle.id = serializer.Read<u32>();
-    ComponentSerializer<T>::Deserialize(mData, serializer);
+  void deserialize(Serializer& serializer) override {
+    m_handle.id = serializer.read<u32>();
+    ComponentSerializer<T>::deserialize(m_data, serializer);
   }
 };
 
@@ -71,16 +71,23 @@ template<SerializableComponent T>
 class RemoveComponentCmd : public Command {
   COMMAND_ID_T(RemoveComponentCmd, T)
 public:
-  EntityHandle mHandle;
+  EntityHandle m_handle;
   RemoveComponentCmd() = default;
-  explicit RemoveComponentCmd(EntityHandle handle) : mHandle(handle) {}
+  explicit RemoveComponentCmd(EntityHandle handle) : m_handle(handle) {}
 
-  void Execute(EntityManager& em, CommandQueue& queue) override {
-    Entity e = queue.GetEntity(mHandle);
-    em.TryRemoveComponent<T>(e);
+  void execute(EntityManager& em, CommandQueue& queue) override {
+    Entity e = queue.get_entity(m_handle);
+    em.try_remove_component<T>(e);
   }
-  void Serialize(Serializer& serializer) const override { serializer.Write(mHandle.id); }
-  void Deserialize(Serializer& serializer) override { mHandle.id = serializer.Read<u32>(); }
+  void serialize(Serializer& serializer) const override { serializer.write(m_handle.id); }
+  void deserialize(Serializer& serializer) override { m_handle.id = serializer.read<u32>(); }
 };
+
+REGISTER_COMMAND(CreateEntityCmd);
+REGISTER_COMMAND(DestroyEntityCmd);
+REGISTER_COMPONENT_COMMANDS(Transform);
+REGISTER_COMPONENT_COMMANDS(Camera);
+REGISTER_COMPONENT_COMMANDS(Renderable);
+REGISTER_COMPONENT_COMMANDS(DebugName);
 
 } // namespace SD

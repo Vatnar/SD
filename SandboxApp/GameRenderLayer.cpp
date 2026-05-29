@@ -6,84 +6,84 @@
 #include "VLA/Matrix.hpp"
 #include "imgui.h"
 
-GameRenderLayer::GameRenderLayer(const std::string& name, SD::Scene* scene,
-                                 SD::PipelineFactory::Handle pipelineHandle,
-                                 SD::PipelineFactory::Handle wireframeHandle,
-                                 VkPipelineLayout layout, SD::PipelineFactory* pipelineFactory) :
-  RenderStage(name, scene), mPipelineHandle(pipelineHandle), mWireframeHandle(wireframeHandle),
-  mLayout(layout), mPipelineFactory(pipelineFactory) {
+GameRenderLayer::GameRenderLayer(const std::string& name, sd::Scene* scene,
+                                 sd::PipelineFactory::Handle pipeline_handle,
+                                 sd::PipelineFactory::Handle wireframe_handle,
+                                 VkPipelineLayout layout, sd::PipelineFactory* pipeline_factory) :
+  RenderStage(name, scene), m_pipeline_handle(pipeline_handle), m_wireframe_handle(wireframe_handle),
+  m_layout(layout), m_pipeline_factory(pipeline_factory) {
 }
 
-void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
-  SD_DEBUG_ASSERT(mPipelineFactory, "PipelineFactory must be valid");
+void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
+  SD_DEBUG_ASSERT(m_pipeline_factory, "PipelineFactory must be valid");
 
   // Resolve handles to actual pipelines (stable across hot-reloads)
-  VkPipeline activePipe = (mView->GetRenderMode() == SD::RenderMode::Wireframe)
-                              ? mPipelineFactory->GetPipeline(mWireframeHandle)
-                              : mPipelineFactory->GetPipeline(mPipelineHandle);
+  VkPipeline active_pipe = (m_view->get_render_mode() == sd::RenderMode::WIREFRAME)
+                              ? m_pipeline_factory->get_pipeline(m_wireframe_handle)
+                              : m_pipeline_factory->get_pipeline(m_pipeline_handle);
 
   SD_DEBUG_ASSERT(cmd != VK_NULL_HANDLE, "Invalid cmd buffer");
-  SD_DEBUG_ASSERT(activePipe != VK_NULL_HANDLE, "Invalid pipeline - was it destroyed or recreated?");
-  SD_DEBUG_ASSERT(mLayout != VK_NULL_HANDLE, "Invalid layout");
+  SD_DEBUG_ASSERT(active_pipe != VK_NULL_HANDLE, "Invalid pipeline - was it destroyed or recreated?");
+  SD_DEBUG_ASSERT(m_layout != VK_NULL_HANDLE, "Invalid layout");
 
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, activePipe);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, active_pipe);
 
   struct Push {
     VLA::Matrix4x4f mvp;
     float color[4];
   };
 
-  auto mousePos = ImGui::GetMousePos();
-  auto regionPos = mView->GetContentRegionPos();
-  auto regionExtent = mView->GetContentRegionExtent();
-  float mouseNdcX = ((mousePos.x - regionPos.x) / regionExtent.x) * 2.0f - 1.0f;
-  float mouseNdcY = ((mousePos.y - regionPos.y) / regionExtent.y) * 2.0f - 1.0f;
+  auto mouse_pos = ImGui::GetMousePos();
+  auto region_pos = m_view->get_content_region_pos();
+  auto region_extent = m_view->get_content_region_extent();
+  float mouse_ndc_x = ((mouse_pos.x - region_pos.x) / region_extent.x) * 2.0f - 1.0f;
+  float mouse_ndc_y = ((mouse_pos.y - region_pos.y) / region_extent.y) * 2.0f - 1.0f;
 
   // Triangle vertices in local space (from world.vert)
-  VLA::Vector2f v0{
+  const VLA::Vector2f v0{
       {0.0f, -0.8f}
   };
-  VLA::Vector2f v1{
+  const VLA::Vector2f v1{
       {-0.8f, 0.8f}
   };
-  VLA::Vector2f v2{
+  const VLA::Vector2f v2{
       {0.8f, 0.8f}
   };
 
   float aspect =
-      static_cast<float>(mView->GetExtent().width) / static_cast<float>(mView->GetExtent().height);
-  float scaleX = (aspect > 1.0f) ? 1.0f / aspect : 1.0f;
-  float scaleY = (aspect > 1.0f) ? 1.0f : aspect; // Correcting for FixedWidth if aspect < 1
+      static_cast<float>(m_view->get_extent().width) / static_cast<float>(m_view->get_extent().height);
+  float scale_x = (aspect > 1.0f) ? 1.0f / aspect : 1.0f;
+  float scale_y = (aspect > 1.0f) ? 1.0f : aspect; // Correcting for FixedWidth if aspect < 1
 
-  auto toNdc = [&](VLA::Vector2f v) {
+  auto to_ndc = [&](VLA::Vector2f v) {
     VLA::Vector2f res;
-    res[0] = v[0] * scaleX;
-    res[1] = v[1] * scaleY;
+    res[0] = v[0] * scale_x;
+    res[1] = v[1] * scale_y;
     return res;
   };
 
-  VLA::Vector2f n0 = toNdc(v0);
-  VLA::Vector2f n1 = toNdc(v1);
-  VLA::Vector2f n2 = toNdc(v2);
-  VLA::Vector2f p{
-      {mouseNdcX, mouseNdcY}
+  const VLA::Vector2f n0 = to_ndc(v0);
+  const VLA::Vector2f n1 = to_ndc(v1);
+  const VLA::Vector2f n2 = to_ndc(v2);
+  const VLA::Vector2f p{
+      {mouse_ndc_x, mouse_ndc_y}
   };
 
   auto cross = [](VLA::Vector2f a, VLA::Vector2f b) {
     return a[0] * b[1] - a[1] * b[0];
   };
-  float d1 = cross(p - n0, n1 - n0);
-  float d2 = cross(p - n1, n2 - n1);
-  float d3 = cross(p - n2, n0 - n2);
+  const float d1 = cross(p - n0, n1 - n0);
+  const float d2 = cross(p - n1, n2 - n1);
+  const float d3 = cross(p - n2, n0 - n2);
 
-  bool inside = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  const bool inside = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 
-  for (auto [entity, transform, renderable] : mScene->em.View<SD::Transform, SD::Renderable>()) {
-    if ((renderable.viewMask & 1u << static_cast<uint32_t>(mViewId)) == 0 || renderable.renderStage != mStageId)
+  for (auto [entity, transform, renderable] : m_scene->em.view<sd::Transform, sd::Renderable>()) {
+    if ((renderable.view_mask & 1u << static_cast<uint32_t>(m_view_id)) == 0 || renderable.render_stage != m_stage_id)
       continue;
 
     Push push;
-    push.mvp = mView->GetProjection() * transform.worldMatrix;
+    push.mvp = m_view->get_projection() * transform.world_matrix;
     memcpy(push.color, renderable.color, sizeof(float) * 4);
 
     if (inside) {
@@ -92,7 +92,7 @@ void GameRenderLayer::OnRender(vk::CommandBuffer cmd) {
       push.color[2] = 1.0f;
     }
 
-    vkCmdPushConstants(cmd, mLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Push), &push);
+    vkCmdPushConstants(cmd, m_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Push), &push);
 
     vkCmdDraw(cmd, 3, 1, 0, 0);
   }

@@ -1,8 +1,8 @@
 #pragma once
 #include "Core/Events/Event.hpp"
 
-namespace SD {
-inline auto KeyCategory = EventCategoryWindow | EventCategoryInput | EventCategoryKeyboard;
+namespace sd {
+inline auto key_category = EventCategory::EVENT_CATEGORY_WINDOW | EventCategory::EVENT_CATEGORY_INPUT | EventCategory::EVENT_CATEGORY_KEYBOARD;
 class KeyPressedEvent : public Event {
 public:
   int key{};
@@ -12,8 +12,8 @@ public:
   KeyPressedEvent(int key, int scancode, int mods, bool repeat) :
     key(key), scancode(scancode), mods(mods), repeat(repeat) {}
 
-  EVENT_CLASS_TYPE(KeyPressed)
-  EVENT_CLASS_CATEGORY(KeyCategory)
+  EVENT_CLASS_TYPE(KEY_PRESSED)
+  EVENT_CLASS_CATEGORY(key_category)
 };
 
 
@@ -25,17 +25,17 @@ public:
 
   KeyReleasedEvent(int key, int scancode, int mods) : key(key), scancode(scancode), mods(mods) {}
 
-  EVENT_CLASS_TYPE(KeyReleased)
-  EVENT_CLASS_CATEGORY(KeyCategory)
+  EVENT_CLASS_TYPE(KEY_RELEASED)
+  EVENT_CLASS_CATEGORY(key_category)
 };
 
 class KeyTypedEvent : public Event {
 public:
-  unsigned int keyCode{};
+  uint32_t keycode{};
 
-  explicit KeyTypedEvent(unsigned int keycode) : keyCode(keycode) {}
+  explicit KeyTypedEvent(uint32_t keycode) : keycode(keycode) {}
 
-  EVENT_CLASS_TYPE(KeyTyped)
-  EVENT_CLASS_CATEGORY(KeyCategory)
+  EVENT_CLASS_TYPE(KEY_TYPED)
+  EVENT_CLASS_CATEGORY(key_category)
 };
 } // namespace SD

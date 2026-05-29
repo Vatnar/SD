@@ -11,7 +11,7 @@
 #include "VulkanContext.hpp"
 #include "VulkanWindow.hpp"
 
-namespace SD {
+namespace sd {
 // TODO(docs): Document VulkanRenderer class
 //   - Purpose: Orchestrates frame rendering (BeginFrame, BeginRenderPass, EndFrame)
 //   - Command buffer management
@@ -22,25 +22,25 @@ class VulkanRenderer {
 public:
   explicit VulkanRenderer(VulkanContext& ctx);
 
-  vk::CommandBuffer BeginCommandBuffer(VulkanWindow& vw);
-  void BeginRenderPass(VulkanWindow& vw);
-  vk::CommandBuffer BeginFrame(VulkanWindow& vw); // Legacy, calls both
-  vk::Result EndFrame(VulkanWindow& vw);
+  vk::CommandBuffer begin_command_buffer(VulkanWindow& vw);
+  void begin_render_pass(VulkanWindow& vw);
+  vk::CommandBuffer begin_frame(VulkanWindow& vw); // Legacy, calls both
+  vk::Result end_frame(VulkanWindow& vw);
 
-  void SetClearColor(const std::array<float, 4>& color) { mClearColor = color; }
+  void set_clear_color(const std::array<float, 4>& color) { m_clear_color = color; }
 
   // Subsystems
-  ShaderLibrary& GetShaderLibrary() { return *mShaders; }
-  PipelineFactory& GetPipelineFactory() { return *mPipelines; }
+  ShaderLibrary& get_shader_library() { return *m_shaders; }
+  PipelineFactory& get_pipeline_factory() { return *m_pipelines; }
 
 private:
   VulkanContext& ctx;
-  VkDevice mDevice;
+  VkDevice m_device;
 
-  std::array<float, 4> mClearColor{0.1f, 0.1f, 0.1f, 1.0f};
+  std::array<float, 4> m_clear_color{0.1f, 0.1f, 0.1f, 1.0f};
 
-  std::unique_ptr<ShaderLibrary> mShaders;
-  std::unique_ptr<PipelineFactory> mPipelines;
+  std::unique_ptr<ShaderLibrary> m_shaders;
+  std::unique_ptr<PipelineFactory> m_pipelines;
 };
 } // namespace SD
 

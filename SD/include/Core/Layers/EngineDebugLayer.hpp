@@ -5,7 +5,7 @@
 #include "Application.hpp"
 #include "Core/Layer.hpp"
 
-namespace SD {
+namespace sd {
 
 class Scene;
 class View;
@@ -15,93 +15,93 @@ class EngineDebugLayer : public Panel {
 public:
   explicit EngineDebugLayer(Scene* scene = nullptr) : Panel("EngineDebug", scene) {}
 
-  void OnUpdate(float dt) override;
-  void OnFixedUpdate(double dt) override;
-  void OnEvent(Event& e) override;
-  void OnImGuiMenuBar() override;
-  void OnGuiRender() override;
+  void on_update(float dt) override;
+  void on_fixed_update(double dt) override;
+  void on_event(Event& e) override;
+  void on_im_gui_menu_bar() override;
+  void on_gui_render() override;
 
 private:
-  void DisplayViewInfo(View* selectedView);
-  void DisplaySceneSelector();
-  void DisplayECSInspector();
-  void DisplayEventLog();
-  void DisplayLayoutMenu();
-  void DisplaySaveLayoutDialog();
-  void DisplayDeleteLayoutDialog();
-  void DisplayOverwriteConfirmationDialog();
-  void HandleLayoutShortcuts();
-  void HandleDebugShortcuts();
+  void display_view_info(View* selected_view);
+  void display_scene_selector();
+  void display_ecs_inspector();
+  void display_event_log();
+  void display_layout_menu();
+  void display_save_layout_dialog();
+  void display_delete_layout_dialog();
+  void display_overwrite_confirmation_dialog();
+  void handle_layout_shortcuts();
+  void handle_debug_shortcuts();
 
   // Dialog state
-  bool mShowSaveLayoutDialog = false;
-  bool mShowDeleteLayoutDialog = false;
-  bool mShowOverwriteConfirmation = false;
-  bool mSaveDialogInitialized = false;  // Track if buffer has been cleared
-  std::string mPendingLayoutName;
-  std::array<char, 64> mLayoutNameBuffer{};  // For save dialog input (replaces static)
+  bool m_show_save_layout_dialog = false;
+  bool m_show_delete_layout_dialog = false;
+  bool m_show_overwrite_confirmation = false;
+  bool m_save_dialog_initialized = false;  // Track if buffer has been cleared
+  std::string m_pending_layout_name;
+  std::array<char, 64> m_layout_name_buffer{};  // For save dialog input (replaces static)
 
   // Window visibility - LayoutManager can control these
-  bool mShowViewInspector = true;
-  bool mShowSceneInspector = true;
-  bool mShowEventLog = true;
-  bool mShowRendererInfo = true;
-  bool mShowContextOverlay = false;
+  bool m_show_view_inspector = true;
+  bool m_show_scene_inspector = true;
+  bool m_show_event_log = true;
+  bool m_show_renderer_info = true;
+  bool m_show_context_overlay = false;
   
 public:
   // LayoutManager interface
-  void SetViewInspectorVisible(bool visible) { mShowViewInspector = visible; }
-  void SetSceneInspectorVisible(bool visible) { mShowSceneInspector = visible; }
-  void SetEventLogVisible(bool visible) { mShowEventLog = visible; }
-  void SetRendererInfoVisible(bool visible) { mShowRendererInfo = visible; }
-  void SetContextOverlayVisible(bool visible) { mShowContextOverlay = visible; }
+  void set_view_inspector_visible(bool visible) { m_show_view_inspector = visible; }
+  void set_scene_inspector_visible(bool visible) { m_show_scene_inspector = visible; }
+  void set_event_log_visible(bool visible) { m_show_event_log = visible; }
+  void set_renderer_info_visible(bool visible) { m_show_renderer_info = visible; }
+  void set_context_overlay_visible(bool visible) { m_show_context_overlay = visible; }
   
-  bool IsViewInspectorVisible() const { return mShowViewInspector; }
-  bool IsSceneInspectorVisible() const { return mShowSceneInspector; }
-  bool IsEventLogVisible() const { return mShowEventLog; }
-  bool IsRendererInfoVisible() const { return mShowRendererInfo; }
-  bool IsContextOverlayVisible() const { return mShowContextOverlay; }
+  bool is_view_inspector_visible() const { return m_show_view_inspector; }
+  bool is_scene_inspector_visible() const { return m_show_scene_inspector; }
+  bool is_event_log_visible() const { return m_show_event_log; }
+  bool is_renderer_info_visible() const { return m_show_renderer_info; }
+  bool is_context_overlay_visible() const { return m_show_context_overlay; }
   
   // Apply a preset configuration (for LayoutManager)
-  void ApplyPresetConfiguration(bool inspectorsVisible, bool logVisible, bool rendererVisible);
+  void apply_preset_configuration(bool inspectors_visible, bool log_visible, bool renderer_visible);
 
-  bool mLogEvents = false;
-  bool mLogSceneChanges = false;
-  bool mLogViewResizes = false;
-  bool mLogEntityLifecycle = false;
+  bool m_log_events = false;
+  bool m_log_scene_changes = false;
+  bool m_log_view_resizes = false;
+  bool m_log_entity_lifecycle = false;
 
   // Log viewer filters
-  char mLogSearchBuffer[128]{};
-  int mLogLevelFilter = 0;  // 0 = All, 1 = Debug+, 2 = Info+, 3 = Warn+, 4 = Error+
-  bool mLogFilterInitialized = false;
+  char m_log_search_buffer[128]{};
+  int m_log_level_filter = 0;  // 0 = All, 1 = Debug+, 2 = Info+, 3 = Warn+, 4 = Error+
+  bool m_log_filter_initialized = false;
 
   // Category tree for log filtering
   struct CategoryNode {
     std::string name;        // display name (last segment)
-    std::string fullPath;    // e.g., "Engine/Renderer"
+    std::string full_path;    // e.g., "Engine/Renderer"
     bool visible = true;
     std::vector<CategoryNode> children;
   };
-  CategoryNode mCategoryRoot{"", "", true, {}};
-  bool mCategoryTreeBuilt = false;
+  CategoryNode m_category_root{"", "", true, {}};
+  bool m_category_tree_built = false;
 
-  void BuildCategoryTree();
-  void RenderCategoryNode(CategoryNode& node);
-  bool IsLogVisible(const std::string& category);
-  void SetCategoryVisible(CategoryNode& node, bool visible);
+  void build_category_tree();
+  void render_category_node(CategoryNode& node);
+  bool is_log_visible(const std::string& category);
+  void set_category_visible(CategoryNode& node, bool visible);
 
-  float mTimer = 0.0f;
-  int mUpdateCount = 0;
-  int mFixedUpdateCount = 0;
-  int mPrevFixed = 0;
-  int mPrevUpdate = 0;
+  float m_timer = 0.0f;
+  int m_update_count = 0;
+  int m_fixed_update_count = 0;
+  int m_prev_fixed = 0;
+  int m_prev_update = 0;
 
-  Scene* mSelectedScene = nullptr;
-  ViewId mSelectedViewId;  // Store ID instead of pointer to avoid dangling
+  Scene* m_selected_scene = nullptr;
+  ViewId m_selected_view_id;  // Store ID instead of pointer to avoid dangling
   
   // Debug shortcut state (was static in HandleDebugShortcuts)
-  bool mDebugModeActive = false;
-  float mDebugModeTimer = 0.0f;
+  bool m_debug_mode_active = false;
+  float m_debug_mode_timer = 0.0f;
 };
 
 } // namespace SD

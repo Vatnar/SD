@@ -11,7 +11,7 @@
 #include "ShaderLibrary.hpp"
 #include "VulkanConfig.hpp"
 
-namespace SD {
+namespace sd {
 
 // TODO(docs): Document PipelineFactory class
 //   - Purpose: Creates and caches Vulkan graphics pipelines
@@ -36,16 +36,16 @@ public:
     bool operator!=(const Handle& other) const { return !(*this == other); }
   };
   
-  static constexpr Handle NullHandle{0, 0};
+  static constexpr Handle null_handle{0, 0};
 
   explicit PipelineFactory(VkDevice device, ShaderLibrary& shaders);
   ~PipelineFactory();
 
   struct PipelineDesc {
-    std::string vertPath, fragPath;
-    VkRenderPass renderPass = VK_NULL_HANDLE;
+    std::string vert_path, frag_path;
+    VkRenderPass render_pass = VK_NULL_HANDLE;
     u32 subpass = 0;
-    VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
+    VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
 
     ~PipelineDesc() = default;
     auto operator<=>(const PipelineDesc&) const = default;
@@ -53,32 +53,32 @@ public:
 
   /// Create a graphics pipeline and return a stable handle.
   /// The handle remains valid even after RecreateAllPipelines() is called.
-  Handle CreateGraphicsPipeline(const PipelineDesc& desc, VkPipelineLayout layout);
+  Handle create_graphics_pipeline(const PipelineDesc& desc, VkPipelineLayout layout);
   
   /// Get the current VkPipeline for a handle.
   /// Returns VK_NULL_HANDLE if handle is invalid or pipeline was destroyed.
-  VkPipeline GetPipeline(Handle handle) const;
+  VkPipeline get_pipeline(Handle handle) const;
   
   /// Check if a handle is valid (exists and generation matches).
-  bool IsValid(Handle handle) const;
+  bool is_valid(Handle handle) const;
   
   /// Destroy a pipeline and invalidate its handle.
   /// Subsequent GetPipeline() calls will return VK_NULL_HANDLE.
-  void DestroyPipeline(Handle handle);
+  void destroy_pipeline(Handle handle);
 
-  VkPipelineLayout CreatePushConstantLayout(VkShaderStageFlags stages, u32 size);
+  VkPipelineLayout create_push_constant_layout(VkShaderStageFlags stages, u32 size);
 
   /// Recreates all tracked pipelines.
   /// Usually called after clearing ShaderLibrary cache.
   /// Handles remain valid - they resolve to the new pipeline instances.
   /// @return Vector of failed shader path pairs (vert, frag) for any pipelines that failed to recreate.
-  std::vector<std::pair<std::string, std::string>> RecreateAllPipelines();
+  std::vector<std::pair<std::string, std::string>> recreate_all_pipelines();
 
   PipelineFactory(const PipelineFactory&) = delete;
   PipelineFactory& operator=(const PipelineFactory&) = delete;
 
 private:
-  VkResult CreatePipelineInstance(const PipelineDesc& desc, vk::PipelineLayout layout,
+  VkResult create_pipeline_instance(const PipelineDesc& desc, vk::PipelineLayout layout,
                                   vk::UniquePipeline* pipeline);
 
   struct PipelineEntry {
@@ -89,13 +89,13 @@ private:
     bool active = false;     // Whether this slot currently holds a pipeline
   };
 
-  vk::Device mDevice;
-  ShaderLibrary& mShaders;
-  vk::UniquePipelineCache mPipelineCache;
+  vk::Device m_device;
+  ShaderLibrary& m_shaders;
+  vk::UniquePipelineCache m_pipeline_cache;
 
-  std::vector<PipelineEntry> mTrackedPipelines;
-  std::vector<uint32_t> mFreeSlots; // Indices of inactive slots for reuse
-  std::vector<vk::UniquePipelineLayout> mCreatedLayouts;
+  std::vector<PipelineEntry> m_tracked_pipelines;
+  std::vector<uint32_t> m_free_slots; // Indices of inactive slots for reuse
+  std::vector<vk::UniquePipelineLayout> m_created_layouts;
 };
 
 } // namespace SD

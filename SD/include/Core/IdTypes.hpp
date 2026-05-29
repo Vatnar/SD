@@ -2,19 +2,19 @@
 #include <cstdint>
 #include <functional>
 
-namespace SD {
+namespace sd {
 
 struct ViewId {
   uint32_t value = 0;
 
-  constexpr ViewId(uint32_t v = 0) noexcept : value(v) {}
+  explicit constexpr ViewId(uint32_t v = 0) noexcept : value(v) {}
 
   constexpr ViewId& operator++() noexcept {
     ++value;
     return *this;
   }
   constexpr ViewId operator++(int) noexcept {
-    ViewId tmp = *this;
+    const ViewId tmp = *this;
     ++value;
     return tmp;
   }
@@ -28,14 +28,14 @@ struct ViewId {
 struct WindowId {
   uint32_t value = 0;
 
-  constexpr WindowId(uint32_t v = 0) noexcept : value(v) {}
+  explicit constexpr WindowId(uint32_t v = 0) noexcept : value(v) {}
 
   constexpr WindowId& operator++() noexcept {
     ++value;
     return *this;
   }
   constexpr WindowId operator++(int) noexcept {
-    WindowId tmp = *this;
+    const WindowId tmp = *this;
     ++value;
     return tmp;
   }
@@ -46,19 +46,19 @@ struct WindowId {
   explicit constexpr operator uint32_t() const noexcept { return value; }
 };
 
-} // namespace SD
+} // namespace sd
 
 // std::hash specializations (inline to avoid ODR violations across TUs)
 template<>
-struct std::hash<SD::ViewId> {
-  inline std::size_t operator()(SD::ViewId id) const noexcept {
+struct std::hash<sd::ViewId> {
+  inline std::size_t operator()(const sd::ViewId id) const noexcept {
     return std::hash<uint32_t>{}(id.value);
   }
 };
 
 template<>
-struct std::hash<SD::WindowId> {
-  inline std::size_t operator()(SD::WindowId id) const noexcept {
+struct std::hash<sd::WindowId> {
+  inline std::size_t operator()(const sd::WindowId id) const noexcept {
     return std::hash<uint32_t>{}(id.value);
   }
 };

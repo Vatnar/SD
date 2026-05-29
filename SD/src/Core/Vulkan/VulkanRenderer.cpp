@@ -5,112 +5,113 @@
 
 #include "Utils/Utils.hpp"
 
-namespace SD {
+namespace sd {
 VulkanRenderer::VulkanRenderer(VulkanContext& ctx) : ctx{ctx} {
-  SD_ALWAYS_ASSERT(ctx.GetVulkanDevice(), "VulkanContext must have valid device");
-  mDevice = ctx.GetVulkanDevice().get();
-  mShaders = std::make_unique<ShaderLibrary>(mDevice);
-  mPipelines = std::make_unique<PipelineFactory>(mDevice, *mShaders);
+  assert(ctx.get_vulkan_device() && "VulkanContext must have valid device");
+  m_device = ctx.get_vulkan_device().get();
+  m_shaders = std::make_unique<ShaderLibrary>(m_device);
+  m_pipelines = std::make_unique<PipelineFactory>(m_device, *m_shaders);
 }
 
-vk::CommandBuffer VulkanRenderer::BeginCommandBuffer(VulkanWindow& vw) {
-  SD_ALWAYS_ASSERT(ctx.GetVulkanDevice(), "Vulkan device must be valid");
-  SD_ALWAYS_ASSERT(vw.GetSwapchain(), "Swapchain must be valid");
-  SD_ALWAYS_ASSERT(vw.GetCurrentCommandBuffer(), "Command buffer must be allocated");
-  SD_ALWAYS_ASSERT(vw.CurrentFrame < MAX_FRAMES_IN_FLIGHT, "Frame index out of bounds");
+vk::CommandBuffer VulkanRenderer::begin_command_buffer(VulkanWindow& vw) {
+  assert(ctx.get_vulkan_device() && "Vulkan device must be valid");
+  assert(vw.get_swapchain()&& "Swapchain must be valid");
+  assert(vw.get_current_command_buffer()&& "Command buffer must be allocated");
+  assert(vw.current_frame < MAX_FRAMES_IN_FLIGHT&& "Frame index out of bounds");
 
-  auto& device = ctx.GetVulkanDevice();
-  auto& frameSync = vw.GetFrameSync();
+  auto& device = ctx.get_vulkan_device();
+  auto& frame_sync = vw.get_frame_sync();
 
-  SD_ALWAYS_ASSERT(frameSync.inFlight, "In-flight fence must be valid");
+  assert(frame_sync.in_flight&& "In-flight fence must be valid");
 
   // Wait for previous frame to finish on GPU (track wait time)
   double waitStart = glfwGetTime();
-  CheckVulkanRes(device->waitForFences(1, &*frameSync.inFlight, true, UINT64_MAX),
+  check_vulkan_res(device->waitForFences(1, &*frame_sync.in_flight, true, UINT64_MAX),
                  "Failed to wait for fences");
   float waitDuration = static_cast<float>(glfwGetTime() - waitStart);
-  Application::Get().AddGpuWaitTime(waitDuration);
+  Application::get().add_gpu_wait_time(waitDuration);
 
-  auto cmd = vw.GetCurrentCommandBuffer();
+  auto cmd = vw.get_current_command_buffer();
   cmd.reset();
-  vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-  (void)cmd.begin(beginInfo);
+
+  vk::CommandBufferBeginInfo begin_info(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+  (void)cmd.begin(begin_info);
 
   return cmd;
 }
 
-void VulkanRenderer::BeginRenderPass(VulkanWindow& vw) {
-  SD_ALWAYS_ASSERT(vw.GetSwapchain(), "Swapchain must be valid");
-  SD_ALWAYS_ASSERT(vw.GetRenderPass(), "Render pass must be valid");
-  SD_ALWAYS_ASSERT(!vw.GetFramebuffers().empty(), "Framebuffers must not be empty");
-  SD_ALWAYS_ASSERT(vw.CurrentImageIndex < vw.GetFramebuffers().size(), "Image index out of bounds");
+void VulkanRenderer::begin_render_pass(VulkanWindow& vw) {
+  assert(vw.get_swapchain()&& "Swapchain must be valid");
+  assert(vw.get_render_pass()&& "Render pass must be valid");
+  assert(!vw.get_framebuffers().empty()&& "Framebuffers must not be empty");
+  assert(vw.current_image_index < vw.get_framebuffers().size()&& "Image index out of bounds");
 
-  auto cmd = vw.GetCurrentCommandBuffer();
+  auto cmd = vw.get_current_command_buffer();
 
-  std::array<vk::ClearValue, 1> clearValues{};
-  clearValues[0].color = vk::ClearColorValue{mClearColor};
+  std::array<vk::ClearValue, 1> clear_values{};
+  clear_values[0].color = vk::ClearColorValue{m_clear_color};
 
-  vk::RenderPassBeginInfo renderPassInfo(vw.GetRenderPass(),
-                                         *vw.GetFramebuffers()[vw.CurrentImageIndex],
+  vk::RenderPassBeginInfo render_pass_begin(vw.get_render_pass(),
+                                         *vw.get_framebuffers()[vw.current_image_index],
                                          {
                                              {0, 0},
-                                             vw.GetSwapchainExtent()
+                                             vw.get_swapchain_extent()
   },
-                                         clearValues);
+                                         clear_values);
 
-  cmd.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+  cmd.beginRenderPass(render_pass_begin, vk::SubpassContents::eInline);
 
-  vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(vw.GetSwapchainExtent().width),
-                        static_cast<float>(vw.GetSwapchainExtent().height), 0.0f, 1.0f);
+  vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(vw.get_swapchain_extent().width),
+                        static_cast<float>(vw.get_swapchain_extent().height), 0.0f, 1.0f);
   cmd.setViewport(0, 1, &viewport);
 
-  vk::Rect2D scissor({0, 0}, vw.GetSwapchainExtent());
+  vk::Rect2D scissor({0, 0}, vw.get_swapchain_extent());
   cmd.setScissor(0, 1, &scissor);
 }
 
-vk::CommandBuffer VulkanRenderer::BeginFrame(VulkanWindow& vw) {
-  auto cmd = BeginCommandBuffer(vw);
-  BeginRenderPass(vw);
+vk::CommandBuffer VulkanRenderer::begin_frame(VulkanWindow& vw) {
+  auto cmd = begin_command_buffer(vw);
+  begin_render_pass(vw);
   return cmd;
 }
 
-vk::Result VulkanRenderer::EndFrame(VulkanWindow& vw) {
-  SD_ALWAYS_ASSERT(vw.GetSwapchain(), "Swapchain must be valid");
-  SD_ALWAYS_ASSERT(vw.CurrentImageIndex < vw.GetSwapchainImages().size(), "Image index out of bounds");
+vk::Result VulkanRenderer::end_frame(VulkanWindow& vw) {
+  assert(vw.get_swapchain()&& "Swapchain must be valid");
+  assert(vw.current_image_index < vw.get_swapchain_images().size()&& "Image index out of bounds");
 
-  auto cmd = vw.GetCurrentCommandBuffer();
+  auto cmd = vw.get_current_command_buffer();
 
   cmd.endRenderPass();
   (void)cmd.end();
 
-  vk::SubmitInfo submitInfo{};
+  vk::SubmitInfo submit_info{};
 
-  vk::Semaphore waitSemaphores[] = {*vw.GetFrameSync().imageAcquired};
-  vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  submitInfo.setWaitSemaphoreCount(1);
-  submitInfo.setPWaitSemaphores(waitSemaphores);
-  submitInfo.setPWaitDstStageMask(waitStages);
+  vk::Semaphore wait_semaphores[] = {*vw.get_frame_sync().image_acquired};
+  vk::PipelineStageFlags wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+  submit_info.setWaitSemaphoreCount(1);
+  submit_info.setPWaitSemaphores(wait_semaphores);
+  submit_info.setPWaitDstStageMask(wait_stages);
 
-  submitInfo.setCommandBufferCount(1);
-  submitInfo.setPCommandBuffers(&cmd);
+  submit_info.setCommandBufferCount(1);
+  submit_info.setPCommandBuffers(&cmd);
 
-  vk::Semaphore signalSemaphores[] = {*vw.GetSwapchainSync(vw.CurrentImageIndex).renderComplete};
-  submitInfo.setSignalSemaphoreCount(1);
-  submitInfo.setPSignalSemaphores(signalSemaphores);
+  vk::Semaphore signal_semaphores[] = {*vw.get_swapchain_sync(vw.current_image_index).render_complete};
+  submit_info.setSignalSemaphoreCount(1);
+  submit_info.setPSignalSemaphores(signal_semaphores);
 
-  auto& device = ctx.GetVulkanDevice();
-  SD_ALWAYS_ASSERT(device, "Device must be valid");
-  (void)device->resetFences(*vw.GetFrameSync().inFlight);
+  auto& device = ctx.get_vulkan_device();
+  assert(device&& "Device must be valid");
+  (void)device->resetFences(*vw.get_frame_sync().in_flight);
 
-  auto err = ctx.GetGraphicsQueue().submit(1, &submitInfo, *vw.GetFrameSync().inFlight);
+  auto err = ctx.get_graphics_queue().submit(1, &submit_info, *vw.get_frame_sync().in_flight);
   if (err != vk::Result::eSuccess) {
-    SD::Log::Engine::Error("Failed to submit draw command buffer!");
+    log::engine::error("Failed to submit draw command buffer!");
     return err;
   }
 
-  vk::Result res = vw.PresentImage(vw.CurrentImageIndex);
+  vk::Result res = vw.present_image(vw.current_image_index);
 
-  vw.CurrentFrame = (vw.CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+  vw.current_frame = (vw.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 
   return res;
 }

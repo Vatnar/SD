@@ -10,83 +10,65 @@
 #include <mutex>
 #include <vector>
 
-namespace SD::Log {
+namespace sd::log {
 
-// ============================================================================
-// Log history
-// ============================================================================
-static std::deque<LogEntry> sLogHistory;
-static std::mutex sLogMutex;
+static std::deque<LogEntry> s_log_history;
+static std::mutex s_log_mutex;
 
-const std::deque<LogEntry>& GetLogHistory() {
-    return sLogHistory;
+const std::deque<LogEntry>& get_log_history() {
+    return s_log_history;
 }
 
-void AddLogEntry(LogEntry entry) {
-    std::lock_guard<std::mutex> lock(sLogMutex);
-    if (sLogHistory.size() > 500) sLogHistory.erase(sLogHistory.begin());
-    sLogHistory.push_back(std::move(entry));
+void add_log_entry(LogEntry entry) {
+    std::lock_guard lock(s_log_mutex);
+    if (s_log_history.size() > 500) s_log_history.erase(s_log_history.begin());
+    s_log_history.push_back(std::move(entry));
 }
 
-// ============================================================================
-// Category registry
-// ============================================================================
-static std::vector<CategoryInfo> sCategoryRegistry;
+static std::vector<CategoryInfo> s_category_registry;
 
-std::vector<CategoryInfo>& GetCategoryRegistry() {
-    return sCategoryRegistry;
+std::vector<CategoryInfo>& get_category_registry() {
+    return s_category_registry;
 }
 
-// ============================================================================
-// Shared sinks & file sinks (stored after Init so RegisterCategory can use them)
-// ============================================================================
-static std::vector<spdlog::sink_ptr> sSharedSinks;
-static spdlog::sink_ptr sEngineFileSink;
-static spdlog::sink_ptr sGameFileSink;
+static std::vector<spdlog::sink_ptr> s_shared_sinks;
+static spdlog::sink_ptr s_engine_file_sink;
+static spdlog::sink_ptr s_game_file_sink;
 
-// ============================================================================
-// Level conversions
-// ============================================================================
-spdlog::level::level_enum ToSpdlogLevel(LogLevel level) {
+spdlog::level::level_enum to_spdlog_level(const LogLevel level) {
     switch (level) {
-        case LogLevel::Trace:    return spdlog::level::trace;
-        case LogLevel::Debug:    return spdlog::level::debug;
-        case LogLevel::Info:     return spdlog::level::info;
-        case LogLevel::Warn:     return spdlog::level::warn;
-        case LogLevel::Error:    return spdlog::level::err;
-        case LogLevel::Critical: return spdlog::level::critical;
-        case LogLevel::Off:      return spdlog::level::off;
+        case LogLevel::TRACE:    return spdlog::level::trace;
+        case LogLevel::DEBUG:    return spdlog::level::debug;
+        case LogLevel::INFO:     return spdlog::level::info;
+        case LogLevel::WARN:     return spdlog::level::warn;
+        case LogLevel::ERROR:    return spdlog::level::err;
+        case LogLevel::CRITICAL: return spdlog::level::critical;
+        case LogLevel::OFF:      return spdlog::level::off;
     }
     return spdlog::level::info;
 }
 
-LogLevel FromSpdlogLevel(spdlog::level::level_enum level) {
+LogLevel from_spdlog_level(spdlog::level::level_enum level) {
     switch (level) {
-        case spdlog::level::trace:    return LogLevel::Trace;
-        case spdlog::level::debug:    return LogLevel::Debug;
-        case spdlog::level::info:     return LogLevel::Info;
-        case spdlog::level::warn:     return LogLevel::Warn;
-        case spdlog::level::err:      return LogLevel::Error;
-        case spdlog::level::critical: return LogLevel::Critical;
-        case spdlog::level::off:      return LogLevel::Off;
-        default:                      return LogLevel::Info;
+        case spdlog::level::trace:    return LogLevel::TRACE;
+        case spdlog::level::debug:    return LogLevel::DEBUG;
+        case spdlog::level::info:     return LogLevel::INFO;
+        case spdlog::level::warn:     return LogLevel::WARN;
+        case spdlog::level::err:      return LogLevel::ERROR;
+        case spdlog::level::critical: return LogLevel::CRITICAL;
+        case spdlog::level::off:      return LogLevel::OFF;
+        default:                      return LogLevel::INFO;
     }
 }
 
-// ============================================================================
-// Uptime tracking
-// ============================================================================
-static std::chrono::steady_clock::time_point sStartTime;
+static std::chrono::steady_clock::time_point s_start_time;
 
-static float GetUptimeSec() {
+static float get_uptime_sec() {
     auto now = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration<float>(now - sStartTime).count();
+    auto elapsed = std::chrono::duration<float>(now - s_start_time).count();
     return elapsed;
 }
 
-// ============================================================================
-// ImGui sink — feeds the in-game log viewer
-// ============================================================================
 template<typename Mutex>
 class imgui_sink : public spdlog::sinks::base_sink<Mutex> {
 protected:
@@ -94,39 +76,36 @@ protected:
         spdlog::memory_buf_t formatted;
         spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, formatted);
 
-        AddLogEntry({
+        add_log_entry({
             .category = std::string(msg.logger_name.data(), msg.logger_name.size()),
-            .level = FromSpdlogLevel(msg.level),
+            .level = from_spdlog_level(msg.level),
             .message = fmt::to_string(formatted),
-            .uptimeSec = GetUptimeSec()
+            .uptime_sec = get_uptime_sec()
         });
     }
 
     void flush_() override {}
 };
 
-using imgui_sink_mt = imgui_sink<std::mutex>;
+using ImguiSinkMt = imgui_sink<std::mutex>;
 
-// ============================================================================
-// Helper: create a logger for a category with the right sinks
-// ============================================================================
-static void CreateCategoryLogger(
+static void create_category_logger(
     const char* name,
-    LogLevel minLevel)
+    const LogLevel minLevel)
 {
-    if (sSharedSinks.empty()) return;  // Init() not called yet
+    if (s_shared_sinks.empty()) return;  // Init() not called yet
 
-    std::vector<spdlog::sink_ptr> catSinks = sSharedSinks;  // console + imgui
+    std::vector<spdlog::sink_ptr> catSinks = s_shared_sinks;  // console + imgui
 
     // Route to the correct file sink based on category prefix
     std::string_view sv(name);
     if (sv.starts_with("Engine")) {
-        catSinks.push_back(sEngineFileSink);
+        catSinks.push_back(s_engine_file_sink);
     } else if (sv.starts_with("Game")) {
-        catSinks.push_back(sGameFileSink);
+        catSinks.push_back(s_game_file_sink);
     } else {
         // Unknown category -> engine.log as fallback
-        catSinks.push_back(sEngineFileSink);
+        catSinks.push_back(s_engine_file_sink);
     }
 
     auto logger = std::make_shared<spdlog::async_logger>(
@@ -134,45 +113,39 @@ static void CreateCategoryLogger(
         spdlog::thread_pool(),
         spdlog::async_overflow_policy::block);
 
-    logger->set_level(ToSpdlogLevel(minLevel));
+    logger->set_level(to_spdlog_level(minLevel));
     logger->flush_on(spdlog::level::err);  // Immediate flush on error/critical for crash debugging
     spdlog::register_logger(logger);
 }
 
-// ============================================================================
-// Public: Register a category at runtime (for game modules or plugins)
-// ============================================================================
-void RegisterCategory(const char* name, ImVec4 color) {
+void register_category(const char* name, ImVec4 color) {
     // Avoid duplicates
-    auto it = std::find_if(sCategoryRegistry.begin(), sCategoryRegistry.end(),
+    auto it = std::find_if(s_category_registry.begin(), s_category_registry.end(),
                              [name](const CategoryInfo& ci) { return ci.name == name; });
-    if (it == sCategoryRegistry.end()) {
-        sCategoryRegistry.push_back(CategoryInfo{ .name = name, .visible = true, .color = color });
+    if (it == s_category_registry.end()) {
+        s_category_registry.push_back(CategoryInfo{ .name = name, .visible = true, .color = color });
         // Create the logger immediately
-        CreateCategoryLogger(name, LogLevel::Info);
+        create_category_logger(name, LogLevel::INFO);
     }
 }
 
-bool IsCategoryUnder(const std::string& child, const std::string& parent) {
+bool is_category_under(const std::string& child, const std::string& parent) {
     if (child == parent) return true;
     if (child.size() <= parent.size()) return false;
     // child starts with parent + "/"
     return child.compare(0, parent.size(), parent) == 0 && child[parent.size()] == '/';
 }
 
-// ============================================================================
-// Init
-// ============================================================================
-void Init() {
-    sStartTime = std::chrono::steady_clock::now();
-    sCategoryRegistry.clear();
-    sSharedSinks.clear();
+void init() {
+    s_start_time = std::chrono::steady_clock::now();
+    s_category_registry.clear();
+    s_shared_sinks.clear();
 
     spdlog::init_thread_pool(8192, 1);
 
     // Shared sinks
     auto console = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    auto imgui   = std::make_shared<imgui_sink_mt>();
+    auto imgui   = std::make_shared<ImguiSinkMt>();
 
     // File sinks — one per tree
     auto engineFile = std::make_shared<spdlog::sinks::basic_file_sink_mt>("engine.log", true);
@@ -187,17 +160,14 @@ void Init() {
     // ImGui sink: raw message only (timestamp/category/level added by ImGui display code)
     imgui->set_pattern("%v");
 
-    sSharedSinks = { console, imgui };
-    sEngineFileSink = engineFile;
-    sGameFileSink   = gameFile;
+    s_shared_sinks = { console, imgui };
+    s_engine_file_sink = engineFile;
+    s_game_file_sink   = gameFile;
 
-    // ------------------------------------------------------------------------
-    // Register engine categories with colors and create their loggers
-    // ------------------------------------------------------------------------
-    RegisterCategory("Engine",          ImVec4(0.0f, 0.8f, 1.0f, 1.0f));   // Cyan
-    RegisterCategory("Engine/Renderer", ImVec4(0.8f, 0.4f, 1.0f, 1.0f));   // Purple
-    RegisterCategory("Engine/ECS",      ImVec4(1.0f, 0.8f, 0.0f, 1.0f));   // Yellow
-    RegisterCategory("Engine/Network",  ImVec4(0.0f, 1.0f, 0.6f, 1.0f));   // Teal
+    register_category("Engine",          ImVec4(0.0f, 0.8f, 1.0f, 1.0f));   // Cyan
+    register_category("Engine/Renderer", ImVec4(0.8f, 0.4f, 1.0f, 1.0f));   // Purple
+    register_category("Engine/ECS",      ImVec4(1.0f, 0.8f, 0.0f, 1.0f));   // Yellow
+    register_category("Engine/Network",  ImVec4(0.0f, 1.0f, 0.6f, 1.0f));   // Teal
 }
 
 } // namespace SD::Log

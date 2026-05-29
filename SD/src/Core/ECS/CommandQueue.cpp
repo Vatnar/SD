@@ -3,69 +3,10 @@
 #include "Core/ECS/Commands.hpp"
 #include "Utils/Utils.hpp"
 
-namespace SD {
+namespace sd {
 
-u32 CreateEntityCmd::sTypeId = CommandRegistry::Register("CreateEntityCmd");
-u32 DestroyEntityCmd::sTypeId = CommandRegistry::Register("DestroyEntityCmd");
-
-template<>
-u32 AddComponentCmd<Transform>::sTypeId =
-    CommandRegistry::Register("AddComponentCmd", ComponentTraits<Transform>::Id);
-template<>
-u32 RemoveComponentCmd<Transform>::sTypeId =
-    CommandRegistry::Register("RemoveComponentCmd", ComponentTraits<Transform>::Id);
-
-template<>
-u32 AddComponentCmd<Camera>::sTypeId =
-    CommandRegistry::Register("AddComponentCmd", ComponentTraits<Camera>::Id);
-template<>
-u32 RemoveComponentCmd<Camera>::sTypeId =
-    CommandRegistry::Register("RemoveComponentCmd", ComponentTraits<Camera>::Id);
-
-template<>
-u32 AddComponentCmd<Renderable>::sTypeId =
-    CommandRegistry::Register("AddComponentCmd", ComponentTraits<Renderable>::Id);
-template<>
-u32 RemoveComponentCmd<Renderable>::sTypeId =
-    CommandRegistry::Register("RemoveComponentCmd", ComponentTraits<Renderable>::Id);
-
-template<>
-u32 AddComponentCmd<DebugName>::sTypeId =
-    CommandRegistry::Register("AddComponentCmd", ComponentTraits<DebugName>::Id);
-template<>
-u32 RemoveComponentCmd<DebugName>::sTypeId =
-    CommandRegistry::Register("RemoveComponentCmd", ComponentTraits<DebugName>::Id);
-
-namespace {
-struct CommandRegistrar {
-  CommandRegistrar() {
-    CommandFactory::Register(CreateEntityCmd::sTypeId,
-                             [] { return std::make_unique<CreateEntityCmd>(); });
-    CommandFactory::Register(DestroyEntityCmd::sTypeId,
-                             [] { return std::make_unique<DestroyEntityCmd>(); });
-    CommandFactory::Register(AddComponentCmd<Transform>::sTypeId,
-                             [] { return std::make_unique<AddComponentCmd<Transform>>(); });
-    CommandFactory::Register(RemoveComponentCmd<Transform>::sTypeId,
-                             [] { return std::make_unique<RemoveComponentCmd<Transform>>(); });
-    CommandFactory::Register(AddComponentCmd<Camera>::sTypeId,
-                             [] { return std::make_unique<AddComponentCmd<Camera>>(); });
-    CommandFactory::Register(RemoveComponentCmd<Camera>::sTypeId,
-                             [] { return std::make_unique<RemoveComponentCmd<Camera>>(); });
-    CommandFactory::Register(AddComponentCmd<Renderable>::sTypeId,
-                             [] { return std::make_unique<AddComponentCmd<Renderable>>(); });
-    CommandFactory::Register(RemoveComponentCmd<Renderable>::sTypeId,
-                             [] { return std::make_unique<RemoveComponentCmd<Renderable>>(); });
-    CommandFactory::Register(AddComponentCmd<DebugName>::sTypeId,
-                             [] { return std::make_unique<AddComponentCmd<DebugName>>(); });
-    CommandFactory::Register(RemoveComponentCmd<DebugName>::sTypeId,
-                             [] { return std::make_unique<RemoveComponentCmd<DebugName>>(); });
-  }
-};
-static CommandRegistrar registrar;
-} // namespace
-
-u32 CommandRegistry::Register(const char* name, u32 componentId) {
-  std::string key = std::string(name) + "_" + std::to_string(componentId);
+u32 CommandRegistry::register_(const char* name, u32 component_id) {
+  std::string key = std::string(name) + "_" + std::to_string(component_id);
   auto it = map.find(key);
   if (it != map.end()) {
     return it->second;
@@ -76,92 +17,92 @@ u32 CommandRegistry::Register(const char* name, u32 componentId) {
   return id;
 }
 
-u32 CommandRegistry::GetId(const char* name, u32 componentId) {
-  std::string key = std::string(name) + "_" + std::to_string(componentId);
+u32 CommandRegistry::get_id(const char* name, u32 component_id) {
+  std::string key = std::string(name) + "_" + std::to_string(component_id);
   auto it = map.find(key);
   if (it != map.end()) {
     return it->second;
   }
-  return type_max<u32>;
+  return g_type_max<u32>;
 }
 
-const char* CommandRegistry::GetName(u32 id) {
+const char* CommandRegistry::get_name(u32 id) {
   if (id < names.size()) {
     return names[id];
   }
   return "Unknown";
 }
 
-void CommandFactory::Register(u32 typeId, CreatorFunc creator) {
-  if (typeId >= creators.size()) {
-    creators.resize(typeId + 1);
+void CommandFactory::register_(u32 type_id, CreatorFn creator) {
+  if (type_id >= creators.size()) {
+    creators.resize(type_id + 1);
   }
-  creators[typeId] = std::move(creator);
+  creators[type_id] = std::move(creator);
 }
 
-std::unique_ptr<Command> CommandFactory::Create(u32 typeId) {
-  if (typeId < creators.size() && creators[typeId]) {
-    return creators[typeId]();
+std::unique_ptr<Command> CommandFactory::create(u32 type_id) {
+  if (type_id < creators.size() && creators[type_id]) {
+    return creators[type_id]();
   }
   return nullptr;
 }
 
-void CommandQueue::Apply(EntityManager& em) {
-  for (const auto& cmd : mCommands) {
-    cmd->Execute(em, *this);
+void CommandQueue::apply(EntityManager& em) {
+  for (const auto& cmd : m_commands) {
+    cmd->execute(em, *this);
   }
-  mCommands.clear();
+  m_commands.clear();
 }
-void CommandQueue::SetEntityForHandle(EntityHandle entityHandle, Entity entity) {
-  SD_ALWAYS_ASSERT(entityHandle.IsValid(), "Cannot set entity for invalid (sentinel) handle");
-  if (entityHandle.id >= mHandleToEntity.size()) {
-    mHandleToEntity.resize(entityHandle.id + 1);
+void CommandQueue::set_entity_for_handle(EntityHandle entity_handle, Entity entity) {
+  assert(entity_handle.is_valid() && "Cannot set entity for invalid (sentinel) handle");
+  if (entity_handle.id >= m_handle_to_entity.size()) {
+    m_handle_to_entity.resize(entity_handle.id + 1);
   }
-  mHandleToEntity[entityHandle.id] = entity;
+  m_handle_to_entity[entity_handle.id] = entity;
 }
-bool CommandQueue::IsHandleResolved(EntityHandle handle) const {
-  return handle.IsValid() && handle.id < mHandleToEntity.size();
+bool CommandQueue::is_handle_resolved(EntityHandle handle) const {
+  return handle.is_valid() && handle.id < m_handle_to_entity.size();
 }
-void CommandQueue::Clear() {
-  mCommands.clear();
-  mHandleToEntity.clear();
+void CommandQueue::clear() {
+  m_commands.clear();
+  m_handle_to_entity.clear();
 }
-usize CommandQueue::GetCount() const {
-  return mCommands.size();
+usize CommandQueue::get_count() const {
+  return m_commands.size();
 }
-Entity CommandQueue::GetEntity(EntityHandle handle) const {
-  assert(handle.id < mHandleToEntity.size() && "Entity has not been resolved");
-  return mHandleToEntity[handle.id];
+Entity CommandQueue::get_entity(EntityHandle handle) const {
+  assert(handle.id < m_handle_to_entity.size() && "Entity has not been resolved");
+  return m_handle_to_entity[handle.id];
 }
 
-void CommandQueue::Serialize(Serializer& serializer) const {
-  serializer.Write(static_cast<u32>(mCommands.size()));
-  for (const auto& cmd : mCommands) {
-    serializer.Write(cmd->GetTypeId());
+void CommandQueue::serialize(Serializer& serializer) const {
+  serializer.write(static_cast<u32>(m_commands.size()));
+  for (const auto& cmd : m_commands) {
+    serializer.write(cmd->get_type_id());
     // Serialize command to temp buffer to know its size
     std::vector<std::byte> payload;
-    Serializer payloadSerializer(payload);
-    cmd->Serialize(payloadSerializer);
-    serializer.Write(static_cast<u32>(payload.size()));
-    serializer.Write(payload.data(), payload.size());
+    Serializer payload_serializer(payload);
+    cmd->serialize(payload_serializer);
+    serializer.write(static_cast<u32>(payload.size()));
+    serializer.write(payload.data(), payload.size());
   }
 }
 
-void CommandQueue::Deserialize(Serializer& serializer) {
-  u32 count = serializer.Read<u32>();
-  mCommands.clear();
-  mCommands.reserve(count);
+void CommandQueue::deserialize(Serializer& serializer) {
+  u32 count = serializer.read<u32>();
+  m_commands.clear();
+  m_commands.reserve(count);
 
   for (u32 i = 0; i < count; ++i) {
-    u32 typeId = serializer.Read<u32>();
-    u32 payloadSize = serializer.Read<u32>();
-    usize payloadStart = serializer.GetOffset();
-    if (auto cmd = CommandFactory::Create(typeId)) {
-      cmd->Deserialize(serializer);
-      mCommands.push_back(std::move(cmd));
+    u32 type_id = serializer.read<u32>();
+    u32 payload_size = serializer.read<u32>();
+    usize payload_start = serializer.get_offset();
+    if (auto cmd = CommandFactory::create(type_id)) {
+      cmd->deserialize(serializer);
+      m_commands.push_back(std::move(cmd));
     } else {
-      SD::Log::Engine::Error("Unknown command type ID {} during deserialization, skipping {} bytes", typeId, payloadSize);
-      serializer.SetOffset(payloadStart + payloadSize);
+      log::engine::error("Unknown command type ID {} during deserialization, skipping {} bytes", type_id, payload_size);
+      serializer.SetOffset(payload_start + payload_size);
     }
   }
 }

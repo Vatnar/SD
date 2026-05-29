@@ -16,30 +16,30 @@
 #include "Core/LayerList.hpp"
 #include "VLA/Matrix.hpp"
 
-namespace SD {
+namespace sd {
 
 // TODO(docs): Document ViewError enum
 //   - Each error code's meaning
 //   - How errors are propagated (std::expected)
 enum ViewError {
-  NameAlreadyExists,
-  Success,
-  ViewDoesNotExist,
+  NAME_ALREADY_EXISTS,
+  SUCCESS,
+  VIEW_DOES_NOT_EXIST,
 };
 
 // TODO(docs): Document AspectMode enum
 //   - Each mode's behavior
 //   - When to use which mode
 enum class AspectMode {
-  FixedHeight, // -aspect to +aspect
-  FixedWidth,  // -1 to +1
-  BestFit      // Auto switch based on aspect
+  FIXED_HEIGHT, // -aspect to +aspect
+  FIXED_WIDTH,  // -1 to +1
+  BEST_FIT      // Auto switch based on aspect
 };
 
 // TODO(docs): Document RenderMode enum
 enum class RenderMode {
-  Shaded,
-  Wireframe
+  SHADED,
+  WIREFRAME
 };
 
 // TODO(docs): Document View class thoroughly
@@ -51,118 +51,118 @@ enum class RenderMode {
 //   - Example: Creating a custom view with layers
 class View {
 public:
-  explicit View(const std::string& name) : mName(name) {
-    mCameraViewProjection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+  explicit View(const std::string& name) : m_name(name) {
+    m_camera_view_projection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
   }
   virtual ~View();
 
-  void OnUpdate(float dt) { mLayers.Update(dt); }
-  virtual void OnGuiRender();
+  void on_update(float dt) { m_layers.update(dt); }
+  virtual void on_gui_render();
 
-  virtual void OnEvent(Event& e) { mLayers.OnEvent(e); }
-  virtual void OnRender(vk::CommandBuffer cmd);
-  virtual void OnFixedUpdate(double dt) { mLayers.OnFixedUpdate(dt); }
+  virtual void on_event(Event& e) { m_layers.on_event(e); }
+  virtual void on_render(vk::CommandBuffer cmd);
+  virtual void on_fixed_update(double dt) { m_layers.on_fixed_update(dt); }
 
   // --- Layer management ---
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
-  T& PushLayer(Args&&... args) {
-    return mLayers.PushLayer<T>(std::forward<Args>(args)...);
+  T& push_layer(Args&&... args) {
+    return m_layers.push_layer<T>(std::forward<Args>(args)...);
   }
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
-  T& PushLayer(int stageOrder, Args&&... args) {
+  T& push_layer(int stageOrder, Args&&... args) {
     auto layer = std::make_unique<T>(std::forward<Args>(args)...);
-    layer->mStageId = stageOrder;
-    layer->mViewId = mViewId;
-    layer->mView = this;
+    layer->m_stage_id = stageOrder;
+    layer->m_view_id = m_view_id;
+    layer->m_view = this;
 
-    if (static_cast<size_t>(stageOrder) >= mLayersByStage.size())
-      mLayersByStage.resize(stageOrder + 1);
-    mLayersByStage[stageOrder] = std::move(layer);
-    return static_cast<T&>(*mLayersByStage[stageOrder]);
+    if (static_cast<size_t>(stageOrder) >= m_layers_by_stage.size())
+      m_layers_by_stage.resize(stageOrder + 1);
+    m_layers_by_stage[stageOrder] = std::move(layer);
+    return static_cast<T&>(*m_layers_by_stage[stageOrder]);
   }
 
   // --- Identity ---
-  const std::string& GetName() const { return mName; }
-  [[nodiscard]] ViewId GetViewId() const { return mViewId; }
-  [[nodiscard]] bool IsOpen() const { return mOpen; }
-  void SetOpen(bool open) { mOpen = open; }
+  const std::string& get_name() const { return m_name; }
+  [[nodiscard]] ViewId get_view_id() const { return m_view_id; }
+  [[nodiscard]] bool is_open() const { return m_open; }
+  void SetOpen(bool open) { m_open = open; }
 
   // --- Layers ---
-  LayerList& GetLayers() { return mLayers; }
-  const LayerList& GetLayers() const { return mLayers; }
+  LayerList& get_layers() { return m_layers; }
+  const LayerList& get_layers() const { return m_layers; }
 
   // --- Viewport state ---
-  VkExtent2D GetExtent() const { return mExtent; }
-  void Resize(VkExtent2D extent);
+  VkExtent2D get_extent() const { return m_extent; }
+  void resize(VkExtent2D extent);
 
-  AspectMode GetAspectMode() const { return mAspectMode; }
-  void SetAspectMode(AspectMode mode) {
-    mAspectMode = mode;
-    Resize(mExtent);
+  AspectMode get_aspect_mode() const { return m_aspect_mode; }
+  void set_aspect_mode(AspectMode mode) {
+    m_aspect_mode = mode;
+    resize(m_extent);
   }
 
-  RenderMode GetRenderMode() const { return mRenderMode; }
-  void SetRenderMode(RenderMode mode) { mRenderMode = mode; }
+  RenderMode get_render_mode() const { return m_render_mode; }
+  void set_render_mode(RenderMode mode) { m_render_mode = mode; }
 
-  const VLA::Matrix4x4f& GetProjection() const { return mCameraViewProjection; }
+  const VLA::Matrix4x4f& get_projection() const { return m_camera_view_projection; }
 
   /// Returns true (once) if the extent changed since the last call.
-  bool ConsumeExtentChanged() {
-    bool changed = mExtentChanged;
-    mExtentChanged = false;
+  bool consume_extent_changed() {
+    bool changed = m_extent_changed;
+    m_extent_changed = false;
     return changed;
   }
 
   // --- Diagnostics (ImGui region tracking) ---
-  ImVec2 GetContentRegionPos() const { return mContentRegionPos; }
-  ImVec2 GetContentRegionExtent() const { return mContentRegionExtent; }
+  ImVec2 get_content_region_pos() const { return m_content_region_pos; }
+  ImVec2 get_content_region_extent() const { return m_content_region_extent; }
 
   // --- Rendering setup ---
-  static VkExtent2D GetImGuiExtent();
-  static VkFormat FindDepthFormat();
-  [[nodiscard]] vk::RenderPass GetLayeredRenderPass() const { return mLayeredRP.get(); }
-  Layer* GetLayerByStage(u32 stage);
+  static VkExtent2D get_im_gui_extent();
+  static VkFormat find_depth_format();
+  [[nodiscard]] vk::RenderPass get_layered_render_pass() const { return m_layered_rp.get(); }
+  Layer* get_layer_by_stage(u32 stage);
 
-  void SetupLayeredRender(u32 maxStages, VkExtent2D initialExtent = {1280, 720});
-  void CleanupLayeredRender();
+  void setup_layered_render(u32 maxStages, VkExtent2D initialExtent = {1280, 720});
+  void cleanup_layered_render();
 
 private:
-  void CreateVulkanResources();
+  void create_vulkan_resources();
 
-  std::string mName;
-  LayerList mLayers;
-  bool mOpen = true;
-  ViewId mViewId;
+  std::string m_name;
+  LayerList m_layers;
+  bool m_open = true;
+  ViewId m_view_id;
 
   // ImGui content region (updated each frame in OnGuiRender)
-  ImVec2 mContentRegionPos{0, 0};
-  ImVec2 mContentRegionExtent{0, 0};
+  ImVec2 m_content_region_pos{0, 0};
+  ImVec2 m_content_region_extent{0, 0};
 
   // Vulkan rendering resources
-  vk::UniqueRenderPass mLayeredRP;
+  vk::UniqueRenderPass m_layered_rp;
 
-  VkImage mColorImage = VK_NULL_HANDLE;
-  VmaAllocation mColorAllocation = VK_NULL_HANDLE;
-  vk::UniqueImageView mColorView;
+  VkImage m_color_image = VK_NULL_HANDLE;
+  VmaAllocation m_color_allocation = VK_NULL_HANDLE;
+  vk::UniqueImageView m_color_view;
 
-  VkImage mDepthImage = VK_NULL_HANDLE;
-  VmaAllocation mDepthAllocation = VK_NULL_HANDLE;
-  vk::UniqueImageView mDepthView;
+  VkImage m_depth_image = VK_NULL_HANDLE;
+  VmaAllocation m_depth_allocation = VK_NULL_HANDLE;
+  vk::UniqueImageView m_depth_view;
 
-  VkDescriptorSet mDisplayTexDS = VK_NULL_HANDLE; // imgui::image
+  VkDescriptorSet m_display_tex_ds = VK_NULL_HANDLE; // imgui::image
 
-  vk::UniqueFramebuffer mLayeredFramebuffer;
+  vk::UniqueFramebuffer m_layered_framebuffer;
 
-  std::vector<std::unique_ptr<Layer>> mLayersByStage;
-  VLA::Matrix4x4f mCameraViewProjection;
-  VkExtent2D mExtent = {1280, 720};
-  bool mExtentChanged = false;
+  std::vector<std::unique_ptr<Layer>> m_layers_by_stage;
+  VLA::Matrix4x4f m_camera_view_projection;
+  VkExtent2D m_extent = {1280, 720};
+  bool m_extent_changed = false;
 
-  AspectMode mAspectMode = AspectMode::BestFit;
-  RenderMode mRenderMode = RenderMode::Shaded;
+  AspectMode m_aspect_mode = AspectMode::BEST_FIT;
+  RenderMode m_render_mode = RenderMode::SHADED;
 
   friend class Application; // needs mViewId assignment
   friend class ViewManager;

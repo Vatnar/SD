@@ -1,150 +1,151 @@
+#pragma once
 template<typename... Components>
-ViewImpl<Components...>::ViewImpl(EntityManager& manager) : mManager(manager) {
-  usize minSize = std::numeric_limits<usize>::max();
+ViewImpl<Components...>::ViewImpl(EntityManager& manager) : m_manager(manager) {
+  usize min_size = std::numeric_limits<usize>::max();
 
-  (CheckSize<Components>(minSize), ...);
+  (check_size<Components>(min_size), ...);
 }
 template<typename... Components>
 ViewImpl<Components...>::Iterator::Iterator(EntityManager& em,
-                                            const std::vector<Entity>* denseEntities, usize idx) :
-  manager(em), entities(denseEntities), index(idx) {
-  if (entities && index < entities->size() && !IsValid()) {
-    Next();
+                                            const std::vector<Entity>* dense_entities, usize idx) :
+  manager(em), entities(dense_entities), index(idx) {
+  if (entities && index < entities->size() && !is_valid()) {
+    next();
   }
 }
 template<typename... Components>
-typename ViewImpl<Components...>::Iterator& ViewImpl<Components...>::Iterator::operator++() {
-  Next();
+ ViewImpl<Components...>::Iterator& ViewImpl<Components...>::Iterator::operator++() {
+  next();
   return *this;
 }
 template<typename... Components>
 std::tuple<Entity, Components&...> ViewImpl<Components...>::Iterator::operator*() const {
-  Entity currentEntity = (*entities)[index];
-  return std::tuple_cat(std::make_tuple(currentEntity),
-                        manager.GetComponentGroup<Components...>(currentEntity));
+  Entity current_entity = (*entities)[index];
+  return std::tuple_cat(std::make_tuple(current_entity),
+                        manager.get_component_group<Components...>(current_entity));
 }
 template<typename... Components>
-void ViewImpl<Components...>::Iterator::Next() {
+void ViewImpl<Components...>::Iterator::next() {
   if (!entities) return;
   do {
     index++;
-  } while (index < entities->size() && !IsValid());
+  } while (index < entities->size() && !is_valid());
 }
 template<typename... Components>
-bool ViewImpl<Components...>::Iterator::IsValid() const {
+bool ViewImpl<Components...>::Iterator::is_valid() const {
   if (!entities) return false;
-  Entity currentEntity = (*entities)[index];
-  return (manager.HasComponent<Components>(currentEntity) && ...);
+  Entity current_entity = (*entities)[index];
+  return (manager.has_component<Components>(current_entity) && ...);
 }
 template<typename... Components>
 ViewImpl<Components...>::Iterator ViewImpl<Components...>::begin() {
-  if (!mSmallestPool) {
-    SD::Log::Engine::Warn("View has no valid component pools - scene may be empty or missing components");
+  if (!m_smallest_pool) {
+    log::engine::warn("View has no valid component pools - scene may be empty or missing components");
     return end();
   }
-  return Iterator(mManager, mSmallestPool, 0);
+  return Iterator(m_manager, m_smallest_pool, 0);
 }
 template<typename... Components>
-typename ViewImpl<Components...>::Iterator ViewImpl<Components...>::end() {
-  if (!mSmallestPool) {
-    return Iterator(mManager, nullptr, 0);
+ ViewImpl<Components...>::Iterator ViewImpl<Components...>::end() {
+  if (!m_smallest_pool) {
+    return Iterator(m_manager, nullptr, 0);
   }
-  return Iterator(mManager, mSmallestPool, mSmallestPool->size());
+  return Iterator(m_manager, m_smallest_pool, m_smallest_pool->size());
 }
 template<typename... Components>
 template<typename Component>
-void ViewImpl<Components...>::CheckSize(usize& minSize) {
-  if (!mManager.HasComponentPool<Component>()) {
+void ViewImpl<Components...>::check_size(usize& minSize) {
+  if (!m_manager.has_component_pool<Component>()) {
     minSize = 0;
-    mSmallestPool = nullptr;
+    m_smallest_pool = nullptr;
     return;
   }
 
-  auto* pool = mManager.GetComponentPool<Component>();
-  if (pool->Size() < minSize) {
-    minSize = pool->Size();
-    mSmallestPool = &pool->GetDenseEntities();
+  auto* pool = m_manager.get_component_pool<Component>();
+  if (pool->size() < minSize) {
+    minSize = pool->size();
+    m_smallest_pool = &pool->get_dense_entities();
   }
 }
 
 
 template<typename T, typename... Args>
-T* EntityManager::AddComponent(Entity e, Args&&... args) {
-  static_assert(ComponentTraits<T>::IsRegistered,
+T* EntityManager::add_component(Entity e, Args&&... args) {
+  static_assert(ComponentTraits<T>::s_is_registered,
                 "Error: Component type is not registered, register it");
-  const usize typeId = ComponentTraits<T>::Id;
+  const usize type_id = ComponentTraits<T>::id;
 
 
-  if (typeId >= mComponentPools.size())
-    mComponentPools.resize(typeId + 1);
-  if (!mComponentPools[typeId])
-    mComponentPools[typeId] = std::make_unique<SparseEntitySet<T>>();
+  if (type_id >= m_component_pools.size())
+    m_component_pools.resize(type_id + 1);
+  if (!m_component_pools[type_id])
+    m_component_pools[type_id] = std::make_unique<SparseEntitySet<T>>();
 
   // add data
-  if (mEntityMasks[e]->test(typeId)) {
+  if (m_entity_masks[e]->test(type_id)) {
     if (auto logger = spdlog::get("Engine")) {
       logger->warn("Overwriting already existing component: {}, id: {} ",
-                   ComponentTraits<T>::Name, typeId);
+                   ComponentTraits<T>::name, type_id);
     }
   }
-  auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
-  mEntityMasks[e]->set(typeId);
-  pool->Add(e, std::forward<Args>(args)...);
+  auto* pool = static_cast<SparseEntitySet<T>*>(m_component_pools[type_id].get());
+  m_entity_masks[e]->set(type_id);
+  pool->add(e, std::forward<Args>(args)...);
 
-  return pool->Get(e);
+  return pool->get(e);
 }
 template<typename T>
-T* EntityManager::TryGetComponent(Entity e) {
-  static_assert(ComponentTraits<T>::IsRegistered,
+T* EntityManager::try_get_component(Entity e) {
+  static_assert(ComponentTraits<T>::s_is_registered,
                 "Error: Component type is not registered, register it");
 
-  usize typeId = ComponentTraits<T>::Id;
-  if (typeId >= mComponentPools.size() || !mComponentPools[typeId] ||
-      !mEntityMasks[e]->test(typeId))
+  usize type_id = ComponentTraits<T>::id;
+  if (type_id >= m_component_pools.size() || !m_component_pools[type_id] ||
+      !m_entity_masks[e]->test(type_id))
     return nullptr;
 
-  auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
-  return pool->Get(e);
+  auto* pool = static_cast<SparseEntitySet<T>*>(m_component_pools[type_id].get());
+  return pool->get(e);
 }
 template<typename T>
-T& EntityManager::GetComponent(Entity e) {
-  usize typeId = ComponentTraits<T>::Id;
-  assert(HasComponent<T>(e) && "Entity doesnt have component");
+T& EntityManager::get_component(Entity e) {
+  usize typeId = ComponentTraits<T>::id;
+  assert(has_component<T>(e) && "Entity doesnt have component");
 
-  auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
-  return *pool->Get(e);
+  auto* pool = static_cast<SparseEntitySet<T>*>(m_component_pools[typeId].get());
+  return *pool->get(e);
 }
 template<typename T>
-const T& EntityManager::GetComponent(Entity e) const {
-  usize typeId = ComponentTraits<T>::Id;
-  assert(HasComponent<T>(e) && "Entity doesnt have component");
+const T& EntityManager::get_component(Entity e) const {
+  usize type_id = ComponentTraits<T>::id;
+  assert(has_component<T>(e) && "Entity doesnt have component");
 
-  auto* pool = static_cast<const SparseEntitySet<T>*>(mComponentPools[typeId].get());
-  return *pool->Get(e);
+  auto* pool = static_cast<const SparseEntitySet<T>*>(m_component_pools[type_id].get());
+  return *pool->get(e);
 }
 
 template<typename T>
-bool EntityManager::TryRemoveComponent(Entity e) {
-  static_assert(ComponentTraits<T>::IsRegistered,
+bool EntityManager::try_remove_component(Entity e) {
+  static_assert(ComponentTraits<T>::s_is_registered,
                 "Error: Can't remove component type that isn't registered");
 
-  usize typeId = ComponentTraits<T>::Id;
-  if (typeId >= mComponentPools.size() || !mComponentPools[typeId] ||
-      !mEntityMasks[e]->test(typeId))
+  usize type_id = ComponentTraits<T>::id;
+  if (type_id >= m_component_pools.size() || !m_component_pools[type_id] ||
+      !m_entity_masks[e]->test(type_id))
     return false;
 
-  auto* pool = static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
-  pool->Remove(e);
-  mEntityMasks[e]->reset(typeId);
+  auto* pool = static_cast<SparseEntitySet<T>*>(m_component_pools[type_id].get());
+  pool->remove(e);
+  m_entity_masks[e]->reset(type_id);
   return true;
 }
 
 
 template<typename... Args>
-auto EntityManager::View() {
+auto EntityManager::view() {
   if constexpr (sizeof...(Args) == 1) {
     using T = std::tuple_element_t<0, std::tuple<Args...>>;
-    if constexpr (UnpackGroup<T>::IsGroup) {
+    if constexpr (UnpackGroup<T>::is_group) {
       return typename UnpackGroup<T>::type(*this);
     } else {
       return ViewImpl<T>(*this);
@@ -154,116 +155,116 @@ auto EntityManager::View() {
   }
 }
 template<typename T>
-bool EntityManager::HasComponent(Entity e) const {
-  if (e.index >= mEntityMasks.GetDenseEntities().size())
+bool EntityManager::has_component(Entity e) const {
+  if (e.index >= m_entity_masks.get_dense_entities().size())
     return false;
 
-  if (!IsAlive(e))
+  if (!is_alive(e))
     return false;
 
-  auto mask = mEntityMasks.Get(e);
-  return mask && mask->test(ComponentTraits<T>::Id);
+  auto mask = m_entity_masks.get(e);
+  return mask && mask->test(ComponentTraits<T>::id);
 }
 template<typename... Components>
-std::tuple<Components&...> EntityManager::GetComponentGroup(Entity e) {
-  return std::forward_as_tuple(GetComponent<Components>(e)...);
+std::tuple<Components&...> EntityManager::get_component_group(Entity e) {
+  return std::forward_as_tuple(get_component<Components>(e)...);
 }
 template<typename... Components>
-std::tuple<const Components&...> EntityManager::GetComponentGroup(Entity e) const {
-  return std::forward_as_tuple(*GetComponent<Components>(e)...);
+std::tuple<const Components&...> EntityManager::get_component_group(Entity e) const {
+  return std::forward_as_tuple(*get_component<Components>(e)...);
 }
 template<typename T>
-SparseEntitySet<T>* EntityManager::GetComponentPool() {
-  static_assert(ComponentTraits<T>::IsRegistered != false, "Unregistered Component");
-  const usize typeId = ComponentTraits<T>::Id;
-  if (typeId >= mComponentPools.size() || !mComponentPools[typeId])
+SparseEntitySet<T>* EntityManager::get_component_pool() {
+  static_assert(ComponentTraits<T>::s_is_registered != false, "Unregistered Component");
+  const usize type_id = ComponentTraits<T>::id;
+  if (type_id >= m_component_pools.size() || !m_component_pools[type_id])
     return nullptr;
 
-  return static_cast<SparseEntitySet<T>*>(mComponentPools[typeId].get());
+  return static_cast<SparseEntitySet<T>*>(m_component_pools[type_id].get());
 }
 template<typename T>
-bool EntityManager::HasComponentPool() {
-  static_assert(ComponentTraits<T>::IsRegistered != false, "Unregistered Component");
-  const usize typeId = ComponentTraits<T>::Id;
-  return typeId < mComponentPools.size() && mComponentPools[typeId];
+bool EntityManager::has_component_pool() {
+  static_assert(ComponentTraits<T>::s_is_registered != false, "Unregistered Component");
+  const usize type_id = ComponentTraits<T>::id;
+  return type_id < m_component_pools.size() && m_component_pools[type_id];
 }
-inline Entity EntityManager::Create() {
-  const uint32_t idx = mFreeList.empty() ? mGenerations.size() : PopFreeList();
+inline Entity EntityManager::create() {
+  const uint32_t idx = m_free_list.empty() ? m_generations.size() : pop_free_list();
 
-  if (idx >= mGenerations.size()) {
-    mGenerations.resize(idx + 1, 0);
+  if (idx >= m_generations.size()) {
+    m_generations.resize(idx + 1, 0);
   }
-  Entity e = {idx, mGenerations[idx]};
+  Entity e = {idx, m_generations[idx]};
 
-  mEntityMasks.Add(e, ComponentMask{});
+  m_entity_masks.add(e, ComponentMask{});
 #ifndef NDEBUG
   ValidateInvariants();
 #endif
   return e;
 }
-inline void EntityManager::Destroy(const Entity e) {
-  if (!IsAlive(e))
+inline void EntityManager::destroy(const Entity e) {
+  if (!is_alive(e))
     return;
 
 
   // TODO: Ranges?
-  ComponentMask* mask = mEntityMasks[e];
+  ComponentMask* mask = m_entity_masks[e];
   assert(mask);
 
   for (usize i = 0; i < mask->size(); ++i) {
     if (mask->test(i)) {
-      if (mComponentPools[i])
-        mComponentPools[i]->Remove(e);
+      if (m_component_pools[i])
+        m_component_pools[i]->remove(e);
     }
   }
   mask->reset();
-  mGenerations[e.index]++;
-  mFreeList.push_back(e.index);
+  m_generations[e.index]++;
+  m_free_list.push_back(e.index);
 #ifndef NDEBUG
   ValidateInvariants();
 #endif
 }
-inline std::vector<ComponentDebugInfo> EntityManager::GetAllComponentInfo(Entity e) const {
+inline std::vector<ComponentDebugInfo> EntityManager::get_all_component_info(Entity e) const {
   std::vector<ComponentDebugInfo> components;
-  if (!IsAlive(e))
+  if (!is_alive(e))
     return {};
-  for (auto& pool : mComponentPools) {
+  for (auto& pool : m_component_pools) {
     if (!pool)
       continue;
 
-    if (auto info = pool->GetDebugInfo(e)) {
+    if (auto info = pool->get_debug_info(e)) {
       components.push_back(info.value());
     }
   }
   return components;
 }
-inline bool EntityManager::IsAlive(const Entity e) const {
-  return e.index < mGenerations.size() && mGenerations[e.index] == e.generation;
+inline bool EntityManager::is_alive(const Entity e) const {
+  return e.index < m_generations.size() && m_generations[e.index] == e.generation;
 }
-inline uint32_t EntityManager::PopFreeList() {
-  const auto idx = mFreeList.back();
-  mFreeList.pop_back();
+inline uint32_t EntityManager::pop_free_list() {
+  const auto idx = m_free_list.back();
+  m_free_list.pop_back();
   return idx;
 }
 
-inline void EntityManager::Serialize(Serializer& s) const {
-  s.Write(mGenerations);
-  s.Write(mFreeList);
+inline void EntityManager::serialize(Serializer& s) const {
+  s.write(m_generations);
+  s.write(m_free_list);
 
   // Serialize entity masks - only serialize alive entities
-  const auto& maskEntities = mEntityMasks.GetDenseEntities();
+  const auto& mask_entities = m_entity_masks.get_dense_entities();
   u32 aliveCount = 0;
-  for (Entity e : maskEntities) {
-    if (IsAlive(e)) aliveCount++;
+  for (Entity e : mask_entities) {
+    if (is_alive(e)) aliveCount++;
   }
-  s.Write(aliveCount);
+  s.write(aliveCount);
 
-  for (Entity e : maskEntities) {
-    if (!IsAlive(e)) continue;
+  for (Entity e : mask_entities) {
+    if (!is_alive(e)) continue;
 
-    s.Write(e.index);
-    s.Write(e.generation);
-    const ComponentMask* mask = mEntityMasks.Get(e);
+    s.write(e.index);
+    s.write(e.generation);
+    const ComponentMask* mask = m_entity_masks.get(e);
     // Pack 256-bit mask into 4 x u64 values (instead of 256 x u64)
     if (mask) {
       for (usize word = 0; word < 4; ++word) {
@@ -273,79 +274,79 @@ inline void EntityManager::Serialize(Serializer& s) const {
             packed |= (u64(1) << bit);
           }
         }
-        s.Write(packed);
+        s.write(packed);
       }
     } else {
       for (usize i = 0; i < 4; ++i) {
-        s.Write(u64(0));
+        s.write(static_cast<u64>(0));
       }
     }
   }
   
   // Serialize component pools - only registered serializable ones
-  u32 serializableCount = 0;
-  for (u32 i = 0; i < mComponentPools.size(); ++i) {
-    if (mComponentPools[i] && ComponentFactory::IsRegistered(i)) {
-      serializableCount++;
+  u32 serializable_count = 0;
+  for (u32 i = 0; i < m_component_pools.size(); ++i) {
+    if (m_component_pools[i] && sd::ComponentFactory::is_registered(i)) {
+      serializable_count++;
     }
   }
-  s.Write(serializableCount);
+  s.write(serializable_count);
   
-  for (u32 i = 0; i < mComponentPools.size(); ++i) {
-    if (mComponentPools[i] && ComponentFactory::IsRegistered(i)) {
-      s.Write(i);  // component type ID
-      mComponentPools[i]->Serialize(s);
+  for (u32 i = 0; i < m_component_pools.size(); ++i) {
+    if (m_component_pools[i] && sd::ComponentFactory::is_registered(i)) {
+      s.write(i);  // component type ID
+      m_component_pools[i]->serialize(s);
     }
   }
 }
 
-inline void EntityManager::Deserialize(Serializer& s) {
-  s.Read(mGenerations);
-  s.Read(mFreeList);
+inline void EntityManager::deserialize(Serializer& s) {
+  s.read(m_generations);
+  s.read(m_free_list);
 
   // Deserialize alive entity masks
-  u32 maskCount = s.Read<u32>();
+  u32 maskCount = s.read<u32>();
   for (u32 i = 0; i < maskCount; ++i) {
-    u32 index = s.Read<u32>();
-    u32 generation = s.Read<u32>();
+    u32 index = s.read<u32>();
+    u32 generation = s.read<u32>();
     Entity e{index, generation};
-    mEntityMasks.Add(e, ComponentMask{});
-    ComponentMask* mask = mEntityMasks.Get(e);
+    m_entity_masks.add(e, ComponentMask{});
+    ComponentMask* mask = m_entity_masks.get(e);
     // Read 4 x u64 values and unpack to 256-bit mask
     if (mask) {
       for (usize word = 0; word < 4; ++word) {
-        u64 packed = s.Read<u64>();
+        u64 packed = s.read<u64>();
         for (usize bit = 0; bit < 64; ++bit) {
-          if (packed & (u64(1) << bit)) {
+          if (packed & (static_cast<u64>(1) << bit)) {
             mask->set(word * 64 + bit);
           }
         }
       }
     } else {
       for (usize j = 0; j < 4; ++j) {
-        s.Read<u64>();
+        s.read<u64>();
       }
     }
   }
 
   // Reconstruct mask entries for destroyed entities (needed for invariants)
-  for (u32 idx : mFreeList) {
-    assert(mGenerations[idx] > 0 && "Freelist index has generation 0");
-    Entity e{idx, mGenerations[idx] - 1};
-    mEntityMasks.Add(e, ComponentMask{});
+  for (u32 idx : m_free_list) {
+    assert(m_generations[idx] > 0 && "Freelist index has generation 0");
+    Entity e{idx, m_generations[idx] - 1};
+    m_entity_masks.add(e, ComponentMask{});
   }
 
   // Deserialize component pools
-  u32 serializableCount = s.Read<u32>();
-  mComponentPools.resize(16);  // Basic size, expand as needed
+  u32 serializable_count = s.read<u32>();
+  m_component_pools.resize(16);  // Basic size, expand as needed
 
-  for (u32 i = 0; i < serializableCount; ++i) {
-    u32 componentId = s.Read<u32>();
-    auto pool = ComponentFactory::Create(componentId);
+  for (u32 i = 0; i < serializable_count; ++i) {
+    u32 componentId = s.read<u32>();
+    auto pool = sd::ComponentFactory::create(componentId);
     if (pool) {
-      pool->Deserialize(s);
-      if (componentId < mComponentPools.size()) {
-        mComponentPools[componentId] = std::move(pool);
+      pool->deserialize(s);
+      if (componentId < m_component_pools.size()) {
+        m_component_pools[componentId] = std::move(pool);
       }
     }
   }

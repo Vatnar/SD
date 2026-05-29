@@ -2,30 +2,30 @@
 #include "Command.hpp"
 #include "Entity.hpp"
 
-namespace SD {
+namespace sd {
 
 class CommandQueue {
 public:
   template<typename T, typename... Args>
-  void Add(Args&&... args) {
-    mCommands.push_back(std::make_unique<T>(std::forward<Args>(args)...));
+  void add(Args&&... args) {
+    m_commands.push_back(std::make_unique<T>(std::forward<Args>(args)...));
   }
-  void Apply(EntityManager& em);
+  void apply(EntityManager& em);
 
-  [[nodiscard]] Entity GetEntity(EntityHandle handle) const;
+  [[nodiscard]] Entity get_entity(EntityHandle handle) const;
 
-  void SetEntityForHandle(EntityHandle entityHandle, Entity entity);
-  [[nodiscard]] bool IsHandleResolved(EntityHandle handle) const;
-  void Clear();
-  [[nodiscard]] usize GetCount() const;
+  void set_entity_for_handle(EntityHandle entity_handle, Entity entity);
+  [[nodiscard]] bool is_handle_resolved(EntityHandle handle) const;
+  void clear();
+  [[nodiscard]] usize get_count() const;
 
-  void Serialize(Serializer& serializer) const;
-  void Deserialize(Serializer& serializer);
+  void serialize(Serializer& serializer) const;
+  void deserialize(Serializer& serializer);
 
 private:
-  std::vector<std::unique_ptr<Command>> mCommands;
-  std::vector<Entity> mHandleToEntity;
-  std::mutex mMutex;
+  std::vector<std::unique_ptr<Command>> m_commands;
+  std::vector<Entity> m_handle_to_entity;
+  std::mutex m_mutex;
 };
 
 } // namespace SD

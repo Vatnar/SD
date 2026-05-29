@@ -9,104 +9,104 @@
 #include "Logging.hpp"
 #include "game.h"
 
-// Wrap SD types for C interface
-static SD::Application* ToApp(SD_Application* app) {
-  return reinterpret_cast<SD::Application*>(app);
+// Wrap sd types for C interface
+static sd::Application* to_app(SD_Application* app) {
+  return reinterpret_cast<sd::Application*>(app);
 }
-static SD::Scene* ToScene(SD_Scene* scene) {
-  return reinterpret_cast<SD::Scene*>(scene);
+static sd::Scene* to_scene(SD_Scene* scene) {
+  return reinterpret_cast<sd::Scene*>(scene);
 }
-[[maybe_unused]] static SD_Application* FromApp(SD::Application* app) {
+[[maybe_unused]] static SD_Application* from_app(sd::Application* app) {
   return reinterpret_cast<SD_Application*>(app);
 }
-static SD_Scene* FromScene(SD::Scene* scene) {
+static SD_Scene* from_scene(sd::Scene* scene) {
   return reinterpret_cast<SD_Scene*>(scene);
 }
 
-static void RegisterGameCategories() {
-  SD::Log::RegisterCategory("Game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
-  SD::Log::RegisterCategory("Game/Combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
-  SD::Log::RegisterCategory("Game/UI", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
-  SD::Log::RegisterCategory("Game/Audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
+static void register_game_categories() {
+  sd::log::register_category("Game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+  sd::log::register_category("Game/Combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
+  sd::log::register_category("Game/UI", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
+  sd::log::register_category("Game/Audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
 }
 
-static void GameOnLoad(SD_Application* appPtr, GameState* state) {
-  RegisterGameCategories();
-  SD::Application& app = *ToApp(appPtr);
+static void game_on_load(SD_Application* appPtr, GameState* state) {
+  register_game_categories();
+  sd::Application& app = *to_app(appPtr);
 
   state->version++;
   printf("GAME VERSION %d LOADED\n", state->version);
 
-  state->sharedScene = FromScene(app.CreateScene("MainScene"));
-  state->anotherScene = FromScene(app.CreateScene("AnotherScene"));
+  state->shared_scene = from_scene(app.create_scene("MainScene"));
+  state->another_scene = from_scene(app.create_scene("AnotherScene"));
 
-  SD::WindowId mainWin = 0;
+  sd::WindowId main_win{0};
   auto& ctrl =
-      app.PushViewLayer<SD::Panel>(mainWin, "Sandbox Controls", ToScene(state->anotherScene));
-  ctrl.SetScene(ToScene(state->sharedScene));
+      app.push_view_layer<sd::Panel>(main_win, "Sandbox Controls", to_scene(state->another_scene));
+  ctrl.set_scene(to_scene(state->shared_scene));
 
-  auto& gameView = app.CreateView<SD::View>("Game");
-  auto& renderer = app.GetRenderer();
-  auto& pipelines = renderer.GetPipelineFactory();
-  gameView.SetupLayeredRender(3);
+  auto& game_view = app.create_view<sd::View>("Game");
+  auto& renderer = app.get_renderer();
+  auto& pipelines = renderer.get_pipeline_factory();
+  game_view.setup_layered_render(3);
 
   struct Push {
     VLA::Matrix4x4f mvp{};
     float color[4]{};
   };
-  VkPipelineLayout pushLayout =
-      pipelines.CreatePushConstantLayout(VK_SHADER_STAGE_VERTEX_BIT, sizeof(Push));
+  VkPipelineLayout push_layout =
+      pipelines.create_push_constant_layout(VK_SHADER_STAGE_VERTEX_BIT, sizeof(Push));
 
-  SD::PipelineFactory::PipelineDesc worldDesc{.vertPath = "assets/engine/shaders/world.vert",
-                                              .fragPath = "assets/engine/shaders/world.frag",
-                                              .renderPass = gameView.GetLayeredRenderPass(),
+  sd::PipelineFactory::PipelineDesc world_desc{.vert_path = "assets/engine/shaders/world.vert",
+                                              .frag_path = "assets/engine/shaders/world.frag",
+                                              .render_pass = game_view.get_layered_render_pass(),
                                               .subpass = 1};
 
-  auto worldPipeHandle = pipelines.CreateGraphicsPipeline(worldDesc, pushLayout);
+  auto world_pipe_handle = pipelines.create_graphics_pipeline(world_desc, push_layout);
 
-  SD::PipelineFactory::PipelineDesc wireDesc = worldDesc;
-  wireDesc.polygonMode = VK_POLYGON_MODE_LINE;
-  auto wirePipeHandle = pipelines.CreateGraphicsPipeline(wireDesc, pushLayout);
+  sd::PipelineFactory::PipelineDesc wire_desc = world_desc;
+  wire_desc.polygon_mode = VK_POLYGON_MODE_LINE;
+  auto wire_pipe_handle = pipelines.create_graphics_pipeline(wire_desc, push_layout);
 
-  SD::Log::Game::Info("Pushing GameRenderLayer");
-  gameView.PushLayer<GameRenderLayer>(1, "GameRender", ToScene(state->sharedScene),
-                                      worldPipeHandle, wirePipeHandle, pushLayout, &pipelines);
-  app.PushGlobalLayer<SD::EngineDebugLayer>(ToScene(state->sharedScene));
+  sd::log::Game::info("Pushing GameRenderLayer");
+  game_view.push_layer<GameRenderLayer>(1, "GameRender", to_scene(state->shared_scene),
+                                      world_pipe_handle, wire_pipe_handle, push_layout, &pipelines);
+  app.push_global_layer<sd::EngineDebugLayer>(to_scene(state->shared_scene));
 
-  auto scene = ToScene(state->sharedScene);
-  auto ent = scene->em.Create();
-  scene->em.AddComponent<SD::DebugName>(ent, "Triangle");
-  scene->em.AddComponent<SD::Transform>(ent, VLA::Matrix4x4f::Identity());
-  scene->em.AddComponent<SD::Renderable>(ent, SD::Renderable{0, 0, 1, 1});
+  auto scene = to_scene(state->shared_scene);
+  auto ent = scene->em.create();
+  scene->em.add_component<sd::DebugName>(ent, "Triangle");
+  scene->em.add_component<sd::Transform>(ent, VLA::Matrix4x4f::Identity());
+  scene->em.add_component<sd::Renderable>(ent, sd::Renderable{0, 0, 1, 1});
 
 
-  auto ent2 = scene->em.Create();
-  scene->em.AddComponent<SD::DebugName>(ent2, "Better triangle");
-  scene->em.AddComponent<SD::Transform>(ent2, VLA::Matrix4x4f::Identity());
-  scene->em.AddComponent<SD::Renderable>(ent2, SD::Renderable{0, 0, 1, 1});
+  auto ent2 = scene->em.create();
+  scene->em.add_component<sd::DebugName>(ent2, "Better triangle");
+  scene->em.add_component<sd::Transform>(ent2, VLA::Matrix4x4f::Identity());
+  scene->em.add_component<sd::Renderable>(ent2, sd::Renderable{0, 0, 1, 1});
 
-  SD::Log::Game::Info("Game loaded, version {}", state->version);
+  sd::log::Game::info("Game loaded, version {}", state->version);
 }
 
-static void GameOnUpdate(SD_Application* appPtr, GameState* state, float dt) {
-  (void)appPtr;
+static void GameOnUpdate(SD_Application* app_ptr, GameState* state, float dt) {
+  (void)app_ptr;
   (void)state;
   (void)dt;
 }
 
-static void GameOnUnload(SD_Application* appPtr, GameState* state) {
-  (void)appPtr;
+static void GameOnUnload(SD_Application* app_ptr, GameState* state) {
+  (void)app_ptr;
   printf("GAME VERSION %d UNLOADING\n", state->version);
-  state->sharedScene = nullptr;
-  state->anotherScene = nullptr;
+  state->shared_scene = nullptr;
+  state->another_scene = nullptr;
 }
 
 // The single exported function
 
-extern "C" GameAPI GetGameAPI(void) {
+extern "C" GameAPI get_game_api(void) {
   GameAPI api = {};
-  api.OnLoad = GameOnLoad;
-  api.OnUpdate = GameOnUpdate;
-  api.OnUnload = GameOnUnload;
+  api.on_load = game_on_load;
+  api.on_update = GameOnUpdate;
+  api.on_unload = GameOnUnload;
   return api;
 }

@@ -7,7 +7,7 @@
 
 #include <GLFW/glfw3.h>
 
-namespace SD {
+namespace sd {
 
 // TODO(docs): Document FrameTimer class
 //   - Purpose: Manages frame timing, fixed timestep accumulation
@@ -18,48 +18,48 @@ namespace SD {
 /// Tracks frame timing, fixed timestep accumulation, and CPU work time.
 class FrameTimer {
 public:
-  void Begin() {
+  void begin() {
     double now = glfwGetTime();
-    mFrameTime = now - mLastTime;
-    mLastTime = now;
+    m_frame_time = now - m_last_time;
+    m_last_time = now;
 
-    if (mFrameTime > 0.25)
-      mFrameTime = 0.25;
-    mAccumulator += mFrameTime;
+    if (m_frame_time > 0.25)
+      m_frame_time = 0.25;
+    m_accumulator += m_frame_time;
   }
 
-  void BeginWork() { mWorkStart = glfwGetTime(); }
+  void begin_work() { m_work_start = glfwGetTime(); }
 
-  void EndWork() {
-    mFrameWorkTime = static_cast<float>(glfwGetTime() - mWorkStart) - mGpuWaitTime;
-    mGpuWaitTime = 0.0f;
+  void end_work() {
+    m_frame_work_time = static_cast<float>(glfwGetTime() - m_work_start) - m_gpu_wait_time;
+    m_gpu_wait_time = 0.0f;
   }
 
   /// Returns true if a fixed step should run. Call in a loop.
-  bool ConsumeFixedStep() {
-    if (mAccumulator >= mFixedTimeStep) {
-      mAccumulator -= mFixedTimeStep;
+  bool consume_fixed_step() {
+    if (m_accumulator >= m_fixed_time_step) {
+      m_accumulator -= m_fixed_time_step;
       return true;
     }
     return false;
   }
 
-  void AddGpuWaitTime(float t) { mGpuWaitTime += t; }
+  void add_gpu_wait_time(float t) { m_gpu_wait_time += t; }
 
   // Accessors
-  [[nodiscard]] float GetFrameTime() const { return static_cast<float>(mFrameTime); }
-  [[nodiscard]] float GetFrameWorkTime() const { return mFrameWorkTime; }
-  [[nodiscard]] double GetFixedTimeStep() const { return mFixedTimeStep; }
-  void SetFixedTimeStep(double step) { mFixedTimeStep = step; }
+  [[nodiscard]] float get_frame_time() const { return static_cast<float>(m_frame_time); }
+  [[nodiscard]] float get_frame_work_time() const { return m_frame_work_time; }
+  [[nodiscard]] double get_fixed_time_step() const { return m_fixed_time_step; }
+  void set_fixed_time_step(double step) { m_fixed_time_step = step; }
 
 private:
-  double mLastTime = 0.0;
-  double mAccumulator = 0.0;
-  double mFixedTimeStep = 1.0 / 60.0;
-  double mWorkStart = 0.0;
-  float mFrameWorkTime = 0.0f;
-  float mGpuWaitTime = 0.0f;
-  double mFrameTime = 0.0;
+  double m_last_time = 0.0;
+  double m_accumulator = 0.0;
+  double m_fixed_time_step = 1.0 / 60.0;
+  double m_work_start = 0.0;
+  float m_frame_work_time = 0.0f;
+  float m_gpu_wait_time = 0.0f;
+  double m_frame_time = 0.0;
 };
 
 } // namespace SD

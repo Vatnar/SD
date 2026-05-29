@@ -8,7 +8,7 @@
 #include "Utils/FileUtils.hpp"
 #include "Utils/Serialization.hpp"
 
-namespace SD {
+namespace sd {
 
 class FileSerializationTest : public ::testing::Test {
 protected:
@@ -23,12 +23,12 @@ TEST_F(FileSerializationTest, Filewriting) {
   constexpr double d{3.14};
   std::vector<std::byte> buffer;
 
-  Serializer(buffer).Write(d);
-  Filesystem::WriteBinary("test.bin", buffer);
+  Serializer(buffer).write(d);
+  Filesystem::write_binary("test.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test.bin", readBuffer);
-  const double d2 = Serializer(readBuffer).Read<double>();
+  Filesystem::read_binary("test.bin", readBuffer);
+  const double d2 = Serializer(readBuffer).read<double>();
 
   EXPECT_EQ(d, d2);
 }
@@ -36,73 +36,73 @@ TEST_F(FileSerializationTest, Filewriting) {
 TEST_F(FileSerializationTest, CommandQueue_FileRoundTrip) {
   CommandQueue queue;
   EntityHandle h(0);
-  queue.Add<CreateEntityCmd>(h);
+  queue.add<CreateEntityCmd>(h);
   queue.Add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity()});
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  queue.Serialize(serializer);
-  Filesystem::WriteBinary("test_commandqueue.bin", buffer);
+  queue.serialize(serializer);
+  Filesystem::write_binary("test_commandqueue.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_commandqueue.bin", readBuffer);
+  Filesystem::read_binary("test_commandqueue.bin", readBuffer);
 
   CommandQueue queue2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  queue2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  queue2.deserialize(deserializer);
 
-  EXPECT_EQ(queue.GetCount(), queue2.GetCount());
+  EXPECT_EQ(queue.get_count(), queue2.get_count());
 }
 
 TEST_F(FileSerializationTest, CommandQueue_FileWithMultipleEntities) {
   CommandQueue queue;
   EntityHandle h1(0);
   EntityHandle h2(1);
-  queue.Add<CreateEntityCmd>(h1);
-  queue.Add<CreateEntityCmd>(h2);
+  queue.add<CreateEntityCmd>(h1);
+  queue.add<CreateEntityCmd>(h2);
   queue.Add<AddComponentCmd<Transform>>(h1, Transform{VLA::Matrix4x4f::Identity()});
   queue.Add<AddComponentCmd<Transform>>(h2, Transform{VLA::Matrix4x4f::Identity() * 2.0f});
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  queue.Serialize(serializer);
-  Filesystem::WriteBinary("test_commandqueue.bin", buffer);
+  queue.serialize(serializer);
+  Filesystem::write_binary("test_commandqueue.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_commandqueue.bin", readBuffer);
+  Filesystem::read_binary("test_commandqueue.bin", readBuffer);
 
   CommandQueue queue2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  queue2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  queue2.deserialize(deserializer);
 
-  EXPECT_EQ(queue2.GetCount(), 4u);
+  EXPECT_EQ(queue2.get_count(), 4u);
 }
 
 TEST_F(FileSerializationTest, ECS_EntityManagerSerialize) {
   EntityManager em;
-  Entity e1 = em.Create();
-  Entity e2 = em.Create();
+  Entity e1 = em.create();
+  Entity e2 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 2.0f);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em.GetEntityCount(), em2.GetEntityCount());
-  EXPECT_TRUE(em2.IsAlive(e1));
-  EXPECT_TRUE(em2.IsAlive(e2));
+  EXPECT_EQ(em.get_entity_count(), em2.get_entity_count());
+  EXPECT_TRUE(em2.is_alive(e1));
+  EXPECT_TRUE(em2.is_alive(e2));
   EXPECT_TRUE(em2.HasComponent<Transform>(e1));
   EXPECT_TRUE(em2.HasComponent<Transform>(e2));
 }
@@ -112,72 +112,72 @@ TEST_F(FileSerializationTest, ECS_EmptyEntityManager) {
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetEntityCount(), 0u);
+  EXPECT_EQ(em2.get_entity_count(), 0u);
 }
 
 TEST_F(FileSerializationTest, ECS_MultipleComponentsSameEntity) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.AddComponent<DebugName>(e1, "EntityOne");
+  em.add_component<DebugName>(e1, "EntityOne");
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetEntityCount(), 1u);
+  EXPECT_EQ(em2.get_entity_count(), 1u);
   EXPECT_TRUE(em2.HasComponent<Transform>(e1));
-  EXPECT_TRUE(em2.HasComponent<DebugName>(e1));
-  const DebugName* name = em2.TryGetComponent<DebugName>(e1);
+  EXPECT_TRUE(em2.has_component<DebugName>(e1));
+  const DebugName* name = em2.try_get_component<DebugName>(e1);
   EXPECT_STREQ(name->name.c_str(), "EntityOne");
 }
 
 TEST_F(FileSerializationTest, ECS_VerifyComponentData) {
   EntityManager em;
-  Entity e1 = em.Create();
-  Entity e2 = em.Create();
+  Entity e1 = em.create();
+  Entity e2 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity() * 3.0f);
   em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 5.0f);
-  em.AddComponent<DebugName>(e1, "First");
-  em.AddComponent<DebugName>(e2, "Second");
+  em.add_component<DebugName>(e1, "First");
+  em.add_component<DebugName>(e2, "Second");
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
   const Transform* t1 = em2.TryGetComponent<Transform>(e1);
   const Transform* t2 = em2.TryGetComponent<Transform>(e2);
-  const DebugName* n1 = em2.TryGetComponent<DebugName>(e1);
-  const DebugName* n2 = em2.TryGetComponent<DebugName>(e2);
+  const DebugName* n1 = em2.try_get_component<DebugName>(e1);
+  const DebugName* n2 = em2.try_get_component<DebugName>(e2);
 
   ASSERT_NE(t1, nullptr);
   ASSERT_NE(t2, nullptr);
@@ -192,55 +192,55 @@ TEST_F(FileSerializationTest, ECS_VerifyComponentData) {
 
 TEST_F(FileSerializationTest, ECS_DestroyedEntityNotSerialized) {
   EntityManager em;
-  Entity e1 = em.Create();
-  Entity e2 = em.Create();
+  Entity e1 = em.create();
+  Entity e2 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity());
-  em.Destroy(e1);
+  em.destroy(e1);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
   (void)e2;
 
-  EXPECT_EQ(em2.GetAliveEntityCount(), 1u);
-  EXPECT_FALSE(em2.IsAlive(e1));
-  EXPECT_TRUE(em2.IsAlive(e2));
+  EXPECT_EQ(em2.get_alive_entity_count(), 1u);
+  EXPECT_FALSE(em2.is_alive(e1));
+  EXPECT_TRUE(em2.is_alive(e2));
   EXPECT_NE(nullptr, em2.TryGetComponent<Transform>(e2));
 }
 
 TEST_F(FileSerializationTest, ECS_RemoveComponentSerialized) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.AddComponent<DebugName>(e1, "Test");
-  em.TryRemoveComponent<DebugName>(e1);
+  em.add_component<DebugName>(e1, "Test");
+  em.try_remove_component<DebugName>(e1);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
   EXPECT_TRUE(em2.HasComponent<Transform>(e1));
-  EXPECT_FALSE(em2.HasComponent<DebugName>(e1));
+  EXPECT_FALSE(em2.has_component<DebugName>(e1));
 }
 
 TEST_F(FileSerializationTest, ECS_ManyEntities) {
@@ -250,54 +250,54 @@ TEST_F(FileSerializationTest, ECS_ManyEntities) {
   entities.reserve(ENTITY_COUNT);
 
   for (int i = 0; i < ENTITY_COUNT; ++i) {
-    Entity e = em.Create();
+    Entity e = em.create();
     entities.push_back(e);
     em.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity() * static_cast<float>(i + 1));
-    em.AddComponent<DebugName>(e, "Entity" + std::to_string(i));
+    em.add_component<DebugName>(e, "Entity" + std::to_string(i));
   }
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetEntityCount(), ENTITY_COUNT);
+  EXPECT_EQ(em2.get_entity_count(), ENTITY_COUNT);
 
   for (int i = 0; i < ENTITY_COUNT; ++i) {
     Entity e = entities[i];
-    EXPECT_TRUE(em2.IsAlive(e));
+    EXPECT_TRUE(em2.is_alive(e));
     EXPECT_TRUE(em2.HasComponent<Transform>(e));
-    EXPECT_TRUE(em2.HasComponent<DebugName>(e));
+    EXPECT_TRUE(em2.has_component<DebugName>(e));
 
     const Transform* t = em2.TryGetComponent<Transform>(e);
     EXPECT_FLOAT_EQ(t->worldMatrix.A[0], static_cast<float>(i + 1));
 
-    const DebugName* n = em2.TryGetComponent<DebugName>(e);
+    const DebugName* n = em2.try_get_component<DebugName>(e);
     EXPECT_STREQ(n->name.c_str(), ("Entity" + std::to_string(i)).c_str());
   }
 }
 
 TEST_F(FileSerializationTest, ECS_DoubleSerializationConsistent) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.AddComponent<DebugName>(e1, "Test");
+  em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer1;
   Serializer ser1(buffer1);
-  em.Serialize(ser1);
+  em.serialize(ser1);
 
   std::vector<std::byte> buffer2;
   Serializer ser2(buffer2);
-  em.Serialize(ser2);
+  em.serialize(ser2);
 
   EXPECT_EQ(buffer1.size(), buffer2.size());
   EXPECT_EQ(buffer1, buffer2);
@@ -305,23 +305,23 @@ TEST_F(FileSerializationTest, ECS_DoubleSerializationConsistent) {
 
 TEST_F(FileSerializationTest, ECS_DeserializeIntoNonEmpty) {
   EntityManager em;
-  Entity existing = em.Create();
+  Entity existing = em.create();
   em.AddComponent<Transform>(existing, VLA::Matrix4x4f::Identity() * 10.0f);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
+  em.serialize(serializer);
 
   EntityManager em2;
-  Entity e3 = em2.Create();
+  Entity e3 = em2.create();
   em2.AddComponent<Transform>(e3, VLA::Matrix4x4f::Identity() * 99.0f);
 
   Serializer deserializer(buffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetEntityCount(), 1u);
-  EXPECT_TRUE(em2.IsAlive(existing));
+  EXPECT_EQ(em2.get_entity_count(), 1u);
+  EXPECT_TRUE(em2.is_alive(existing));
 
   const Transform* tExisting = em2.TryGetComponent<Transform>(existing);
   ASSERT_NE(tExisting, nullptr);
@@ -330,79 +330,79 @@ TEST_F(FileSerializationTest, ECS_DeserializeIntoNonEmpty) {
 
 TEST_F(FileSerializationTest, ECS_GenerationAfterDeserialize) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.Destroy(e1);
-  Entity e2 = em.Create();
+  em.destroy(e1);
+  Entity e2 = em.create();
   em.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 2.0f);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
+  em.serialize(serializer);
 
   EntityManager em2;
   Serializer deserializer(buffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetEntityCount(), 1u);
-  EXPECT_TRUE(em2.IsAlive(e2));
+  EXPECT_EQ(em2.get_entity_count(), 1u);
+  EXPECT_TRUE(em2.is_alive(e2));
 
-  Entity e3 = em2.Create();
+  Entity e3 = em2.create();
   EXPECT_NE(e3.index, e2.index);
 
-  em2.AddComponent<DebugName>(e3, "newlyCreated");
-  EXPECT_TRUE(em2.IsAlive(e3));
-  EXPECT_NE(nullptr, em2.TryGetComponent<DebugName>(e3));
+  em2.add_component<DebugName>(e3, "newlyCreated");
+  EXPECT_TRUE(em2.is_alive(e3));
+  EXPECT_NE(nullptr, em2.try_get_component<DebugName>(e3));
 }
 
 TEST_F(FileSerializationTest, ECS_FreeListPreserved) {
   EntityManager em;
   std::vector<Entity> created;
   for (int i = 0; i < 10; ++i) {
-    created.push_back(em.Create());
+    created.push_back(em.create());
   }
   for (int i = 0; i < 5; ++i) {
-    em.Destroy(created[i]);
+    em.destroy(created[i]);
   }
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
+  em.serialize(serializer);
 
   EntityManager em2;
   Serializer deserializer(buffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetAliveEntityCount(), 5u);
+  EXPECT_EQ(em2.get_alive_entity_count(), 5u);
 
-  Entity e = em2.Create();
-  EXPECT_TRUE(em2.IsAlive(e));
+  Entity e = em2.create();
+  EXPECT_TRUE(em2.is_alive(e));
   em2.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity());
   EXPECT_NE(nullptr, em2.TryGetComponent<Transform>(e));
 }
 
 TEST_F(FileSerializationTest, ECS_EmptyString) {
   EntityManager em;
-  Entity e1 = em.Create();
-  em.AddComponent<DebugName>(e1, "");
+  Entity e1 = em.create();
+  em.add_component<DebugName>(e1, "");
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
-  Filesystem::WriteBinary("test_ecs.bin", buffer);
+  em.serialize(serializer);
+  Filesystem::write_binary("test_ecs.bin", buffer);
 
   std::vector<std::byte> readBuffer;
-  Filesystem::ReadBinary("test_ecs.bin", readBuffer);
+  Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
   Serializer deserializer(readBuffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  const DebugName* n = em2.TryGetComponent<DebugName>(e1);
+  const DebugName* n = em2.try_get_component<DebugName>(e1);
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->name, "");
 }
@@ -412,54 +412,54 @@ TEST_F(FileSerializationTest, ECS_LongString) {
   longStr += "END";
 
   EntityManager em;
-  Entity e1 = em.Create();
-  em.AddComponent<DebugName>(e1, longStr);
+  Entity e1 = em.create();
+  em.add_component<DebugName>(e1, longStr);
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
+  em.serialize(serializer);
 
   EntityManager em2;
   Serializer deserializer(buffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  const DebugName* n = em2.TryGetComponent<DebugName>(e1);
+  const DebugName* n = em2.try_get_component<DebugName>(e1);
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->name, longStr);
 }
 
 TEST_F(FileSerializationTest, ECS_DoubleRoundTrip) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.AddComponent<DebugName>(e1, "Test");
+  em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer1;
   Serializer ser1(buffer1);
-  em.Serialize(ser1);
+  em.serialize(ser1);
 
   EntityManager em2;
   Serializer des1(buffer1);
-  des1.ResetOffset();
-  em2.Deserialize(des1);
+  des1.reset_offset();
+  em2.deserialize(des1);
 
   std::vector<std::byte> buffer2;
   Serializer ser2(buffer2);
-  em2.Serialize(ser2);
+  em2.serialize(ser2);
 
   EXPECT_EQ(buffer1.size(), buffer2.size());
   EXPECT_EQ(buffer1, buffer2);
 
   EntityManager em3;
   Serializer des2(buffer2);
-  des2.ResetOffset();
-  em3.Deserialize(des2);
+  des2.reset_offset();
+  em3.deserialize(des2);
 
-  EXPECT_EQ(em3.GetEntityCount(), 1u);
-  EXPECT_TRUE(em3.IsAlive(e1));
+  EXPECT_EQ(em3.get_entity_count(), 1u);
+  EXPECT_TRUE(em3.is_alive(e1));
   const Transform* t = em3.TryGetComponent<Transform>(e1);
-  const DebugName* n = em3.TryGetComponent<DebugName>(e1);
+  const DebugName* n = em3.try_get_component<DebugName>(e1);
   ASSERT_NE(t, nullptr);
   ASSERT_NE(n, nullptr);
   EXPECT_FLOAT_EQ(t->worldMatrix.A[0], 1.0f);
@@ -468,30 +468,30 @@ TEST_F(FileSerializationTest, ECS_DoubleRoundTrip) {
 
 TEST_F(FileSerializationTest, ECS_AllComponentTypes) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.AddComponent<DebugName>(e1, "TestEntity");
+  em.add_component<DebugName>(e1, "TestEntity");
 
-  Entity e2 = em.Create();
-  em.AddComponent<Renderable>(e2);
-  em.GetComponent<Renderable>(e2).meshId = 42;
-  em.GetComponent<Renderable>(e2).materialId = 99;
-  em.GetComponent<Renderable>(e2).color[0] = 0.5f;
+  Entity e2 = em.create();
+  em.add_component<Renderable>(e2);
+  em.get_component<Renderable>(e2).mesh_id = 42;
+  em.get_component<Renderable>(e2).material_id = 99;
+  em.get_component<Renderable>(e2).color[0] = 0.5f;
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
+  em.serialize(serializer);
 
   EntityManager em2;
   Serializer deserializer(buffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
-  EXPECT_EQ(em2.GetEntityCount(), 2u);
+  EXPECT_EQ(em2.get_entity_count(), 2u);
 
   const Transform* t = em2.TryGetComponent<Transform>(e1);
-  const DebugName* n = em2.TryGetComponent<DebugName>(e1);
-  const Renderable* r = em2.TryGetComponent<Renderable>(e2);
+  const DebugName* n = em2.try_get_component<DebugName>(e1);
+  const Renderable* r = em2.try_get_component<Renderable>(e2);
 
   ASSERT_NE(t, nullptr);
   ASSERT_NE(n, nullptr);
@@ -499,29 +499,29 @@ TEST_F(FileSerializationTest, ECS_AllComponentTypes) {
 
   EXPECT_FLOAT_EQ(t->worldMatrix.A[0], 1.0f);
   EXPECT_EQ(n->name, "TestEntity");
-  EXPECT_EQ(r->meshId, 42u);
-  EXPECT_EQ(r->materialId, 99u);
+  EXPECT_EQ(r->mesh_id, 42u);
+  EXPECT_EQ(r->material_id, 99u);
   EXPECT_FLOAT_EQ(r->color[0], 0.5f);
 }
 
 TEST_F(FileSerializationTest, ECS_SerializableComponentsOnly) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.AddComponent<DebugName>(e1, "Test");
+  em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer;
   Serializer serializer(buffer);
-  em.Serialize(serializer);
+  em.serialize(serializer);
 
   EntityManager em2;
   Serializer deserializer(buffer);
-  deserializer.ResetOffset();
-  em2.Deserialize(deserializer);
+  deserializer.reset_offset();
+  em2.deserialize(deserializer);
 
   auto* transformPool = em2.GetComponentPool<Transform>();
-  auto* debugNamePool = em2.GetComponentPool<DebugName>();
-  auto* cameraPool = em2.GetComponentPool<Camera>();
+  auto* debugNamePool = em2.get_component_pool<DebugName>();
+  auto* cameraPool = em2.get_component_pool<Camera>();
 
   EXPECT_NE(transformPool, nullptr);
   EXPECT_NE(debugNamePool, nullptr);
@@ -530,39 +530,39 @@ TEST_F(FileSerializationTest, ECS_SerializableComponentsOnly) {
 
 TEST_F(FileSerializationTest, ECS_IndependentInstances) {
   EntityManager em1;
-  Entity e1 = em1.Create();
+  Entity e1 = em1.create();
   em1.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em1.AddComponent<DebugName>(e1, "FirstECS");
+  em1.add_component<DebugName>(e1, "FirstECS");
 
   EntityManager em2;
-  Entity e2 = em2.Create();
+  Entity e2 = em2.create();
   em2.AddComponent<Transform>(e2, VLA::Matrix4x4f::Identity() * 5.0f);
-  em2.AddComponent<DebugName>(e2, "SecondECS");
+  em2.add_component<DebugName>(e2, "SecondECS");
 
   std::vector<std::byte> buffer1, buffer2;
   Serializer ser1(buffer1);
   Serializer ser2(buffer2);
-  em1.Serialize(ser1);
-  em2.Serialize(ser2);
+  em1.serialize(ser1);
+  em2.serialize(ser2);
 
   EntityManager em1Restored;
   EntityManager em2Restored;
 
   Serializer des1(buffer1);
-  des1.ResetOffset();
-  em1Restored.Deserialize(des1);
+  des1.reset_offset();
+  em1Restored.deserialize(des1);
 
   Serializer des2(buffer2);
-  des2.ResetOffset();
-  em2Restored.Deserialize(des2);
+  des2.reset_offset();
+  em2Restored.deserialize(des2);
 
-  EXPECT_EQ(em1Restored.GetEntityCount(), 1u);
-  EXPECT_EQ(em2Restored.GetEntityCount(), 1u);
+  EXPECT_EQ(em1Restored.get_entity_count(), 1u);
+  EXPECT_EQ(em2Restored.get_entity_count(), 1u);
 
   const Transform* t1 = em1Restored.TryGetComponent<Transform>(e1);
   const Transform* t2 = em2Restored.TryGetComponent<Transform>(e2);
-  const DebugName* n1 = em1Restored.TryGetComponent<DebugName>(e1);
-  const DebugName* n2 = em2Restored.TryGetComponent<DebugName>(e2);
+  const DebugName* n1 = em1Restored.try_get_component<DebugName>(e1);
+  const DebugName* n2 = em2Restored.try_get_component<DebugName>(e2);
 
   ASSERT_NE(t1, nullptr);
   ASSERT_NE(t2, nullptr);
@@ -574,14 +574,14 @@ TEST_F(FileSerializationTest, ECS_IndependentInstances) {
   EXPECT_EQ(n1->name, "FirstECS");
   EXPECT_EQ(n2->name, "SecondECS");
 
-  EXPECT_TRUE(em1Restored.IsAlive(e1));
-  EXPECT_TRUE(em2Restored.IsAlive(e2));
+  EXPECT_TRUE(em1Restored.is_alive(e1));
+  EXPECT_TRUE(em2Restored.is_alive(e2));
 
-  Entity newInEM1 = em1Restored.Create();
-  Entity newInEM2 = em2Restored.Create();
+  Entity newInEM1 = em1Restored.create();
+  Entity newInEM2 = em2Restored.create();
 
-  EXPECT_EQ(em1Restored.GetEntityCount(), 2u);
-  EXPECT_EQ(em2Restored.GetEntityCount(), 2u);
+  EXPECT_EQ(em1Restored.get_entity_count(), 2u);
+  EXPECT_EQ(em2Restored.get_entity_count(), 2u);
 
   em1Restored.AddComponent<Transform>(newInEM1, VLA::Matrix4x4f::Identity() * 10.0f);
   em2Restored.AddComponent<Transform>(newInEM2, VLA::Matrix4x4f::Identity() * 20.0f);
@@ -593,40 +593,40 @@ TEST_F(FileSerializationTest, ECS_IndependentInstances) {
   EXPECT_FLOAT_EQ(tNew1->worldMatrix.A[0], 10.0f);
   EXPECT_FLOAT_EQ(tNew2->worldMatrix.A[0], 20.0f);
 
-  em1Restored.Destroy(e1);
-  EXPECT_EQ(em1Restored.GetEntityCount(), 2u);
-  EXPECT_FALSE(em1Restored.IsAlive(e1));
-  EXPECT_EQ(em2Restored.GetEntityCount(), 2u);
-  EXPECT_TRUE(em2Restored.IsAlive(e2));
+  em1Restored.destroy(e1);
+  EXPECT_EQ(em1Restored.get_entity_count(), 2u);
+  EXPECT_FALSE(em1Restored.is_alive(e1));
+  EXPECT_EQ(em2Restored.get_entity_count(), 2u);
+  EXPECT_TRUE(em2Restored.is_alive(e2));
 }
 
 TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
   std::vector<std::byte> buffer;
   {
     EntityManager em;
-    Entity e = em.Create();
+    Entity e = em.create();
     em.AddComponent<Transform>(e, VLA::Matrix4x4f::Identity());
 
     Serializer ser(buffer);
-    em.Serialize(ser);
+    em.serialize(ser);
   }
 
   EntityManager em;
   Serializer des(buffer);
-  des.ResetOffset();
-  em.Deserialize(des);
+  des.reset_offset();
+  em.deserialize(des);
 
-  EXPECT_EQ(em.GetEntityCount(), 1u);
+  EXPECT_EQ(em.get_entity_count(), 1u);
 
-  Entity newEntity = em.Create();
+  Entity newEntity = em.create();
   em.AddComponent<Transform>(newEntity, VLA::Matrix4x4f::Identity() * 2.0f);
-  em.AddComponent<DebugName>(newEntity, "CreatedAfter");
+  em.add_component<DebugName>(newEntity, "CreatedAfter");
 
-  EXPECT_EQ(em.GetEntityCount(), 2u);
-  EXPECT_TRUE(em.IsAlive(newEntity));
+  EXPECT_EQ(em.get_entity_count(), 2u);
+  EXPECT_TRUE(em.is_alive(newEntity));
 
   const Transform* t = em.TryGetComponent<Transform>(newEntity);
-  const DebugName* n = em.TryGetComponent<DebugName>(newEntity);
+  const DebugName* n = em.try_get_component<DebugName>(newEntity);
   ASSERT_NE(t, nullptr);
   ASSERT_NE(n, nullptr);
   EXPECT_FLOAT_EQ(t->worldMatrix.A[0], 2.0f);
@@ -635,15 +635,15 @@ TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
 
 TEST_F(FileSerializationTest, ECS_IdempotentSerialization) {
   EntityManager em;
-  Entity e1 = em.Create();
+  Entity e1 = em.create();
   em.AddComponent<Transform>(e1, VLA::Matrix4x4f::Identity());
-  em.AddComponent<DebugName>(e1, "Test");
+  em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> b1, b2, b3;
   Serializer s1(b1), s2(b2), s3(b3);
-  em.Serialize(s1);
-  em.Serialize(s2);
-  em.Serialize(s3);
+  em.serialize(s1);
+  em.serialize(s2);
+  em.serialize(s3);
 
   EXPECT_EQ(b1, b2);
   EXPECT_EQ(b2, b3);

@@ -3,10 +3,11 @@
 //   - Remove(): assert(denseEntities.size() == denseData.size()) after swap-and-pop
 //   - Remove(): assert(sparse[lastPage][lastOffset] == denseIdx) after update
 //   - DeserializeFrom(): call ValidateInvariants() at end
+#pragma once
 
 template<typename T>
 template<typename... Args>
-void SparseEntitySet<T>::Add(Entity entity, Args&&... args) {
+void SparseEntitySet<T>::add(Entity entity, Args&&... args) {
   const usize page = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
@@ -17,52 +18,52 @@ void SparseEntitySet<T>::Add(Entity entity, Args&&... args) {
     std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<usize>::max());
   }
 
-  usize denseIdx = sparse[page][offset];
-  if (denseIdx != std::numeric_limits<usize>::max()) {
-    denseData[denseIdx] = T{std::forward<Args>(args)...};
-    denseEntities[denseIdx] = entity;
+  usize dense_idx = sparse[page][offset];
+  if (dense_idx != std::numeric_limits<usize>::max()) {
+    dense_data[dense_idx] = T{std::forward<Args>(args)...};
+    dense_entities[dense_idx] = entity;
   } else {
-    sparse[page][offset] = denseEntities.size(); // end
-    denseData.push_back(T{std::forward<Args>(args)...});
-    denseEntities.push_back(entity);
+    sparse[page][offset] = dense_entities.size(); // end
+    dense_data.push_back(T{std::forward<Args>(args)...});
+    dense_entities.push_back(entity);
   }
 #ifndef NDEBUG
   ValidateInvariants();
 #endif
 }
 template<typename T>
-bool SparseEntitySet<T>::Remove(Entity entity) {
+bool SparseEntitySet<T>::remove(Entity entity) {
   const usize page = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
     return false; // out of bounds
 
-  usize denseIdx = sparse[page][offset];
-  if (denseIdx == std::numeric_limits<usize>::max())
+  usize dense_idx = sparse[page][offset];
+  if (dense_idx == std::numeric_limits<usize>::max())
     return false; // doesnt exist
 
-  if (denseEntities[denseIdx] != entity)
+  if (dense_entities[dense_idx] != entity)
     return false; // wrong generation
 
   // move, last to removed pos
-  usize lastIdx = denseEntities.size() - 1;
-  Entity lastEntity = denseEntities[lastIdx];
+  usize last_idx = dense_entities.size() - 1;
+  Entity last_entity = dense_entities[last_idx];
 
-  denseData[denseIdx] = std::move(denseData[lastIdx]);
-  denseEntities[denseIdx] = lastEntity;
+  dense_data[dense_idx] = std::move(dense_data[last_idx]);
+  dense_entities[dense_idx] = last_entity;
 
   // update sparse index
-  const usize lastPage = lastEntity.index >> SHIFT;
-  const usize lastOffset = lastEntity.index & MASK;
-  sparse[lastPage][lastOffset] = denseIdx;
+  const usize last_page = last_entity.index >> SHIFT;
+  const usize last_offset = last_entity.index & MASK;
+  sparse[last_page][last_offset] = dense_idx;
 
   // free index
   sparse[page][offset] = std::numeric_limits<usize>::max();
 
   // remove duplicated last
-  denseData.pop_back();
-  denseEntities.pop_back();
+  dense_data.pop_back();
+  dense_entities.pop_back();
 #ifndef NDEBUG
   ValidateInvariants();
 #endif
@@ -70,52 +71,52 @@ bool SparseEntitySet<T>::Remove(Entity entity) {
   return true;
 }
 template<typename T>
-T* SparseEntitySet<T>::Get(Entity entity) {
+T* SparseEntitySet<T>::get(Entity entity) {
   const usize page = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
     return nullptr;
 
-  usize denseIdx = sparse[page][offset];
+  usize dense_idx = sparse[page][offset];
 
-  if (denseIdx == std::numeric_limits<usize>::max())
+  if (dense_idx == std::numeric_limits<usize>::max())
     return nullptr; // cant get something that doesnt have data in this component.
 
   // Check if the entity is still alive
-  if (denseEntities[denseIdx] != entity)
+  if (dense_entities[dense_idx] != entity)
     return nullptr;
 
 
-  return &denseData[denseIdx];
+  return &dense_data[dense_idx];
 }
 template<typename T>
-const T* SparseEntitySet<T>::Get(const Entity entity) const {
+const T* SparseEntitySet<T>::get(const Entity entity) const {
   const usize page = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
     return nullptr;
 
-  usize denseIdx = sparse[page][offset];
+  usize dense_idx = sparse[page][offset];
 
-  if (denseIdx == std::numeric_limits<usize>::max())
+  if (dense_idx == std::numeric_limits<usize>::max())
     return nullptr;
 
-  if (denseEntities[denseIdx] != entity)
+  if (dense_entities[dense_idx] != entity)
     return nullptr;
 
 
-  return &denseData[denseIdx];
+  return &dense_data[dense_idx];
 }
 template<typename T>
-std::optional<ComponentDebugInfo> SparseEntitySet<T>::GetDebugInfo(Entity e) {
-  if constexpr (ComponentTraits<T>::IsRegistered) {
-    T* ptr = Get(e);
+std::optional<ComponentDebugInfo> SparseEntitySet<T>::get_debug_info(Entity e) {
+  if constexpr (ComponentTraits<T>::s_is_registered) {
+    T* ptr = get(e);
     if (!ptr)
       return std::nullopt;
 
-    return ComponentDebugInfo{ComponentTraits<T>::Id, ComponentTraits<T>::Name, ptr};
+    return ComponentDebugInfo{ComponentTraits<T>::id, ComponentTraits<T>::name, ptr};
   } else {
     return std::nullopt; // not a component
   }

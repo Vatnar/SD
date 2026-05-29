@@ -10,120 +10,120 @@
 #include "Logging.hpp"
 #include "RuntimeStateManager.hpp"
 
-static void RegisterGameCategories() {
-  SD::Log::RegisterCategory("Game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
-  SD::Log::RegisterCategory("Game/Combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
-  SD::Log::RegisterCategory("Game/UI", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
-  SD::Log::RegisterCategory("Game/Audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
+static void register_game_categories() {
+  sd::log::register_category("Game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+  sd::log::register_category("Game/Combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
+  sd::log::register_category("Game/UI", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
+  sd::log::register_category("Game/Audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
 }
 
-class SandboxGame : public SD::GameContext {
+class SandboxGame : public sd::GameContext {
 public:
-  explicit SandboxGame(SD::RuntimeStateManager* stateManager) : mStateManager(stateManager) {}
+  explicit SandboxGame(sd::RuntimeStateManager* stateManager) : m_state_manager(stateManager) {}
 
-  void OnLoad(SD::Application& app) override {
-    mSharedScene = app.CreateScene("MainScene");
-    mAnotherScene = app.CreateScene("AnotherScene");
+  void on_load(sd::Application& app) override {
+    m_shared_scene = app.create_scene("MainScene");
+    m_another_scene = app.create_scene("AnotherScene");
 
-    auto& gameView = app.CreateView<SD::View>("Game");
-    auto& renderer = app.GetRenderer();
-    auto& pipelines = renderer.GetPipelineFactory();
-    gameView.SetupLayeredRender(3);
+    auto& game_view = app.create_view<sd::View>("Game");
+    auto& renderer = app.get_renderer();
+    auto& pipelines = renderer.get_pipeline_factory();
+    game_view.setup_layered_render(3);
 
     struct Push {
       VLA::Matrix4x4f mvp{};
       float color[4]{};
     };
-    VkPipelineLayout pushLayout =
-        pipelines.CreatePushConstantLayout(VK_SHADER_STAGE_VERTEX_BIT, sizeof(Push));
+    VkPipelineLayout push_layout =
+        pipelines.create_push_constant_layout(VK_SHADER_STAGE_VERTEX_BIT, sizeof(Push));
 
-    SD::PipelineFactory::PipelineDesc worldDesc{.vertPath = "assets/engine/shaders/world.vert",
-                                                .fragPath = "assets/engine/shaders/world.frag",
-                                                .renderPass = gameView.GetLayeredRenderPass(),
+    sd::PipelineFactory::PipelineDesc world_desc{.vert_path = "assets/engine/shaders/world.vert",
+                                                .frag_path = "assets/engine/shaders/world.frag",
+                                                .render_pass = game_view.get_layered_render_pass(),
                                                 .subpass = 1};
-    VkRenderPass pass = gameView.GetLayeredRenderPass();
-    SD_CORE_ASSERT(pass, "Null renderpass");
+    VkRenderPass pass = game_view.get_layered_render_pass();
+    assert(pass && "Null renderpass");
 
-    auto worldPipeHandle = pipelines.CreateGraphicsPipeline(worldDesc, pushLayout);
-    SD_CORE_ASSERT(worldPipeHandle, "Pipeline creation failed");
+    auto world_pipe_handle = pipelines.create_graphics_pipeline(world_desc, push_layout);
+    assert(world_pipe_handle && "Pipeline creation failed");
 
-    SD::PipelineFactory::PipelineDesc wireDesc = worldDesc;
-    wireDesc.polygonMode = VK_POLYGON_MODE_LINE;
-    auto wirePipeHandle = pipelines.CreateGraphicsPipeline(wireDesc, pushLayout);
+    sd::PipelineFactory::PipelineDesc wireDesc = world_desc;
+    wireDesc.polygon_mode = VK_POLYGON_MODE_LINE;
+    auto wire_pipe_handle = pipelines.create_graphics_pipeline(wireDesc, push_layout);
 
-    gameView.PushLayer<GameRenderLayer>(1, "GameRender", mSharedScene, worldPipeHandle,
-                                        wirePipeHandle, pushLayout, &pipelines);
-    app.PushGlobalLayer<SD::EngineDebugLayer>(mSharedScene);
+    game_view.push_layer<GameRenderLayer>(1, "GameRender", m_shared_scene, world_pipe_handle,
+                                        wire_pipe_handle, push_layout, &pipelines);
+    app.push_global_layer<sd::EngineDebugLayer>(m_shared_scene);
 
-    auto ent = mSharedScene->em.Create();
-    mSharedScene->em.AddComponent<SD::DebugName>(ent, "Triangle");
-    mSharedScene->em.AddComponent<SD::Transform>(ent, VLA::Matrix4x4f::Identity());
-    mSharedScene->em.AddComponent<SD::Renderable>(ent, SD::Renderable{0, 0, 1, 1});
+    auto ent = m_shared_scene->em.create();
+    m_shared_scene->em.add_component<sd::DebugName>(ent, "Triangle");
+    m_shared_scene->em.add_component<sd::Transform>(ent, VLA::Matrix4x4f::Identity());
+    m_shared_scene->em.add_component<sd::Renderable>(ent, sd::Renderable{0, 0, 1, 1});
 
-    auto ent2 = mSharedScene->em.Create();
+    auto ent2 = m_shared_scene->em.create();
     auto mat2 = VLA::Matrix4x4f::Identity();
 
     mat2.Column(3) = {3, 0, 0, 1};
-    mSharedScene->em.AddComponent<SD::DebugName>(ent2, "Better triangle");
-    mSharedScene->em.AddComponent<SD::Transform>(ent2, VLA::Matrix4x4f::Identity());
-    mSharedScene->em.AddComponent<SD::Renderable>(ent2, SD::Renderable{0, 0, 1, 1});
+    m_shared_scene->em.add_component<sd::DebugName>(ent2, "Better triangle");
+    m_shared_scene->em.add_component<sd::Transform>(ent2, VLA::Matrix4x4f::Identity());
+    m_shared_scene->em.add_component<sd::Renderable>(ent2, sd::Renderable{0, 0, 1, 1});
 
-    if (mStateManager && mStateManager->HasState()) {
-      mStateManager->Restore(&app);
+    if (m_state_manager && m_state_manager->has_state()) {
+      m_state_manager->restore(&app);
     }
   }
 
-  void OnUpdate(float dt) override { (void)dt; }
+  void on_update(float dt) override { (void)dt; }
 
-  void OnUnload() override {
-    mSharedScene = nullptr;
-    mAnotherScene = nullptr;
+  void on_unload() override {
+    m_shared_scene = nullptr;
+    m_another_scene = nullptr;
   }
 
-  std::vector<SD::Scene*> GetScenes() override {
-    std::vector<SD::Scene*> scenes;
-    if (mSharedScene)
-      scenes.push_back(mSharedScene);
-    if (mAnotherScene && mAnotherScene != mSharedScene)
-      scenes.push_back(mAnotherScene);
+  std::vector<sd::Scene*> get_scenes() override {
+    std::vector<sd::Scene*> scenes;
+    if (m_shared_scene)
+      scenes.push_back(m_shared_scene);
+    if (m_another_scene && m_another_scene != m_shared_scene)
+      scenes.push_back(m_another_scene);
     return scenes;
   }
 
 private:
-  SD::RuntimeStateManager* mStateManager;
-  SD::Scene* mSharedScene = nullptr;
-  SD::Scene* mAnotherScene = nullptr;
+  sd::RuntimeStateManager* m_state_manager;
+  sd::Scene* m_shared_scene = nullptr;
+  sd::Scene* m_another_scene = nullptr;
 };
 
 int main() {
-  SD::Log::Init();
+  sd::log::init();
 
-  SD::Log::Game::Info("Starting game");
+  sd::log::Game::info("Starting game");
 
-  std::unique_ptr<SD::RuntimeStateManager> stateManager;
-  stateManager = std::make_unique<SD::RuntimeStateManager>();
+  std::unique_ptr<sd::RuntimeStateManager> state_manager;
+  state_manager = std::make_unique<sd::RuntimeStateManager>();
 
-  SD::ApplicationSpecification spec;
+  sd::ApplicationSpecification spec;
   spec.name = "Sandbox";
   spec.width = 1280;
   spec.height = 720;
   spec.enableHotReload = false;
 
-  std::unique_ptr<SD::Application> app;
-  app = std::make_unique<SD::Application>(spec, stateManager.get());
+  std::unique_ptr<sd::Application> app;
+  app = std::make_unique<sd::Application>(spec, state_manager.get());
 
-  stateManager->SetApplication(app.get());
+  state_manager->set_application(app.get());
 
-  std::unique_ptr<SD::GameContext> game;
-  game = std::make_unique<SandboxGame>(stateManager.get());
+  std::unique_ptr<sd::GameContext> game;
+  game = std::make_unique<SandboxGame>(state_manager.get());
 
-  app->SetGameContext(game.get());
+  app->set_game_context(game.get());
 
-  RegisterGameCategories();
-  game->OnLoad(*app);
+  register_game_categories();
+  game->on_load(*app);
 
-  std::atomic stopFlag{false};
-  app->Run(&stopFlag);
+  std::atomic stop_flag{false};
+  app->run(&stop_flag);
 
   return 0;
 }

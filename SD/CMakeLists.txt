@@ -17,7 +17,7 @@ set_target_properties(vma PROPERTIES
         POSITION_INDEPENDENT_CODE ON
 )
 #############
-# SD ENGINE #
+# sd ENGINE #
 #############
 file(GLOB_RECURSE ECS_IMPL_headers "include/Core/ECS/impl/*.inl")
 set(ENGINE_SOURCES
@@ -68,7 +68,7 @@ target_include_directories(SD PUBLIC
 )
 
 ################
-# SDEngine PCH #
+# sdEngine PCH #
 ################
 target_precompile_headers(SD PRIVATE
         <vulkan/vulkan.h>
@@ -89,7 +89,7 @@ target_precompile_headers(SD PRIVATE
         <cstdint>
 )
 #########################
-# SDEngine compile defs #
+# sdEngine compile defs #
 #########################
 
 target_compile_definitions(SD PUBLIC

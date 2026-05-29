@@ -2,176 +2,174 @@
 
 #include "Application.hpp"
 #include "Core/Events/window/WindowEvents.hpp"
-#include "Core/Logging.hpp"
 #include "Core/SDImGuiContext.hpp"
 #include "Core/ViewManager.hpp"
 #include "Core/Vulkan/VulkanRenderer.hpp"
-#include "Utils/Utils.hpp"
 
-namespace SD {
+namespace sd {
 
 WindowManager::WindowManager() = default;
 WindowManager::~WindowManager() = default;
 
-WindowId WindowManager::Create(const WindowProps& props) {
-  SD_ALWAYS_ASSERT(!props.title.empty(), "Window title must not be empty");
-  SD_ALWAYS_ASSERT(props.width > 0 && props.height > 0, "Window dimensions must be positive");
+WindowId WindowManager::create(const WindowProps& props) {
+  assert(!props.title.empty() && "Window title must not be empty");
+  assert(props.width > 0 && props.height > 0 && "Window dimensions must be positive");
 
-  WindowId id = mNextWindowId++;
+  WindowId id = m_next_window_id++;
 
   auto window =
-      WindowBuilder().SetTitle(props.title.c_str()).SetSize(props.width, props.height).Build();
+      WindowBuilder().set_title(props.title.c_str()).set_size(props.width, props.height).build();
 
-  SD_ALWAYS_ASSERT(window, "Window must be created");
+  assert(window && "Window must be created");
 
-  auto& app = Application::Get();
-  auto& vulkanCtx = app.GetVulkanContext();
+  auto& app = Application::get();
+  auto& vulkan_ctx = app.get_vulkan_context();
 
-  if (!vulkanCtx.IsInitialized()) {
-    vulkanCtx.Init(*window);
+  if (!vulkan_ctx.is_initialized()) {
+    vulkan_ctx.init(*window);
   }
 
-  auto vw = std::make_unique<VulkanWindow>(*window, vulkanCtx);
+  auto vw = std::make_unique<VulkanWindow>(*window, vulkan_ctx);
 
   WindowData data;
   data.logic = std::move(window);
   data.render = std::move(vw);
 
-  mWindows[id] = std::move(data);
+  m_windows[id] = std::move(data);
   return id;
 }
 
-void WindowManager::Destroy(WindowId id) {
-  auto it = mWindows.find(id);
-  SD_ALWAYS_ASSERT(it != mWindows.end(), "Cannot destroy window - window ID does not exist");
+void WindowManager::destroy(WindowId id) {
+  auto it = m_windows.find(id);
+  assert(it != m_windows.end() && "Cannot destroy window,  window ID does not exist");
 
-  auto& app = Application::Get();
-  (void)app.GetVulkanContext().GetVulkanDevice()->waitIdle();
-  mWindows.erase(id);
+  auto& app = Application::get();
+  (void)app.get_vulkan_context().get_vulkan_device()->waitIdle();
+  m_windows.erase(id);
 }
 
-void WindowManager::ProcessPendingCloses() {
-  for (WindowId id : mPendingClose) {
-    Destroy(id);
+void WindowManager::process_pending_closes() {
+  for (WindowId id : m_pending_close) {
+    destroy(id);
   }
-  mPendingClose.clear();
+  m_pending_close.clear();
 }
 
-Window& WindowManager::GetWindow(WindowId id) {
-  auto it = mWindows.find(id);
-  SD_ALWAYS_ASSERT(it != mWindows.end(), "Window ID does not exist");
+Window& WindowManager::get_window(WindowId id) {
+  auto it = m_windows.find(id);
+  assert(it != m_windows.end() && "Window ID does not exist");
   return *it->second.logic;
 }
 
-VulkanWindow& WindowManager::GetRenderWindow(WindowId id) {
-  auto it = mWindows.find(id);
-  SD_ALWAYS_ASSERT(it != mWindows.end(), "Window ID does not exist");
-  SD_ALWAYS_ASSERT(it->second.render, "Render window must be valid");
+VulkanWindow& WindowManager::get_render_window(WindowId id) {
+  auto it = m_windows.find(id);
+  assert(it != m_windows.end() &&  "Window ID does not exist");
+  assert(it->second.render && "Render window must be valid");
   return *it->second.render;
 }
 
-void WindowManager::UpdateWindows(float dt) {
-  for (auto& [id, data] : mWindows) {
-    UpdateWindow(id, data, dt);
+void WindowManager::update_windows(float dt) {
+  for (auto& [id, data] : m_windows) {
+    update_window(id, data, dt);
   }
 }
 
-void WindowManager::DrawWindows(ViewManager& viewManager) {
-  SD_ALWAYS_ASSERT(!mWindows.empty(), "Must have at least one window to draw");
+void WindowManager::draw_windows(ViewManager& viewManager) {
+  assert(!m_windows.empty() && "Must have at least one window to draw");
 
-  for (auto& [id, data] : mWindows) {
-    DrawWindow(id, data, viewManager);
+  for (auto& [id, data] : m_windows) {
+    draw_window(id, data, viewManager);
   }
 }
 
-void WindowManager::UpdateWindow(WindowId id, WindowData& data, float dt) {
-  SD_ALWAYS_ASSERT(data.logic, "Logic window must be valid");
-  SD_ALWAYS_ASSERT(data.render, "Render window must be valid");
+void WindowManager::update_window(WindowId id, WindowData& data, float dt) {
+  assert(data.logic &&  "Logic window must be valid");
+  assert(data.render &&  "Render window must be valid");
 
   Window& window = *data.logic;
   VulkanWindow& vw = *data.render;
-  LayerList& layers = data.viewLayers;
-  auto& app = Application::Get();
+  LayerList& layers = data.view_layers;
+  auto& app = Application::get();
 
-  if (vw.IsMinimized())
+  if (vw.is_minimized())
     return;
 
-  for (auto& e : window.GetEventManager()) {
+  for (auto& e : window.get_event_manager()) {
     EventDispatcher dispatcher(*e);
 
-    dispatcher.Dispatch<WindowResizeEvent>([&](const WindowResizeEvent& event) {
-      vw.Resize(event.width, event.height);
+    dispatcher.dispatch<WindowResizeEvent>([&](const WindowResizeEvent& event) {
+      vw.resize(event.width, event.height);
       return false;
     });
 
-    dispatcher.Dispatch<WindowCloseEvent>([&](const WindowCloseEvent&) {
+    dispatcher.dispatch<WindowCloseEvent>([&](const WindowCloseEvent&) {
       if (id == WindowId{}) {
-        app.Close();
+        app.close();
       } else {
-        mPendingClose.push_back(id);
+        m_pending_close.push_back(id);
       }
       return true;
     });
 
-    layers.OnEvent(*e);
+    layers.on_event(*e);
     // Note: Application-level global layer and view event dispatching
     // should probably happen in Application::Run or some other unified way.
     // For now, we'll let Application handle its own event distribution.
-    app.OnAppEvent(*e);
+    app.on_app_event(*e);
   }
-  window.GetEventManager().Clear();
+  window.get_event_manager().clear();
 
   for (auto& layer : layers)
-    layer->OnUpdate(dt);
+    layer->on_update(dt);
   for (auto& layer : layers)
-    layer->OnGuiRender();
+    layer->on_gui_render();
 }
 
-void WindowManager::DrawWindow(WindowId id, WindowData& data, ViewManager& viewManager) {
-  SD_ALWAYS_ASSERT(data.render, "Render window must be valid");
+void WindowManager::draw_window(WindowId id, WindowData& data, ViewManager& viewManager) {
+  assert(data.render&& "Render window must be valid");
 
   VulkanWindow& vw = *data.render;
-  LayerList& layers = data.viewLayers;
-  auto& app = Application::Get();
-  auto& renderer = app.GetRenderer();
+  LayerList& layers = data.view_layers;
+  auto& app = Application::get();
+  auto& renderer = app.get_renderer();
 
-  if (vw.IsMinimized())
+  if (vw.is_minimized())
     return;
 
-  if (vw.IsFramebufferResized()) {
-    vw.RecreateSwapchain(layers);
-    vw.ResetFramebufferResized();
+  if (vw.is_framebuffer_resized()) {
+    vw.recreate_swapchain(layers);
+    vw.reset_framebuffer_resized();
   }
 
   // Acquire Image
-  auto& frameSync = vw.GetFrameSync();
-  auto acquireRes = vw.GetVulkanImages(frameSync.imageAcquired);
+  auto& frame_sync = vw.get_frame_sync();
+  auto acquire_res = vw.get_vulkan_images(frame_sync.image_acquired);
 
-  if (!acquireRes) {
-    if (acquireRes.error() == vk::Result::eErrorOutOfDateKHR) {
-      vw.RecreateSwapchain(layers);
+  if (!acquire_res) {
+    if (acquire_res.error() == vk::Result::eErrorOutOfDateKHR) {
+      vw.recreate_swapchain(layers);
     }
     return;
   }
-  vk::CommandBuffer cmd = renderer.BeginCommandBuffer(vw);
+  vk::CommandBuffer cmd = renderer.begin_command_buffer(vw);
 
   // 1. Offscreen viewports (Handled by ViewManager)
-  viewManager.RenderViews(cmd);
+  viewManager.render_views(cmd);
 
   // 2. Begin Main Render Pass
-  renderer.BeginRenderPass(vw);
+  renderer.begin_render_pass(vw);
 
   // 3. Render Layers
   for (auto& layer : layers)
-    layer->OnRender(cmd);
+    layer->on_render(cmd);
 
   if (id == WindowId{}) {
-    app.GetImGuiContext().RenderDrawData(cmd);
+    app.get_im_gui_context().render_draw_data(cmd);
   }
 
-  vk::Result presentRes = renderer.EndFrame(vw);
-  if (presentRes == vk::Result::eErrorOutOfDateKHR || presentRes == vk::Result::eSuboptimalKHR) {
-    vw.RecreateSwapchain(layers);
+  vk::Result present_res = renderer.end_frame(vw);
+  if (present_res == vk::Result::eErrorOutOfDateKHR || present_res == vk::Result::eSuboptimalKHR) {
+    vw.recreate_swapchain(layers);
   }
 }
 

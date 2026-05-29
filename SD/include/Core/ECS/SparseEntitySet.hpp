@@ -9,16 +9,16 @@
 #include "Entity.hpp"
 #include "Utils/Serialization.hpp"
 
-namespace SD {
+namespace sd {
 // TODO(docs): Document SparseEntitySetBase interface
 //   - Purpose: Type-erased base for component pools
 //   - Used by EntityManager for heterogeneous storage
 class SparseEntitySetBase : public Serializable {
 public:
-  virtual ~SparseEntitySetBase() = default;
-  virtual bool Remove(Entity entity) = 0;
+   ~SparseEntitySetBase() override = default;
+  virtual bool remove(Entity entity) = 0;
 
-  virtual std::optional<ComponentDebugInfo> GetDebugInfo(Entity e) = 0;
+  virtual std::optional<ComponentDebugInfo> get_debug_info(Entity e) = 0;
 };
 
 // TODO(docs): Document SparseEntitySet class thoroughly
@@ -37,19 +37,19 @@ public:
 template<typename T>
 class SparseEntitySet : public SparseEntitySetBase {
   static constexpr usize PAGE_SIZE = 1024;
-  static constexpr usize SHIFT = Math::log2_int(PAGE_SIZE);
+  static constexpr usize SHIFT = math::log2_int(PAGE_SIZE);
   static constexpr usize MASK = PAGE_SIZE - 1;
 
   // INVARIANTS:
-  // 1. denseEntities.size() == denseData.size() (parallel arrays)
+  // 1. dense_entities.size() == dense_data.size() (parallel arrays)
   // 2. sparse[page][offset] is either valid dense index OR sentinel (max usize)
-  // 3. For each i in [0, denseEntities.size()): sparse[denseEntities[i]] points back to i
+  // 3. For each i in [0, dense_entities.size()): sparse[dense_entities[i]] points back to i
 
 #ifndef NDEBUG
   void ValidateInvariants() const {
-    assert(denseEntities.size() == denseData.size());
-    for (size_t i = 0; i < denseEntities.size(); ++i) {
-      Entity e = denseEntities[i];
+    assert(dense_entities.size() == dense_data.size());
+    for (size_t i = 0; i < dense_entities.size(); ++i) {
+      Entity e = dense_entities[i];
       usize page = e.index >> SHIFT;
       usize offset = e.index & MASK;
       assert(page < sparse.size() && sparse[page]);
@@ -59,37 +59,37 @@ class SparseEntitySet : public SparseEntitySetBase {
 #endif
 
   std::vector<std::unique_ptr<usize[]>> sparse;
-  std::vector<T> denseData;
-  std::vector<Entity> denseEntities;
+  std::vector<T> dense_data;
+  std::vector<Entity> dense_entities;
 
 public:
   template<typename... Args>
-  void Add(Entity entity, Args&&... args);
+  void add(Entity entity, Args&&... args);
 
   /**
    * Remove an entity from the set
    * @param entity Entity to remove
    * @return true if successfully removed, false if it doesn't exist
    */
-  bool Remove(Entity entity) override;
+  bool remove(Entity entity) override;
 
   /**
    * Retrieve data for this entity
    * @param entity
    * @return Data associated for this entity, or nullptr if it doesn't exist
    */
-  T* Get(Entity entity);
-  [[nodiscard]] const T* Get(Entity entity) const;
+  T* get(Entity entity);
+  [[nodiscard]] const T* get(Entity entity) const;
 
-  std::optional<ComponentDebugInfo> GetDebugInfo(Entity e) override;
-  T* operator[](const Entity idx) { return Get(idx); }
-  [[nodiscard]] const std::vector<Entity>& GetDenseEntities() const { return denseEntities; }
+  std::optional<ComponentDebugInfo> get_debug_info(Entity e) override;
+  T* operator[](const Entity idx) { return get(idx); }
+  [[nodiscard]] const std::vector<Entity>& get_dense_entities() const { return dense_entities; }
 
-  [[nodiscard]] usize Size() const { return denseEntities.size(); }
+  [[nodiscard]] usize size() const { return dense_entities.size(); }
 
-  void SerializeTo(std::vector<char>& out) const {
+  void serialize_to(std::vector<char>& out) const {
     // Header: size_t entity_count, size_t sizeof(T).
-    size_t entity_count = denseEntities.size();
+    size_t entity_count = dense_entities.size();
     size_t comp_size = sizeof(T);
 
     out.resize(sizeof(size_t) * 2 + entity_count * (sizeof(Entity) + comp_size));
@@ -100,12 +100,12 @@ public:
     ptr += sizeof(size_t);
 
     // Dense entities + data.
-    memcpy(ptr, denseEntities.data(), entity_count * sizeof(Entity));
+    memcpy(ptr, dense_entities.data(), entity_count * sizeof(Entity));
     ptr += entity_count * sizeof(Entity);
-    memcpy(ptr, denseData.data(), entity_count * comp_size);
+    memcpy(ptr, dense_data.data(), entity_count * comp_size);
   }
 
-  void DeserializeFrom(const std::vector<char>& data) {
+  void deserialize_from(const std::vector<char>& data) {
     const char* ptr = data.data();
     size_t entity_count, comp_size;
     memcpy(&entity_count, ptr, sizeof(size_t));
@@ -113,16 +113,16 @@ public:
     memcpy(&comp_size, ptr, sizeof(size_t));
     ptr += sizeof(size_t);
 
-    denseEntities.resize(entity_count);
-    denseData.resize(entity_count);
+    dense_entities.resize(entity_count);
+    dense_data.resize(entity_count);
 
-    memcpy(denseEntities.data(), ptr, entity_count * sizeof(Entity));
+    memcpy(dense_entities.data(), ptr, entity_count * sizeof(Entity));
     ptr += entity_count * sizeof(Entity);
-    memcpy(denseData.data(), ptr, entity_count * comp_size);
+    memcpy(dense_data.data(), ptr, entity_count * comp_size);
 
     sparse.clear();
     for (size_t i = 0; i < entity_count; ++i) {
-      Entity e = denseEntities[i];
+      Entity e = dense_entities[i];
       const usize page = e.index >> SHIFT;
       const usize offset = e.index & MASK;
 
@@ -139,37 +139,37 @@ public:
 #endif
   }
 
-  void Serialize(Serializer& s) const override {
-    s.Write(static_cast<u32>(denseEntities.size()));
-    for (const auto& e : denseEntities) {
-      s.Write(e.index);
-      s.Write(e.generation);
+  void serialize(Serializer& s) const override {
+    s.write(static_cast<u32>(dense_entities.size()));
+    for (const auto& e : dense_entities) {
+      s.write(e.index);
+      s.write(e.generation);
     }
     // Only serialize component data if it's serializable
     if constexpr (SerializableComponent<T>) {
-      for (const auto& data : denseData) {
-        ComponentSerializer<T>::Serialize(data, s);
+      for (const auto& data : dense_data) {
+        ComponentSerializer<T>::serialize(data, s);
       }
     }
   }
 
-  void Deserialize(Serializer& s) override {
-    u32 count = s.Read<u32>();
-    denseEntities.resize(count);
+  void deserialize(Serializer& s) override {
+    u32 count = s.read<u32>();
+    dense_entities.resize(count);
     for (u32 i = 0; i < count; ++i) {
-      denseEntities[i].index = s.Read<u32>();
-      denseEntities[i].generation = s.Read<u32>();
+      dense_entities[i].index = s.read<u32>();
+      dense_entities[i].generation = s.read<u32>();
     }
-    denseData.resize(denseEntities.size());
+    dense_data.resize(dense_entities.size());
     if constexpr (SerializableComponent<T>) {
-      for (auto& data : denseData) {
-        ComponentSerializer<T>::Deserialize(data, s);
+      for (auto& data : dense_data) {
+        ComponentSerializer<T>::deserialize(data, s);
       }
     }
     // Rebuild sparse index
     sparse.clear();
-    for (size_t i = 0; i < denseEntities.size(); ++i) {
-      Entity e = denseEntities[i];
+    for (size_t i = 0; i < dense_entities.size(); ++i) {
+      Entity e = dense_entities[i];
       const usize page = e.index >> SHIFT;
       const usize offset = e.index & MASK;
 

@@ -30,23 +30,23 @@
 #define ENGINE_LOG_LEVEL_GAME ENGINE_LOG_LEVEL
 #endif
 
-namespace SD::Log {
+namespace sd::log {
 
 enum class LogLevel {
-  Trace = ENGINE_LOG_LEVEL_TRACE,
-  Debug = ENGINE_LOG_LEVEL_DEBUG,
-  Info = ENGINE_LOG_LEVEL_INFO,
-  Warn = ENGINE_LOG_LEVEL_WARN,
-  Error = ENGINE_LOG_LEVEL_ERROR,
-  Critical = ENGINE_LOG_LEVEL_CRITICAL,
-  Off = ENGINE_LOG_LEVEL_OFF
+  TRACE = ENGINE_LOG_LEVEL_TRACE,
+  DEBUG = ENGINE_LOG_LEVEL_DEBUG,
+  INFO = ENGINE_LOG_LEVEL_INFO,
+  WARN = ENGINE_LOG_LEVEL_WARN,
+  ERROR = ENGINE_LOG_LEVEL_ERROR,
+  CRITICAL = ENGINE_LOG_LEVEL_CRITICAL,
+  OFF = ENGINE_LOG_LEVEL_OFF
 };
 
 struct LogEntry {
   std::string category;
   LogLevel level;
   std::string message;
-  float uptimeSec{};
+  float uptime_sec{};
 };
 
 struct CategoryInfo {
@@ -55,33 +55,34 @@ struct CategoryInfo {
   ImVec4 color{};
 };
 
-const std::deque<LogEntry>& GetLogHistory();
-void AddLogEntry(LogEntry entry);
+const std::deque<LogEntry>& get_log_history();
+void add_log_entry(LogEntry entry);
 
-std::vector<CategoryInfo>& GetCategoryRegistry();
-void RegisterCategory(const char* name, ImVec4 color);
+std::vector<CategoryInfo>& get_category_registry();
+void register_category(const char* name, ImVec4 color);
 
-bool IsCategoryUnder(const std::string& child, const std::string& parent);
+bool is_category_under(const std::string& child, const std::string& parent);
 
 /**
  * @brief Initializes all category loggers, shared sinks, and the ImGui sink
  */
-void Init();
+void init();
 
-spdlog::level::level_enum ToSpdlogLevel(LogLevel level);
+spdlog::level::level_enum to_spdlog_level(LogLevel level);
 
-LogLevel FromSpdlogLevel(spdlog::level::level_enum level);
+LogLevel from_spdlog_level(spdlog::level::level_enum level);
 
 } // namespace SD::Log
 
 
+// TODO: Try to do this without macro
 #define SD_LOG_CATEGORY_IMPL(CategoryPath, Level)                              \
-  constexpr auto cMinLevel = static_cast<::SD::Log::LogLevel>(Level);          \
+  constexpr auto cMinLevel = static_cast<::sd::log::LogLevel>(Level);          \
   constexpr const char* cCategoryPath = CategoryPath;                          \
                                                                                \
   template<typename... Args>                                                   \
-  inline void Trace(spdlog::format_string_t<Args...> fmt, Args&&... args) {    \
-    if constexpr (cMinLevel <= ::SD::Log::LogLevel::Trace) {                   \
+  inline void trace(spdlog::format_string_t<Args...> fmt, Args&&... args) {    \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::TRACE) {                   \
       if (auto logger = spdlog::get(CategoryPath)) {                           \
         logger->trace(fmt, std::forward<Args>(args)...);                       \
       }                                                                        \
@@ -89,8 +90,8 @@ LogLevel FromSpdlogLevel(spdlog::level::level_enum level);
   }                                                                            \
                                                                                \
   template<typename... Args>                                                   \
-  inline void Debug(spdlog::format_string_t<Args...> fmt, Args&&... args) {    \
-    if constexpr (cMinLevel <= ::SD::Log::LogLevel::Debug) {                   \
+  inline void debug(spdlog::format_string_t<Args...> fmt, Args&&... args) {    \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::DEBUG) {                   \
       if (auto logger = spdlog::get(CategoryPath)) {                           \
         logger->debug(fmt, std::forward<Args>(args)...);                       \
       }                                                                        \
@@ -98,8 +99,8 @@ LogLevel FromSpdlogLevel(spdlog::level::level_enum level);
   }                                                                            \
                                                                                \
   template<typename... Args>                                                   \
-  inline void Info(spdlog::format_string_t<Args...> fmt, Args&&... args) {     \
-    if constexpr (cMinLevel <= ::SD::Log::LogLevel::Info) {                    \
+  inline void info(spdlog::format_string_t<Args...> fmt, Args&&... args) {     \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::INFO) {                    \
       if (auto logger = spdlog::get(CategoryPath)) {                           \
         logger->info(fmt, std::forward<Args>(args)...);                        \
       }                                                                        \
@@ -107,8 +108,8 @@ LogLevel FromSpdlogLevel(spdlog::level::level_enum level);
   }                                                                            \
                                                                                \
   template<typename... Args>                                                   \
-  inline void Warn(spdlog::format_string_t<Args...> fmt, Args&&... args) {     \
-    if constexpr (cMinLevel <= ::SD::Log::LogLevel::Warn) {                    \
+  inline void warn(spdlog::format_string_t<Args...> fmt, Args&&... args) {     \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::WARN) {                    \
       if (auto logger = spdlog::get(CategoryPath)) {                           \
         logger->warn(fmt, std::forward<Args>(args)...);                        \
       }                                                                        \
@@ -116,8 +117,8 @@ LogLevel FromSpdlogLevel(spdlog::level::level_enum level);
   }                                                                            \
                                                                                \
   template<typename... Args>                                                   \
-  inline void Error(spdlog::format_string_t<Args...> fmt, Args&&... args) {    \
-    if constexpr (cMinLevel <= ::SD::Log::LogLevel::Error) {                   \
+  inline void error(spdlog::format_string_t<Args...> fmt, Args&&... args) {    \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::ERROR) {                   \
       if (auto logger = spdlog::get(CategoryPath)) {                           \
         logger->error(fmt, std::forward<Args>(args)...);                       \
       }                                                                        \
@@ -125,8 +126,8 @@ LogLevel FromSpdlogLevel(spdlog::level::level_enum level);
   }                                                                            \
                                                                                \
   template<typename... Args>                                                   \
-  inline void Critical(spdlog::format_string_t<Args...> fmt, Args&&... args) { \
-    if constexpr (cMinLevel <= ::SD::Log::LogLevel::Critical) {                \
+  inline void critical(spdlog::format_string_t<Args...> fmt, Args&&... args) { \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::CRITICAL) {                \
       if (auto logger = spdlog::get(CategoryPath)) {                           \
         logger->critical(fmt, std::forward<Args>(args)...);                    \
       }                                                                        \
@@ -134,7 +135,7 @@ LogLevel FromSpdlogLevel(spdlog::level::level_enum level);
   }
 
 
-namespace SD::Log::Engine {
+namespace sd::log::engine {
 SD_LOG_CATEGORY_IMPL("Engine", ENGINE_LOG_LEVEL_ENGINE)
 
 namespace Renderer {

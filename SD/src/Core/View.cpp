@@ -6,23 +6,23 @@
 #include "Core/SDImGuiContext.hpp"
 #include "Utils/Utils.hpp"
 
-SD::View::~View() {
+sd::View::~View() {
   // Detach layers first while resources are still valid
-  for (auto& layer : mLayersByStage) {
+  for (auto& layer : m_layers_by_stage) {
     if (layer) {
-      layer->OnDetach();
+      layer->on_detach();
       layer.reset();
     }
   }
-  mLayersByStage.clear();
+  m_layers_by_stage.clear();
 
-  CleanupLayeredRender();
+  cleanup_layered_render();
 }
 
-VkExtent2D SD::View::GetImGuiExtent() {
+VkExtent2D sd::View::get_im_gui_extent() {
   const ImVec2 size = ImGui::GetContentRegionAvail();
 
-  auto clampToU32 = [](float v) -> u32 {
+  auto clamp_to_u32 = [](float v) -> u32 {
     if (v <= 0.0f)
       return 1;
     if (v >= static_cast<float>(std::numeric_limits<u32>::max()))
@@ -30,43 +30,43 @@ VkExtent2D SD::View::GetImGuiExtent() {
     return static_cast<u32>(v);
   };
 
-  return {clampToU32(size.x), clampToU32(size.y)};
+  return {clamp_to_u32(size.x), clamp_to_u32(size.y)};
 }
-VkFormat SD::View::FindDepthFormat() {
-  constexpr std::vector depthFormats = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+VkFormat sd::View::find_depth_format() {
+   std::vector depth_formats = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
                                         VK_FORMAT_D24_UNORM_S8_UINT};
 
-  auto physicalDevice = Application::Get().GetVulkanContext().GetPhysicalDevice();
-  SD_ALWAYS_ASSERT(physicalDevice, "Physical device must be valid");
+  auto physical_device = Application::get().get_vulkan_context().get_physical_device();
+  assert(physical_device&& "Physical device must be valid");
 
-  for (const auto& format : depthFormats) {
+  for (const auto& format : depth_formats) {
     VkFormatProperties props;
-    vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+    vkGetPhysicalDeviceFormatProperties(physical_device, format, &props);
 
     if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
       return format;
     }
   }
 
-  Abort("Failed to find supported depth format");
+  engine_abort("Failed to find supported depth format");
 }
 
-void SD::View::OnGuiRender() {
-  if (!mOpen)
+void sd::View::on_gui_render() {
+  if (!m_open)
     return;
   if (!ImGui::GetCurrentContext())
     return;
-  if (ImGui::Begin(mName.c_str(), &mOpen)) {
-    VkExtent2D currentExtent = GetImGuiExtent();
-    if (currentExtent.width != mExtent.width || currentExtent.height != mExtent.height) {
-      Resize(currentExtent);
+  if (ImGui::Begin(m_name.c_str(), &m_open)) {
+    VkExtent2D current_extent = get_im_gui_extent();
+    if (current_extent.width != m_extent.width || current_extent.height != m_extent.height) {
+      resize(current_extent);
     }
-    mContentRegionPos = ImGui::GetCursorScreenPos();
-    mContentRegionExtent = ImGui::GetContentRegionAvail();
+    m_content_region_pos = ImGui::GetCursorScreenPos();
+    m_content_region_extent = ImGui::GetContentRegionAvail();
 
-    mLayers.GuiRender();
-    if (mDisplayTexDS != VK_NULL_HANDLE) {
-      ImGui::Image(reinterpret_cast<ImTextureID>(mDisplayTexDS), ImGui::GetContentRegionAvail());
+    m_layers.gui_render();
+    if (m_display_tex_ds != VK_NULL_HANDLE) {
+      ImGui::Image(reinterpret_cast<ImTextureID>(m_display_tex_ds), ImGui::GetContentRegionAvail());
     }
   }
   ImGui::End();
@@ -76,44 +76,44 @@ void SD::View::OnGuiRender() {
 //   CleanupLayeredRender();
 // }
 
-void SD::View::SetupLayeredRender(u32 maxStages, VkExtent2D initialExtent) {
-  SD_ALWAYS_ASSERT(initialExtent.width > 0 && initialExtent.height > 0,
+void sd::View::setup_layered_render(u32 maxStages, VkExtent2D initialExtent) {
+  assert(initialExtent.width > 0 && initialExtent.height > 0 &&
                    "Initial extent must be valid");
-  SD_ALWAYS_ASSERT(maxStages > 0, "Must have at least one stage");
+  assert(maxStages > 0 && "Must have at least one stage");
 
-  CleanupLayeredRender();
+  cleanup_layered_render();
 
-  mExtent = initialExtent;
+  m_extent = initialExtent;
 
   // This ensures projection is set up correctly for the initial extent
-  float aspect = static_cast<float>(mExtent.width) / static_cast<float>(mExtent.height);
-  AspectMode effectiveMode = mAspectMode;
-  if (mAspectMode == AspectMode::BestFit) {
-    effectiveMode = (aspect > 1.0f) ? AspectMode::FixedHeight : AspectMode::FixedWidth;
+  float aspect = static_cast<float>(m_extent.width) / static_cast<float>(m_extent.height);
+  AspectMode effective_mode = m_aspect_mode;
+  if (m_aspect_mode == AspectMode::BEST_FIT) {
+    effective_mode = (aspect > 1.0f) ? AspectMode::FIXED_HEIGHT : AspectMode::FIXED_WIDTH;
   }
 
-  if (effectiveMode == AspectMode::FixedHeight) {
-    mCameraViewProjection = VLA::Matrix4x4f::Ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
+  if (effective_mode == AspectMode::FIXED_HEIGHT) {
+    m_camera_view_projection = VLA::Matrix4x4f::Ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
   } else {
-    float invAspect = 1.0f / aspect;
-    mCameraViewProjection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -invAspect, invAspect, -1.0f, 1.0f);
+    float inv_aspect = 1.0f / aspect;
+    m_camera_view_projection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -inv_aspect, inv_aspect, -1.0f, 1.0f);
   }
 
-  CreateVulkanResources();
+  create_vulkan_resources();
 }
 
-void SD::View::CreateVulkanResources() {
-  auto& application = SD::Application::Get();
-  auto& vulkanContext = application.GetVulkanContext();
-  VmaAllocator allocator = vulkanContext.GetVmaAllocator();
-  auto extent = mExtent;
+void sd::View::create_vulkan_resources() {
+  auto& application = Application::get();
+  auto& vulkan_context = application.get_vulkan_context();
+  VmaAllocator allocator = vulkan_context.get_vma_allocator();
+  auto extent = m_extent;
 
-  SD_ALWAYS_ASSERT(vulkanContext.GetVulkanDevice(), "Vulkan device must be valid");
-  SD_ALWAYS_ASSERT(allocator, "VMA allocator must be valid");
-  SD_ALWAYS_ASSERT(extent.width > 0 && extent.height > 0, "Extent must be valid");
+  assert(vulkan_context.get_vulkan_device()&& "Vulkan device must be valid");
+  assert(allocator&& "VMA allocator must be valid");
+  assert(extent.width > 0 && extent.height > 0&& "Extent must be valid");
 
   // Color image (device-local)
-  VkImageCreateInfo colorInfo{
+  VkImageCreateInfo color_info{
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .pNext = {},
       .flags = {},
@@ -132,72 +132,72 @@ void SD::View::CreateVulkanResources() {
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
   };
 
-  VmaAllocationCreateInfo colorAllocInfo = {};
-  colorAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  VmaAllocationCreateInfo color_alloc_info = {};
+  color_alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-  VK_CHECK(vmaCreateImage(allocator, &colorInfo, &colorAllocInfo, &mColorImage, &mColorAllocation,
+  VK_CHECK(vmaCreateImage(allocator, &color_info, &color_alloc_info, &m_color_image, &m_color_allocation,
                           nullptr));
-  SD_ALWAYS_ASSERT(mColorImage != VK_NULL_HANDLE, "Color image must be created");
+  assert(m_color_image != VK_NULL_HANDLE&&  "Color image must be created");
 
-  vk::ImageViewCreateInfo colorViewInfo{
+  vk::ImageViewCreateInfo color_view_info{
       {},
-      mColorImage,
+      m_color_image,
       vk::ImageViewType::e2D,
       vk::Format::eR8G8B8A8Unorm,
       {},
       {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
   };
-  mColorView =
-      CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createImageViewUnique(colorViewInfo),
+  m_color_view =
+      check_vulkan_res_val(vulkan_context.get_vulkan_device()->createImageViewUnique(color_view_info),
                         "Failed to create color view: ");
-  SD_ALWAYS_ASSERT(mColorView, "Color view must be created");
+  assert(m_color_view && "Color view must be created");
 
   //  Depth image
-  VkFormat depthFormat = FindDepthFormat();
-  VkImageCreateInfo depthInfo = colorInfo;
-  depthInfo.format = depthFormat;
-  depthInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  VkFormat depth_format = find_depth_format();
+  VkImageCreateInfo depth_info = color_info;
+  depth_info.format = depth_format;
+  depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-  VK_CHECK(vmaCreateImage(allocator, &depthInfo, &colorAllocInfo, &mDepthImage, &mDepthAllocation,
+  VK_CHECK(vmaCreateImage(allocator, &depth_info, &color_alloc_info, &m_depth_image, &m_depth_allocation,
                           nullptr));
-  SD_ALWAYS_ASSERT(mDepthImage != VK_NULL_HANDLE, "Depth image must be created");
+  assert(m_depth_image != VK_NULL_HANDLE && "Depth image must be created");
 
-  vk::ImageViewCreateInfo depthViewInfo{
+  vk::ImageViewCreateInfo depth_view_info{
       {},
-      mDepthImage,
+      m_depth_image,
       vk::ImageViewType::e2D,
-      (vk::Format)depthFormat,
+      static_cast<vk::Format>(depth_format),
       {},
       {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
   };
-  mDepthView =
-      CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createImageViewUnique(depthViewInfo),
+  m_depth_view =
+      check_vulkan_res_val(vulkan_context.get_vulkan_device()->createImageViewUnique(depth_view_info),
                         "Failed to create depth view: ");
-  SD_ALWAYS_ASSERT(mDepthView, "Depth view must be created");
+  assert(m_depth_view && "Depth view must be created");
 
   //  RenderPass attachments
-  vk::AttachmentDescription colorAttach(
+  vk::AttachmentDescription color_attach(
       {}, vk::Format::eR8G8B8A8Unorm, vk::SampleCountFlagBits::e1, vk::AttachmentLoadOp::eClear,
       vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
       vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
       vk::ImageLayout::eShaderReadOnlyOptimal);
-  vk::AttachmentDescription depthAttach(
-      {}, static_cast<vk::Format>(depthFormat), vk::SampleCountFlagBits::e1,
+  vk::AttachmentDescription depth_attach(
+      {}, static_cast<vk::Format>(depth_format), vk::SampleCountFlagBits::e1,
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
       vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-  vk::AttachmentDescription attachments[2] = {colorAttach, depthAttach};
+  vk::AttachmentDescription attachments[2] = {color_attach, depth_attach};
 
   // Subpass references
-  vk::AttachmentReference colorRef(0, vk::ImageLayout::eColorAttachmentOptimal);
-  vk::AttachmentReference depthRef(1, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  vk::AttachmentReference color_ref(0, vk::ImageLayout::eColorAttachmentOptimal);
+  vk::AttachmentReference depth_ref(1, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-  vk::SubpassDescription subpassBg({}, vk::PipelineBindPoint::eGraphics, {}, nullptr, 1, &colorRef,
-                                   nullptr, &depthRef);
-  vk::SubpassDescription subpassWorld = subpassBg; // Identical for now
-  vk::SubpassDescription subpassUi({}, vk::PipelineBindPoint::eGraphics, {}, nullptr, 1, &colorRef,
+  vk::SubpassDescription subpass_bg({}, vk::PipelineBindPoint::eGraphics, {}, nullptr, 1, &color_ref,
+                                   nullptr, &depth_ref);
+  vk::SubpassDescription subpass_world = subpass_bg; // Identical for now
+  vk::SubpassDescription subpass_ui({}, vk::PipelineBindPoint::eGraphics, {}, nullptr, 1, &color_ref,
                                    nullptr, nullptr);
-  vk::SubpassDescription subpasses[3] = {subpassBg, subpassWorld, subpassUi};
+  vk::SubpassDescription subpasses[3] = {subpass_bg, subpass_world, subpass_ui};
 
   // Subpass dependencies (proper progression)
   vk::SubpassDependency dependencies[4] = {
@@ -221,35 +221,35 @@ void SD::View::CreateVulkanResources() {
        vk::DependencyFlagBits::eByRegion                                           }
   };
 
-  if (!mLayeredRP) {
-    vk::RenderPassCreateInfo rpInfo{
-        {},        (u32)std::size(attachments),  attachments, (u32)std::size(subpasses),
-        subpasses, (u32)std::size(dependencies), dependencies};
-    mLayeredRP = CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createRenderPassUnique(rpInfo),
+  if (!m_layered_rp) {
+    vk::RenderPassCreateInfo rp_info{
+        {},        static_cast<u32>(std::size(attachments)),  attachments, static_cast<u32>(std::size(subpasses)),
+        subpasses, static_cast<u32>(std::size(dependencies)), dependencies};
+    m_layered_rp = check_vulkan_res_val(vulkan_context.get_vulkan_device()->createRenderPassUnique(rp_info),
                                    "Failed to create render pass: ");
-    SD_ALWAYS_ASSERT(mLayeredRP, "Render pass must be created");
+    assert(m_layered_rp && "Render pass must be created");
   }
 
   // Framebuffer (now with valid renderPass)
-  vk::ImageView views[] = {mColorView.get(), mDepthView.get()};
-  vk::FramebufferCreateInfo fbInfo{
-      {}, mLayeredRP.get(), (u32)std::size(views), views, extent.width, extent.height, 1};
-  mLayeredFramebuffer =
-      CheckVulkanResVal(vulkanContext.GetVulkanDevice()->createFramebufferUnique(fbInfo),
+  vk::ImageView views[] = {m_color_view.get(), m_depth_view.get()};
+  vk::FramebufferCreateInfo fb_info{
+      {}, m_layered_rp.get(), static_cast<u32>(std::size(views)), views, extent.width, extent.height, 1};
+  m_layered_framebuffer =
+      check_vulkan_res_val(vulkan_context.get_vulkan_device()->createFramebufferUnique(fb_info),
                         "Failed to create framebuffer: ");
-  SD_ALWAYS_ASSERT(mLayeredFramebuffer, "Framebuffer must be created");
+  assert(m_layered_framebuffer && "Framebuffer must be created");
 
-  auto& imguiCtx = application.GetImGuiContext();
-  mDisplayTexDS = imguiCtx.CreateTextureFromView(mColorView.get());
+  auto& imguiCtx = application.get_im_gui_context();
+  m_display_tex_ds = imguiCtx.create_texture_from_view(m_color_view.get());
 }
 
-void SD::View::OnRender(vk::CommandBuffer cmd) {
-  SD_ALWAYS_ASSERT(mLayeredRP, "Render pass must be valid");
-  SD_ALWAYS_ASSERT(mLayeredFramebuffer, "Framebuffer must be valid");
-  SD_ALWAYS_ASSERT(mExtent.width > 0 && mExtent.height > 0, "Extent must be valid");
+void sd::View::on_render(vk::CommandBuffer cmd) {
+  assert(m_layered_rp && "Render pass must be valid");
+  assert(m_layered_framebuffer && "Framebuffer must be valid");
+  assert(m_extent.width > 0 && m_extent.height > 0 && "Extent must be valid");
 
-  auto* gameLayer = GetLayerByStage(1);
-  if (!gameLayer) {
+  auto* game_layer = get_layer_by_stage(1);
+  if (!game_layer) {
     return;
   }
 
@@ -257,122 +257,122 @@ void SD::View::OnRender(vk::CommandBuffer cmd) {
   clears[0].color = vk::ClearColorValue(0.1f, 0.1f, 0.1f, 1.0f);
   clears[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
 
-  vk::RenderPassBeginInfo beginInfo{
-      mLayeredRP.get(),
-      mLayeredFramebuffer.get(),
-      {{0, 0}, mExtent},
+  vk::RenderPassBeginInfo begin_info{
+      m_layered_rp.get(),
+      m_layered_framebuffer.get(),
+      {{0, 0}, m_extent},
       2,
       clears
   };
 
-  cmd.beginRenderPass(beginInfo, vk::SubpassContents::eInline);
+  cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
 
   // Viewport/scissor once
-  vk::Viewport viewport{0, 0, static_cast<float>(mExtent.width), static_cast<float>(mExtent.height),
+  vk::Viewport viewport{0, 0, static_cast<float>(m_extent.width), static_cast<float>(m_extent.height),
                         0, 1};
   cmd.setViewport(0, viewport);
   vk::Rect2D scissor{
       {0, 0},
-      mExtent
+      m_extent
   };
   cmd.setScissor(0, scissor);
 
   // Subpass 1: Game layer only (for now)
   cmd.nextSubpass(vk::SubpassContents::eInline);
-  gameLayer->OnRender(cmd);
+  game_layer->on_render(cmd);
 
   cmd.endRenderPass();
 }
 
-void SD::View::CleanupLayeredRender() {
-  auto& application = SD::Application::Get();
+void sd::View::cleanup_layered_render() {
+  auto& application = Application::get();
 
   // Check if Vulkan context is still valid
-  if (!application.GetVulkanContext().GetVulkanDevice()) {
-    SD::Log::Engine::Warn("Vulkan context invalid during view cleanup, resetting handles only");
+  if (!application.get_vulkan_context().get_vulkan_device()) {
+    log::engine::warn("Vulkan context invalid during view cleanup, resetting handles only");
     // Just reset handles, can't properly clean up
-    mColorImage = VK_NULL_HANDLE;
-    mColorAllocation = VK_NULL_HANDLE;
-    mDepthImage = VK_NULL_HANDLE;
-    mDepthAllocation = VK_NULL_HANDLE;
-    mDisplayTexDS = VK_NULL_HANDLE;
-    mLayeredFramebuffer.reset();
-    mColorView.reset();
-    mDepthView.reset();
-    mLayeredRP.reset();
+    m_color_image = VK_NULL_HANDLE;
+    m_color_allocation = VK_NULL_HANDLE;
+    m_depth_image = VK_NULL_HANDLE;
+    m_depth_allocation = VK_NULL_HANDLE;
+    m_display_tex_ds = VK_NULL_HANDLE;
+    m_layered_framebuffer.reset();
+    m_color_view.reset();
+    m_depth_view.reset();
+    m_layered_rp.reset();
     return;
   }
 
-  auto& vulkanContext = application.GetVulkanContext();
-  VmaAllocator allocator = vulkanContext.GetVmaAllocator();
+  auto& vulkan_context = application.get_vulkan_context();
+  VmaAllocator allocator = vulkan_context.get_vma_allocator();
 
-  if (mDisplayTexDS != VK_NULL_HANDLE) {
-    application.GetImGuiContext().RemoveTexture(mDisplayTexDS);
-    mDisplayTexDS = VK_NULL_HANDLE;
+  if (m_display_tex_ds != VK_NULL_HANDLE) {
+    application.get_im_gui_context().remove_texture(m_display_tex_ds);
+    m_display_tex_ds = VK_NULL_HANDLE;
   }
 
   // Images and allocations - check allocator validity
-  if (mColorImage != VK_NULL_HANDLE) {
+  if (m_color_image != VK_NULL_HANDLE) {
     if (allocator) {
-      vmaDestroyImage(allocator, mColorImage, mColorAllocation);
+      vmaDestroyImage(allocator, m_color_image, m_color_allocation);
     } else {
-      SD::Log::Engine::Error("Cannot destroy color image: VMA allocator is null");
+      log::engine::error("Cannot destroy color image: VMA allocator is null");
     }
-    mColorImage = VK_NULL_HANDLE;
-    mColorAllocation = VK_NULL_HANDLE;
+    m_color_image = VK_NULL_HANDLE;
+    m_color_allocation = VK_NULL_HANDLE;
   }
 
-  if (mDepthImage != VK_NULL_HANDLE) {
+  if (m_depth_image != VK_NULL_HANDLE) {
     if (allocator) {
-      vmaDestroyImage(allocator, mDepthImage, mDepthAllocation);
+      vmaDestroyImage(allocator, m_depth_image, m_depth_allocation);
     } else {
-      SD::Log::Engine::Error("Cannot destroy depth image: VMA allocator is null");
+      log::engine::error("Cannot destroy depth image: VMA allocator is null");
     }
-    mDepthImage = VK_NULL_HANDLE;
-    mDepthAllocation = VK_NULL_HANDLE;
+    m_depth_image = VK_NULL_HANDLE;
+    m_depth_allocation = VK_NULL_HANDLE;
   }
 
   // vk::Unique handles (Views, RP, FB) clean themselves up
-  mLayeredFramebuffer.reset();
-  mColorView.reset();
-  mDepthView.reset();
-  mLayeredRP.reset();
+  m_layered_framebuffer.reset();
+  m_color_view.reset();
+  m_depth_view.reset();
+  m_layered_rp.reset();
 }
 
-void SD::View::Resize(VkExtent2D extent) {
+void sd::View::resize(VkExtent2D extent) {
   if (extent.width == 0 || extent.height == 0)
     return;
-  if (mExtent.width == extent.width && mExtent.height == extent.height)
+  if (m_extent.width == extent.width && m_extent.height == extent.height)
     return;
 
-  mExtent = extent;
-  mExtentChanged = true;
+  m_extent = extent;
+  m_extent_changed = true;
 
-  auto& vulkanContext = SD::Application::Get().GetVulkanContext();
-  SD_ALWAYS_ASSERT(vulkanContext.GetVulkanDevice(), "Device must be valid");
-  CheckVulkanRes(vulkanContext.GetVulkanDevice()->waitIdle(),
+  auto& vulkan_context = Application::get().get_vulkan_context();
+  assert(vulkan_context.get_vulkan_device()&& "Device must be valid");
+  check_vulkan_res(vulkan_context.get_vulkan_device()->waitIdle(),
                  "Failed to wait for device during resize");
 
-  CleanupLayeredRender();
-  CreateVulkanResources();
+  cleanup_layered_render();
+  create_vulkan_resources();
 
   float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
-  AspectMode effectiveMode = mAspectMode;
-  if (mAspectMode == AspectMode::BestFit) {
-    effectiveMode = (aspect > 1.0f) ? AspectMode::FixedHeight : AspectMode::FixedWidth;
+  AspectMode effective_mode = m_aspect_mode;
+  if (m_aspect_mode == AspectMode::BEST_FIT) {
+    effective_mode = (aspect > 1.0f) ? AspectMode::FIXED_HEIGHT : AspectMode::FIXED_WIDTH;
   }
 
-  if (effectiveMode == AspectMode::FixedHeight) {
-    mCameraViewProjection = VLA::Matrix4x4f::Ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
+  if (effective_mode == AspectMode::FIXED_HEIGHT) {
+    m_camera_view_projection = VLA::Matrix4x4f::Ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
   } else {
-    float invAspect = 1.0f / aspect;
-    mCameraViewProjection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -invAspect, invAspect, -1.0f, 1.0f);
+    float inv_aspect = 1.0f / aspect;
+    m_camera_view_projection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -inv_aspect, inv_aspect, -1.0f, 1.0f);
   }
 }
 
-SD::Layer* SD::View::GetLayerByStage(u32 stage) {
-  if (stage < mLayersByStage.size()) {
-    return mLayersByStage[stage].get();
+sd::Layer* sd::View::get_layer_by_stage(u32 stage) {
+  if (stage < m_layers_by_stage.size()) {
+    return m_layers_by_stage[stage].get();
   }
   return nullptr;
 }

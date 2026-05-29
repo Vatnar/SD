@@ -19,6 +19,6 @@
 //   - Purpose: Frame overlap for CPU-GPU parallelism
 //   - Trade-offs (higher = more latency, lower = more CPU wait)
 //   - How it affects synchronization
-namespace SD {
+namespace sd {
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 }

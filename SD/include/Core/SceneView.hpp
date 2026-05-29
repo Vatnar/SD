@@ -3,20 +3,20 @@
 #include "Core/View.hpp"
 #include "Core/SDImGuiViewport.hpp"
 
-namespace SD {
+namespace sd {
 
 class SceneView : public View {
 public:
     SceneView(const std::string& name, VulkanContext& ctx);
     virtual ~SceneView() override = default;
 
-    virtual void OnGuiRender() override;
-    void OnRender(vk::CommandBuffer cmd);
+    virtual void on_gui_render() override;
+    void on_render(vk::CommandBuffer cmd) override;
 
-    SDImGuiViewport& GetViewport() { return mViewport; }
+    SDImGuiViewport& get_viewport() { return m_viewport; }
 
 private:
-    SDImGuiViewport mViewport;
+    SDImGuiViewport m_viewport;
 };
 
 } // namespace SD

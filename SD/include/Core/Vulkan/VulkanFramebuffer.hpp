@@ -3,34 +3,34 @@
 #include <vulkan/vulkan.hpp>
 #include "Core/Vulkan/VulkanContext.hpp"
 
-namespace SD {
+namespace sd {
 
 class VulkanFramebuffer {
 public:
     VulkanFramebuffer(VulkanContext& ctx, uint32_t width, uint32_t height);
     ~VulkanFramebuffer();
 
-    void Resize(uint32_t width, uint32_t height);
+    void resize(uint32_t width, uint32_t height);
 
-    vk::Framebuffer GetFramebuffer() const { return *mFramebuffer; }
-    vk::RenderPass GetRenderPass() const { return *mRenderPass; }
-    vk::ImageView GetColorImageView() const { return *mColorImageView; }
-    vk::Extent2D GetExtent() const { return mExtent; }
-
-private:
-    void CreateResources();
-    void DestroyResources();
+    vk::Framebuffer get_framebuffer() const { return *m_framebuffer; }
+    vk::RenderPass get_render_pass() const { return *m_render_pass; }
+    vk::ImageView get_color_image_view() const { return *m_color_image_view; }
+    vk::Extent2D get_extent() const { return m_extent; }
 
 private:
-    VulkanContext& mCtx;
-    vk::Extent2D mExtent;
+    void create_resources();
+    void destroy_resources();
 
-    vk::UniqueImage mColorImage;
-    vk::UniqueDeviceMemory mColorImageMemory;
-    vk::UniqueImageView mColorImageView;
+private:
+    VulkanContext& m_ctx;
+    vk::Extent2D m_extent;
 
-    vk::UniqueRenderPass mRenderPass;
-    vk::UniqueFramebuffer mFramebuffer;
+    vk::UniqueImage m_color_image;
+    vk::UniqueDeviceMemory m_color_image_memory;
+    vk::UniqueImageView m_color_image_view;
+
+    vk::UniqueRenderPass m_render_pass;
+    vk::UniqueFramebuffer m_framebuffer;
 };
 
 } // namespace SD

@@ -10,228 +10,228 @@
 #include "ConfigLoader.hpp"
 #include "game.h"
 
-static void* gameHandle = nullptr;
-static GameAPI gameAPI = {};
-static GameState gameState = {};
-static std::filesystem::file_time_type lastSoWriteTime;
-static int reloadCount = 0;
+static void* g_game_handle = nullptr;
+static GameAPI g_game_api = {};
+static GameState g_game_state = {};
+static std::filesystem::file_time_type g_last_so_write_time;
+static int g_reload_count = 0;
 
-static std::string GetLiveSoName(const std::string& gameSo) {
-  reloadCount++;
-  return "./" + gameSo + "_live_" + std::to_string(reloadCount);
+static std::string get_live_so_name(const std::string& game_so) {
+  g_reload_count++;
+  return "./" + game_so + "_live_" + std::to_string(g_reload_count);
 }
 
 // Wait for file to stop changing (build system finished writing)
-static bool WaitForFileStable(const std::filesystem::path& path,
+static bool wait_for_file_stable(const std::filesystem::path& path,
                               std::chrono::milliseconds timeout = std::chrono::seconds(2),
-                              std::chrono::milliseconds checkInterval = std::chrono::milliseconds(50)) {
+                              std::chrono::milliseconds check_interval = std::chrono::milliseconds(50)) {
   std::error_code ec;
-  auto lastSize = std::filesystem::file_size(path, ec);
+  auto last_size = std::filesystem::file_size(path, ec);
   if (ec) {
-    SD::Log::Engine::Error("File stability check failed (file_size): {}", ec.message());
+    sd::log::engine::error("File stability check failed (file_size): {}", ec.message());
     return false;
   }
-  auto lastTime = std::filesystem::last_write_time(path, ec);
+  auto last_time = std::filesystem::last_write_time(path, ec);
   if (ec) {
-    SD::Log::Engine::Error("File stability check failed (last_write_time): {}", ec.message());
+    sd::log::engine::error("File stability check failed (last_write_time): {}", ec.message());
     return false;
   }
   auto start = std::chrono::steady_clock::now();
 
   while (std::chrono::steady_clock::now() - start < timeout) {
-    std::this_thread::sleep_for(checkInterval);
+    std::this_thread::sleep_for(check_interval);
 
-    auto currentSize = std::filesystem::file_size(path, ec);
+    auto current_size = std::filesystem::file_size(path, ec);
     if (ec) {
-      SD::Log::Engine::Error("File stability check failed (file_size): {}", ec.message());
+      sd::log::engine::error("File stability check failed (file_size): {}", ec.message());
       return false;
     }
-    auto currentTime = std::filesystem::last_write_time(path, ec);
+    auto current_time = std::filesystem::last_write_time(path, ec);
     if (ec) {
-      SD::Log::Engine::Error("File stability check failed (last_write_time): {}", ec.message());
+      sd::log::engine::error("File stability check failed (last_write_time): {}", ec.message());
       return false;
     }
 
-    if (currentSize == lastSize && currentTime == lastTime) {
+    if (current_size == last_size && current_time == last_time) {
       return true;  // File stable
     }
 
-    lastSize = currentSize;
-    lastTime = currentTime;
+    last_size = current_size;
+    last_time = current_time;
   }
 
-  SD::Log::Engine::Warn("File {} still changing after {}ms, skipping reload", path.string(), timeout.count());
+  sd::log::engine::warn("File {} still changing after {}ms, skipping reload", path.string(), timeout.count());
   return false;
 }
 
 // Load new game code while keeping old code mapped
 // Returns true on success, false on failure (old code remains valid)
-static bool LoadGameCodeSafe(const std::string& gameSoPath,
-                             void** outNewHandle, GameAPI* outNewAPI) {
+static bool load_game_code_safe(const std::string& game_so_path,
+                             void** out_new_handle, GameAPI* out_new_api) {
   // Wait for file to be stable (build finished)
-  if (!WaitForFileStable(gameSoPath)) {
+  if (!wait_for_file_stable(game_so_path)) {
     return false;
   }
 
-  std::string gameSoFilename = std::filesystem::path(gameSoPath).filename().string();
-  std::string liveSo = GetLiveSoName(gameSoFilename);
-  std::string tempSo = liveSo + ".tmp";
+  std::string game_so_filename = std::filesystem::path(game_so_path).filename().string();
+  std::string live_so = get_live_so_name(game_so_filename);
+  std::string temp_so = live_so + ".tmp";
 
   // Copy to temp file first (not the watched file)
   std::error_code ec;
-  if (!std::filesystem::copy_file(gameSoPath, tempSo,
+  if (!std::filesystem::copy_file(game_so_path, temp_so,
                                   std::filesystem::copy_options::overwrite_existing, ec)) {
-    SD::Log::Engine::Error("Failed to copy game code: {}", ec.message());
+    sd::log::engine::error("Failed to copy game code: {}", ec.message());
     return false;
   }
 
   // Atomically rename temp to final - this ensures the loader only sees complete file
-  std::filesystem::rename(tempSo, liveSo, ec);
+  std::filesystem::rename(temp_so, live_so, ec);
   if (ec) {
-    SD::Log::Engine::Error("Failed to rename game code: {}", ec.message());
+    sd::log::engine::error("Failed to rename game code: {}", ec.message());
     return false;
   }
 
   // Load new code BEFORE closing old code
-  void* newHandle = dlopen(liveSo.c_str(), RTLD_NOW);
-  if (!newHandle) {
+  void* new_handle = dlopen(live_so.c_str(), RTLD_NOW);
+  if (!new_handle) {
     const char* err = dlerror();
-    SD::Log::Engine::Error("dlopen failed: {}", err ? err : "unknown error");
+    sd::log::engine::error("dlopen failed: {}", err ? err : "unknown error");
     return false;
   }
 
-  auto* getAPI = reinterpret_cast<GetGameAPIFn>(dlsym(newHandle, GAME_GET_API_NAME));
-  if (!getAPI) {
+  auto* get_api = reinterpret_cast<GetGameAPIFn>(dlsym(new_handle, GAME_GET_API_NAME));
+  if (!get_api) {
     const char* err = dlerror();
-    SD::Log::Engine::Error("dlsym GetGameAPI failed: {}", err ? err : "unknown error");
-    dlclose(newHandle);
+    sd::log::engine::error("dlsym GetGameAPI failed: {}", err ? err : "unknown error");
+    dlclose(new_handle);
     return false;
   }
 
-  GameAPI newAPI = getAPI();
-  if (!newAPI.OnLoad) {
-    SD::Log::Engine::Error("Game code missing OnLoad function");
-    dlclose(newHandle);
+  GameAPI new_api = get_api();
+  if (!new_api.on_load) {
+    sd::log::engine::error("Game code missing OnLoad function");
+    dlclose(new_handle);
     return false;
   }
 
-  std::printf("%p\t%p\t%p\n", newAPI.OnUpdate, newAPI.OnLoad, newAPI.OnUnload);
-  SD::Log::Engine::Info("New game code loaded successfully");
+  std::printf("%p\t%p\t%p\n", new_api.on_update, new_api.on_load, new_api.on_unload);
+  sd::log::engine::info("New game code loaded successfully");
 
-  *outNewHandle = newHandle;
-  *outNewAPI = newAPI;
+  *out_new_handle = new_handle;
+  *out_new_api = new_api;
   return true;
 }
 
 int main(int argc, char* argv[]) {
   ConfigLoader config(argc, argv);
-  const auto& cfg = config.GetConfig();
+  const auto& cfg = config.get_config();
 
-  SD::Log::Init();
-  SD::Log::Engine::Info("HotReloadApp starting");
-  SD::Log::Engine::Info("  game-so-path: {}", cfg.gameSoPath);
-  SD::Log::Engine::Info("  build-dir: {}", cfg.buildDir);
-  SD::Log::Engine::Info("  app-name: {}", cfg.appName);
-  SD::Log::Engine::Info("  window: {}x{}", cfg.windowWidth, cfg.windowHeight);
+  sd::log::init();
+  sd::log::engine::info("HotReloadApp starting");
+  sd::log::engine::info("  game-so-path: {}", cfg.game_so_path);
+  sd::log::engine::info("  build-dir: {}", cfg.build_dir);
+  sd::log::engine::info("  app-name: {}", cfg.app_name);
+  sd::log::engine::info("  window: {}x{}", cfg.window_width, cfg.window_height);
 
   // Initial load (old style - no fallback possible)
   {
-    std::string gameSoFilename = std::filesystem::path(cfg.gameSoPath).filename().string();
-    std::string liveSo = GetLiveSoName(gameSoFilename);
-    std::string tempSo = liveSo + ".tmp";
+    std::string game_so_filename = std::filesystem::path(cfg.game_so_path).filename().string();
+    std::string live_so = get_live_so_name(game_so_filename);
+    std::string temp_so = live_so + ".tmp";
 
     std::error_code ec;
-    if (!std::filesystem::copy_file(cfg.gameSoPath, tempSo,
+    if (!std::filesystem::copy_file(cfg.game_so_path, temp_so,
                                     std::filesystem::copy_options::overwrite_existing, ec)) {
-      SD::Abort("Failed to copy game code: " + ec.message());
+      sd::engine_abort("Failed to copy game code: " + ec.message());
     }
-    std::filesystem::rename(tempSo, liveSo, ec);
+    std::filesystem::rename(temp_so, live_so, ec);
     if (ec) {
-      SD::Abort("Failed to rename game code: " + ec.message());
+      sd::engine_abort("Failed to rename game code: " + ec.message());
     }
 
-    gameHandle = dlopen(liveSo.c_str(), RTLD_NOW);
-    if (!gameHandle) {
-      SD::Log::Engine::Error("Failed to load game code: {}", dlerror());
+    g_game_handle = dlopen(live_so.c_str(), RTLD_NOW);
+    if (!g_game_handle) {
+      sd::log::engine::error("Failed to load game code: {}", dlerror());
       return 1;
     }
 
-    auto* getAPI = reinterpret_cast<GetGameAPIFn>(dlsym(gameHandle, GAME_GET_API_NAME));
-    if (!getAPI) {
-      SD::Log::Engine::Error("Failed to get game API: {}", dlerror());
+    auto* get_api = reinterpret_cast<GetGameAPIFn>(dlsym(g_game_handle, GAME_GET_API_NAME));
+    if (!get_api) {
+      sd::log::engine::error("Failed to get game API: {}", dlerror());
       return 1;
     }
 
-    gameAPI = getAPI();
+    g_game_api = get_api();
   }
 
-  lastSoWriteTime = std::filesystem::last_write_time(cfg.gameSoPath);
+  g_last_so_write_time = std::filesystem::last_write_time(cfg.game_so_path);
 
-  SD::Application app({cfg.appName.c_str(), cfg.windowWidth, cfg.windowHeight});
+  sd::Application app({cfg.app_name.c_str(), cfg.window_width, cfg.window_height});
 
   // Initial load
-  gameAPI.OnLoad(reinterpret_cast<SD_Application*>(&app), &gameState);
+  g_game_api.on_load(reinterpret_cast<SD_Application*>(&app), &g_game_state);
 
   // Run loop - check for .so changes
-  while (app.IsRunning()) {
+  while (app.is_running()) {
     // Check for reload (when user clicks Build in CLion)
-    if (std::filesystem::exists(cfg.gameSoPath)) {
-      auto currentTime = std::filesystem::last_write_time(cfg.gameSoPath);
-      if (currentTime > lastSoWriteTime) {
-        lastSoWriteTime = currentTime;
+    if (std::filesystem::exists(cfg.game_so_path)) {
+      auto current_time = std::filesystem::last_write_time(cfg.game_so_path);
+      if (current_time > g_last_so_write_time) {
+        g_last_so_write_time = current_time;
 
-        SD::Log::Engine::Info("Detected change, reloading game code...");
+        sd::log::engine::info("Detected change, reloading game code...");
 
         // Load NEW code first (while old code is still mapped)
-        void* newHandle = nullptr;
-        GameAPI newAPI = {};
-        if (!LoadGameCodeSafe(cfg.gameSoPath, &newHandle, &newAPI)) {
-          SD::Log::Engine::Error("Failed to load new game code - keeping old code running");
+        void* new_handle = nullptr;
+        GameAPI new_api = {};
+        if (!load_game_code_safe(cfg.game_so_path, &new_handle, &new_api)) {
+          sd::log::engine::error("Failed to load new game code - keeping old code running");
           continue;  // Don't reload, keep using current code
         }
 
         // New code loaded successfully - now safe to unload old
-        SD::Log::Engine::Info("Unloading old game code...");
+        sd::log::engine::info("Unloading old game code...");
 
         // Unload old code
-        if (gameAPI.OnUnload) {
-          gameAPI.OnUnload(reinterpret_cast<SD_Application*>(&app), &gameState);
+        if (g_game_api.on_unload) {
+          g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app), &g_game_state);
         }
 
         // CRITICAL: Wait for GPU to finish all work before destroying layers
         // This prevents use-after-free of Vulkan resources
-        (void)app.GetVulkanContext().GetVulkanDevice()->waitIdle();
+        (void)app.get_vulkan_context().get_vulkan_device()->waitIdle();
 
         // Clear engine state before loading new code
-        app.ClearGameLayers();
+        app.clear_game_layers();
 
         // Close old handle after layers are destroyed
-        if (gameHandle) {
-          dlclose(gameHandle);
+        if (g_game_handle) {
+          dlclose(g_game_handle);
         }
 
         // Switch to new code
-        gameHandle = newHandle;
-        gameAPI = newAPI;
+        g_game_handle = new_handle;
+        g_game_api = new_api;
 
         // Load new code with existing state
-        gameAPI.OnLoad(reinterpret_cast<SD_Application*>(&app), &gameState);
+        g_game_api.on_load(reinterpret_cast<SD_Application*>(&app), &g_game_state);
 
-        SD::Log::Engine::Info("Game code reload completed successfully");
+        sd::log::engine::info("Game code reload completed successfully");
       }
     }
 
     // Frame
-    app.Frame();
+    app.frame();
   }
 
   // Cleanup
-  if (gameAPI.OnUnload) {
-    gameAPI.OnUnload(reinterpret_cast<SD_Application*>(&app), &gameState);
+  if (g_game_api.on_unload) {
+    g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app), &g_game_state);
   }
 
-  if (gameHandle) {
-    dlclose(gameHandle);
+  if (g_game_handle) {
+    dlclose(g_game_handle);
   }
 
   return 0;

@@ -1,154 +1,153 @@
 #include "ConfigLoader.hpp"
 
-#include <cstdlib>
 #include <cstring>
 #include <toml++/toml.hpp>
 
 #include "Core/Logging.hpp"
 
 ConfigLoader::ConfigLoader(int argc, char* argv[]) {
-  LoadDefaults();
+  load_defaults();
 
-  mEngineDir = std::filesystem::path(SD_ENGINE_DIR);
-  LoadEngineConfig(mEngineDir);
+  m_engine_dir = std::filesystem::path(SD_ENGINE_DIR);
+  load_engine_config(m_engine_dir);
 
-  LoadCwdConfig();
-  LoadEnvConfig();
+  load_cwd_config();
+  load_env_config();
   if (argc > 0) {
-    LoadCliConfig(argc, argv);
+    load_cli_config(argc, argv);
   }
 
-  ResolvePaths();
+  resolve_paths();
 }
 
-void ConfigLoader::LoadDefaults() {
-  mConfig.buildDir = "../build";
-  mConfig.gameSoPath = "libSandboxApp.so";
-  mConfig.appName = "Sandbox";
-  mConfig.windowWidth = 1280;
-  mConfig.windowHeight = 720;
-  mConfig.pollInterval = 0.5f;
+void ConfigLoader::load_defaults() {
+  m_config.build_dir = "../build";
+  m_config.game_so_path = "libSandboxApp.so";
+  m_config.app_name = "Sandbox";
+  m_config.window_width = 1280;
+  m_config.window_height = 720;
+  m_config.poll_interval = 0.5f;
 }
 
-void ConfigLoader::LoadEngineConfig(const std::filesystem::path& engineDir) {
-  auto engineConfigPath = engineDir / "config" / "engine.toml";
-  if (std::filesystem::exists(engineConfigPath)) {
-    auto config = toml::parse_file(engineConfigPath.string());
+void ConfigLoader::load_engine_config(const std::filesystem::path& engineDir) {
+  auto engine_config_path = engineDir / "config" / "engine.toml";
+  if (std::filesystem::exists(engine_config_path)) {
+    auto config = toml::parse_file(engine_config_path.string());
     if (!config) {
-      SD::Log::Engine::Error("Failed to parse engine config: {}", config.error().description());
+      sd::log::engine::error("Failed to parse engine config: {}", config.error().description());
       return;
     }
 
-    auto& engineTable = config.table();
-    if (auto* engine = engineTable["engine"].as_table()) {
-      if (auto* buildDir = engine->get("build-dir")) {
-        mConfig.buildDir = buildDir->value<std::string>().value_or(mConfig.buildDir);
+    auto& engine_table = config.table();
+    if (auto* engine = engine_table["engine"].as_table()) {
+      if (auto* build_dir = engine->get("build-dir")) {
+        m_config.build_dir = build_dir->value<std::string>().value_or(m_config.build_dir);
       }
-      if (auto* windowWidth = engine->get("window-width")) {
-        mConfig.windowWidth = windowWidth->value<int>().value_or(mConfig.windowWidth);
+      if (auto* window_width = engine->get("window-width")) {
+        m_config.window_width = window_width->value<int>().value_or(m_config.window_width);
       }
-      if (auto* windowHeight = engine->get("window-height")) {
-        mConfig.windowHeight = windowHeight->value<int>().value_or(mConfig.windowHeight);
+      if (auto* window_height = engine->get("window-height")) {
+        m_config.window_height = window_height->value<int>().value_or(m_config.window_height);
       }
-      if (auto* pollInterval = engine->get("poll-interval")) {
-        mConfig.pollInterval = pollInterval->value<float>().value_or(mConfig.pollInterval);
+      if (auto* poll_interval = engine->get("poll-interval")) {
+        m_config.poll_interval = poll_interval->value<float>().value_or(m_config.poll_interval);
       }
     }
 
-    SD::Log::Engine::Info("Loaded engine config from {}", engineConfigPath.string());
+    sd::log::engine::info("Loaded engine config from {}", engine_config_path.string());
   }
 }
 
-void ConfigLoader::LoadCwdConfig() {
-  auto cwdConfigPath = std::filesystem::current_path() / "hotreload.toml";
-  if (std::filesystem::exists(cwdConfigPath)) {
-    OverrideFromFile(cwdConfigPath);
+void ConfigLoader::load_cwd_config() {
+  auto cwd_config_path = std::filesystem::current_path() / "hotreload.toml";
+  if (std::filesystem::exists(cwd_config_path)) {
+    override_from_file(cwd_config_path);
   }
 }
 
-void ConfigLoader::OverrideFromFile(const std::filesystem::path& path) {
+void ConfigLoader::override_from_file(const std::filesystem::path& path) {
   auto config = toml::parse_file(path.string());
   if (!config) {
-    SD::Log::Engine::Error("Failed to parse config {}: {}", path.string(),
+    sd::log::engine::error("Failed to parse config {}: {}", path.string(),
                            config.error().description());
     return;
   }
 
-  auto& hotreloadTable = config.table();
-  if (auto* hotreload = hotreloadTable["hotreload"].as_table()) {
-    if (auto* gameSoPath = hotreload->get("game-so-path")) {
-      mConfig.gameSoPath = gameSoPath->value<std::string>().value_or(mConfig.gameSoPath);
+  auto& hotreload_table = config.table();
+  if (auto* hotreload = hotreload_table["hotreload"].as_table()) {
+    if (auto* game_so_path = hotreload->get("game-so-path")) {
+      m_config.game_so_path = game_so_path->value<std::string>().value_or(m_config.game_so_path);
     }
-    if (auto* appName = hotreload->get("app-name")) {
-      mConfig.appName = appName->value<std::string>().value_or(mConfig.appName);
+    if (auto* app_name = hotreload->get("app-name")) {
+      m_config.app_name = app_name->value<std::string>().value_or(m_config.app_name);
     }
-    if (auto* windowWidth = hotreload->get("window-width")) {
-      mConfig.windowWidth = windowWidth->value<int>().value_or(mConfig.windowWidth);
+    if (auto* window_width = hotreload->get("window-width")) {
+      m_config.window_width = window_width->value<int>().value_or(m_config.window_width);
     }
-    if (auto* windowHeight = hotreload->get("window-height")) {
-      mConfig.windowHeight = windowHeight->value<int>().value_or(mConfig.windowHeight);
+    if (auto* window_height = hotreload->get("window-height")) {
+      m_config.window_height = window_height->value<int>().value_or(m_config.window_height);
     }
-    if (auto* buildDir = hotreload->get("build-dir")) {
-      mConfig.buildDir = buildDir->value<std::string>().value_or(mConfig.buildDir);
+    if (auto* build_dir = hotreload->get("build-dir")) {
+      m_config.build_dir = build_dir->value<std::string>().value_or(m_config.build_dir);
     }
   }
 
-  SD::Log::Engine::Info("Loaded config from {}", path.string());
+  sd::log::engine::info("Loaded config from {}", path.string());
 }
 
-void ConfigLoader::LoadEnvConfig() {
+void ConfigLoader::load_env_config() {
   if (const char* env = std::getenv("SD_GAME_SO_PATH")) {
-    mConfig.gameSoPath = env;
+    m_config.game_so_path = env;
   }
   if (const char* env = std::getenv("SD_APP_NAME")) {
-    mConfig.appName = env;
+    m_config.app_name = env;
   }
   if (const char* env = std::getenv("SD_BUILD_DIR")) {
-    mConfig.buildDir = env;
+    m_config.build_dir = env;
   }
   if (const char* env = std::getenv("SD_WINDOW_WIDTH")) {
-    mConfig.windowWidth = std::atoi(env);
+    m_config.window_width = std::atoi(env);
   }
   if (const char* env = std::getenv("SD_WINDOW_HEIGHT")) {
-    mConfig.windowHeight = std::atoi(env);
+    m_config.window_height = std::atoi(env);
   }
 }
 
-void ConfigLoader::LoadCliConfig(int argc, char** argv) {
-  OverrideFromCli(argc, argv);
+void ConfigLoader::load_cli_config(int argc, char** argv) {
+  override_from_cli(argc, argv);
 }
 
-void ConfigLoader::OverrideFromCli(int argc, char** argv) {
+void ConfigLoader::override_from_cli(int argc, char** argv) {
   if (argc == 0)
     return;
 
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--game-so-path") == 0 && i + 1 < argc) {
-      mConfig.gameSoPath = argv[++i];
+      m_config.game_so_path = argv[++i];
     } else if (strcmp(argv[i], "--build-dir") == 0 && i + 1 < argc) {
-      mConfig.buildDir = argv[++i];
+      m_config.build_dir = argv[++i];
     } else if (strcmp(argv[i], "--app-name") == 0 && i + 1 < argc) {
-      mConfig.appName = argv[++i];
+      m_config.app_name = argv[++i];
     } else if (strcmp(argv[i], "--window-width") == 0 && i + 1 < argc) {
-      mConfig.windowWidth = std::atoi(argv[++i]);
+      m_config.window_width = std::atoi(argv[++i]);
     } else if (strcmp(argv[i], "--window-height") == 0 && i + 1 < argc) {
-      mConfig.windowHeight = std::atoi(argv[++i]);
+      m_config.window_height = std::atoi(argv[++i]);
     }
   }
 }
 
-void ConfigLoader::ResolvePaths() {
+void ConfigLoader::resolve_paths() {
   std::filesystem::path cwd = std::filesystem::current_path();
-  std::filesystem::path gameSoPath = std::filesystem::path(mConfig.gameSoPath);
+  std::filesystem::path game_so_path = std::filesystem::path(m_config.game_so_path);
 
-  if (gameSoPath.is_absolute()) {
-    mConfig.gameSoPath = gameSoPath.lexically_normal().string();
+  if (game_so_path.is_absolute()) {
+    m_config.game_so_path = game_so_path.lexically_normal().string();
   } else {
-    if (gameSoPath == std::filesystem::path(".")) {
-      gameSoPath = std::filesystem::path("");
+    if (game_so_path == std::filesystem::path(".")) {
+      game_so_path = std::filesystem::path("");
     }
-    mConfig.gameSoPath = (cwd / gameSoPath).lexically_normal().string();
+    m_config.game_so_path = (cwd / game_so_path).lexically_normal().string();
   }
 
-  SD::Log::Engine::Info("Resolved game-so path: {}", mConfig.gameSoPath);
+  sd::log::engine::info("Resolved game-so path: {}", m_config.game_so_path);
 }

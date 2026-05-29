@@ -7,7 +7,7 @@
 #include "ECS/CommandQueue.hpp"
 #include "ECS/EntityManager.hpp"
 
-namespace SD {
+namespace sd {
 // TODO(docs): Document Scene class
 //   - Purpose: Container for entities and scene-level systems
 //   - Ownership of EntityManager
@@ -16,34 +16,34 @@ namespace SD {
 //   - Example: Creating and populating a scene
 class Scene {
 public:
-  explicit Scene(std::string name = "Untitled Scene") : mName(std::move(name)) {}
+  explicit Scene(std::string name = "Untitled Scene") : m_name(std::move(name)) {}
 
-  void OnStart() { mActive = true; }
-  void OnStop() { mActive = false; }
-  void OnUpdate(float dt) { (void)dt; /* future: scene-level systems */ }
+  void on_start() { m_is_active = true; }
+  void on_stop() { m_is_active = false; }
+  void on_update(float dt) { (void)dt; /* future: scene-level systems */ }
 
-  [[nodiscard]] bool IsActive() const { return mActive; }
-  [[nodiscard]] const std::string& GetName() const { return mName; }
+  [[nodiscard]] bool is_active() const { return m_is_active; }
+  [[nodiscard]] const std::string& get_name() const { return m_name; }
 
   template<typename T, typename... Args>
-  void AddCommand(Args&&... args) {
-    mCommands.Add<T>(std::forward<Args>(args)...);
+  void add_command(Args&&... args) {
+    m_commands.add<T>(std::forward<Args>(args)...);
   }
 
-  void ApplyCommands() {
-    mCommands.Apply(em);
-    mCommands.Clear();
+  void apply_commands() {
+    m_commands.apply(em);
+    m_commands.clear();
   }
-  [[nodiscard]] usize CommandCount() const;
+  [[nodiscard]] usize command_count() const;
 
   EntityManager em;
 
 private:
-  CommandQueue mCommands;
-  std::string mName;
-  bool mActive = false;
+  CommandQueue m_commands;
+  std::string m_name;
+  bool m_is_active = false;
 };
-inline usize Scene::CommandCount() const {
-  return mCommands.GetCount();
+inline usize Scene::command_count() const {
+  return m_commands.get_count();
 }
 } // namespace SD

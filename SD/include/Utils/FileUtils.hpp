@@ -6,13 +6,13 @@
 
 #include "Core/types.hpp"
 
-namespace SD {
+namespace sd {
 
 enum class FileError {
-  none,
-  error,
-  file_too_large,
-  already_exists,
+  NONE,
+  ERROR,
+  FILE_TOO_LARGE,
+  ALREADY_EXISTS,
 };
 
 /**
@@ -20,22 +20,22 @@ enum class FileError {
  * @param filename
  * @return array of chars
  */
-inline std::expected<std::vector<char>, FileError> readFile(const std::string& filename) {
+inline std::expected<std::vector<char>, FileError> read_file(const std::string& filename) {
   std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
   if (!file.is_open()) {
-    return std::unexpected(FileError::error);
+    return std::unexpected(FileError::ERROR);
   }
 
-  const usize fileSize = file.tellg();
-  std::vector<char> buffer(fileSize);
+  const usize file_size = file.tellg();
+  std::vector<char> buffer(file_size);
 
   file.seekg(0);
-  file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
+  file.read(buffer.data(), static_cast<std::streamsize>(file_size));
   file.close();
 
   if (!file) {
-    return std::unexpected(FileError::error);
+    return std::unexpected(FileError::ERROR);
   }
 
   return buffer;
@@ -43,51 +43,51 @@ inline std::expected<std::vector<char>, FileError> readFile(const std::string& f
 
 namespace Filesystem {
 /**
- * Overwrites given buffer with read binary data
+ * Overwrites a given buffer with read binary data
  * @param path
  * @param buffer * @return
  */
-inline FileError ReadBinary(const std::filesystem::path& path, std::vector<std::byte>& buffer) {
+inline FileError read_binary(const std::filesystem::path& path, std::vector<std::byte>& buffer) {
   std::error_code ec;
-  const auto fileSize = std::filesystem::file_size(path, ec);
+  const auto file_size = std::filesystem::file_size(path, ec);
   if (ec) {
     // TODO: handle errors
-    SD::Abort(ec.category().name());
-    return FileError::error;
+    engine_abort(ec.category().name());
+    return FileError::ERROR;
   }
-  if (fileSize == std::numeric_limits<std::uintmax_t>::max()) {
+  if (file_size == std::numeric_limits<std::uintmax_t>::max()) {
     // fails to read something
-    return FileError::error;
+    return FileError::ERROR;
   }
 
-  if (fileSize > std::numeric_limits<std::size_t>::max()) {
-    return FileError::file_too_large;
+  if (file_size > std::numeric_limits<std::size_t>::max()) {
+    return FileError::FILE_TOO_LARGE;
   }
 
   buffer.clear();
-  buffer.resize(fileSize);
+  buffer.resize(file_size);
 
   std::ifstream file(path, std::ios::binary);
   if (!file)
-    return FileError::error;
+    return FileError::ERROR;
 
-  file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(fileSize));
-  if (!file || file.gcount() != static_cast<std::streamsize>(fileSize)) {
-    return FileError::error;
+  file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(file_size));
+  if (!file || file.gcount() != static_cast<std::streamsize>(file_size)) {
+    return FileError::ERROR;
   }
-  return FileError::none;
+  return FileError::NONE;
 }
-inline FileError WriteBinary(const std::filesystem::path& path, const std::vector<std::byte>& data,
-                             bool overwriteExisting = false) {
+inline FileError write_binary(const std::filesystem::path& path, const std::vector<std::byte>& data,
+                             bool overwrite_existing = false) {
   if (std::filesystem::exists(path)) {
-    if (!overwriteExisting)
-      return FileError::already_exists;
+    if (!overwrite_existing)
+      return FileError::ALREADY_EXISTS;
   }
   // truncates by default
   std::ofstream file(path, std::ios::out | std::ios::binary);
   file.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
   // todo: handle error
-  return FileError::none;
+  return FileError::NONE;
 }
 } // namespace Filesystem
 

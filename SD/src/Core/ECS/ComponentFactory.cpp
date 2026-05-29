@@ -1,23 +1,23 @@
 #include "Core/ECS/ComponentFactory.hpp"
 
-namespace SD {
+namespace sd {
 
-void ComponentFactory::Register(u32 componentId, PoolCreatorFunc creator) {
-  if (componentId >= creators.size()) {
-    creators.resize(componentId + 1);
+void ComponentFactory::register_component(u32 component_id, PoolCreatorFn creator) {
+  if (component_id >= m_creators.size()) {
+    m_creators.resize(component_id + 1);
   }
-  creators[componentId] = std::move(creator);
+  m_creators[component_id] = std::move(creator);
 }
 
-std::unique_ptr<SparseEntitySetBase> ComponentFactory::Create(u32 componentId) {
-  if (componentId < creators.size() && creators[componentId]) {
-    return creators[componentId]();
+std::unique_ptr<SparseEntitySetBase> ComponentFactory::create(u32 component_id) {
+  if (component_id < m_creators.size() && m_creators[component_id]) {
+    return m_creators[component_id]();
   }
   return nullptr;
 }
 
-bool ComponentFactory::IsRegistered(u32 componentId) {
-  return componentId < creators.size() && creators[componentId] != nullptr;
+bool ComponentFactory::is_registered(u32 component_id) {
+  return component_id < m_creators.size() && m_creators[component_id] != nullptr;
 }
 
 } // namespace SD

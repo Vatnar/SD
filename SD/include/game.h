@@ -11,8 +11,8 @@ typedef struct SD_RuntimeStateManager SD_RuntimeStateManager;
 
 // Game state - allocated by platform, filled by game
 typedef struct GameState {
-    SD_Scene* sharedScene;
-    SD_Scene* anotherScene;
+    SD_Scene* shared_scene;
+    SD_Scene* another_scene;
     int version;  // For testing reloads
 } GameState;
 
@@ -23,9 +23,9 @@ typedef void (*Game_OnUnloadFn)(SD_Application* app, GameState* state);
 
 // The game API - function pointers we reload
 typedef struct GameAPI {
-    Game_OnLoadFn OnLoad;
-    Game_OnUpdateFn OnUpdate;
-    Game_OnUnloadFn OnUnload;
+    Game_OnLoadFn on_load;
+    Game_OnUpdateFn on_update;
+    Game_OnUnloadFn on_unload;
 } GameAPI;
 
 // The single exported function from the game DLL

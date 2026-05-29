@@ -5,27 +5,27 @@
 #include <memory>
 #include "Core/Vulkan/VulkanFramebuffer.hpp"
 
-namespace SD {
+namespace sd {
 
 class SDImGuiViewport {
 public:
     SDImGuiViewport(VulkanContext& ctx, const std::string& name, uint32_t width = 1280, uint32_t height = 720);
     ~SDImGuiViewport();
 
-    void Begin();
-    void End();
+    void begin();
+    void end();
 
-    VulkanFramebuffer& GetFramebuffer() { return *mFramebuffer; }
-    const std::string& GetName() const { return mName; }
+    VulkanFramebuffer& get_framebuffer() { return *m_framebuffer; }
+    const std::string& get_name() const { return m_name; }
     
-    ImTextureID GetImGuiTextureID() const { return reinterpret_cast<ImTextureID>(mTextureID); }
+    ImTextureID get_im_gui_texture_id() const { return reinterpret_cast<ImTextureID>(m_texture_id); }
 
 private:
-    std::string mName;
-    std::unique_ptr<VulkanFramebuffer> mFramebuffer;
-    vk::UniqueSampler mSampler;
-    VkDescriptorSet mTextureID = VK_NULL_HANDLE;
-    VulkanContext& mCtx;
+    std::string m_name;
+    std::unique_ptr<VulkanFramebuffer> m_framebuffer;
+    vk::UniqueSampler m_sampler;
+    VkDescriptorSet m_texture_id = VK_NULL_HANDLE;
+    VulkanContext& m_ctx;
 };
 
 } // namespace SD

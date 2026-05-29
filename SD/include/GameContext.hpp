@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace SD {
+namespace sd {
 
 class Application;
 class Scene;
@@ -21,11 +21,11 @@ class GameContext {
 public:
     virtual ~GameContext() = default;
 
-    virtual void OnLoad(Application& app) = 0;
-    virtual void OnUpdate(float dt) = 0;
-    virtual void OnUnload() = 0;
+    virtual void on_load(Application& app) = 0;
+    virtual void on_update(float dt) = 0;
+    virtual void on_unload() = 0;
 
-    virtual std::vector<Scene*> GetScenes() = 0;
+    virtual std::vector<Scene*> get_scenes() = 0;
 };
 
 } // namespace SD

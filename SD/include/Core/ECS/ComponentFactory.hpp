@@ -7,29 +7,29 @@
 #include "Core/types.hpp"
 #include "SparseEntitySet.hpp"
 
-namespace SD {
+namespace sd {
 
 class ComponentFactory {
 public:
-  using PoolCreatorFunc = std::function<std::unique_ptr<SparseEntitySetBase>()>;
+  using PoolCreatorFn = std::function<std::unique_ptr<SparseEntitySetBase>()>;
 
-  static void Register(u32 componentId, PoolCreatorFunc creator);
-  static std::unique_ptr<SparseEntitySetBase> Create(u32 componentId);
-  static bool IsRegistered(u32 componentId);
+  static void register_component(u32 component_id, PoolCreatorFn creator);
+  static std::unique_ptr<SparseEntitySetBase> create(u32 component_id);
+  static bool is_registered(u32 component_id);
 
 private:
-  static inline std::vector<PoolCreatorFunc> creators;
+  static inline std::vector<PoolCreatorFn> m_creators;
 };
 
 #define REGISTER_SERIALIZABLE_COMPONENT(T)                                 \
-  namespace {                                                                \
-    struct T##PoolRegistrar {                                               \
-      T##PoolRegistrar() {                                                  \
-        SD::ComponentFactory::Register(SD::ComponentTraits<T>::Id,        \
-          [] { return std::make_unique<SD::SparseEntitySet<T>>(); });       \
-      }                                                                     \
-    };                                                                      \
-    static T##PoolRegistrar T##poolRegistrar;                               \
+  namespace {                                                              \
+    struct T## PoolRegistrar {                                             \
+      T## PoolRegistrar() {                                                \
+        ComponentFactory::register_component(ComponentTraits<T>::id,       \
+          [] { return std::make_unique<SparseEntitySet<(T)>>(); });        \
+      }                                                                    \
+    };                                                                     \
+    static T## PoolRegistrar T## s_pool_registrar;                         \
   }
 
-} // namespace SD
+} // namespace sd

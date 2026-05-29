@@ -3,32 +3,32 @@
 #include "Application.hpp"
 #include "Core/Logging.hpp"
 
-namespace SD {
+namespace sd {
 
 RuntimeStateManager::RuntimeStateManager() = default;
 RuntimeStateManager::~RuntimeStateManager() = default;
 
 // TODO: this doesnt make sense since game doesnt own state
-void RuntimeStateManager::Serialize() {
-  if (!mApp)
+void RuntimeStateManager::serialize() {
+  if (!m_app)
     return;
-  SD::Log::Engine::Debug("RuntimeStateManager::Serialize() called (state persists externally)");
+  log::engine::debug("RuntimeStateManager::Serialize() called (state persists externally)");
 }
 
-void RuntimeStateManager::Restore(Application* app) {
+void RuntimeStateManager::restore(Application* app) {
   // Game state is externally owned and auto-persists across hot reloads.
   // Engine state does not need restoration here.
-  mApp = app;
+  m_app = app;
   if (!app)
     return;
-  SD::Log::Engine::Debug("RuntimeStateManager::Restore() called (state persists externally)");
+ log::engine::debug("RuntimeStateManager::Restore() called (state persists externally)");
 }
 
-void RuntimeStateManager::SetApplication(Application* app) {
-  mApp = app;
+void RuntimeStateManager::set_application(Application* app) {
+  m_app = app;
 }
 
-bool RuntimeStateManager::HasState() const {
+bool RuntimeStateManager::has_state() const {
   // mSerializedScenes is unused — state is externally owned.
   return false;
 }

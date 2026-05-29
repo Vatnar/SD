@@ -4,33 +4,33 @@
 #include <string>
 
 struct HotReloadConfig {
-    std::string buildDir = "../build";
-    std::string gameSoPath = "libSandboxApp.so";
-    std::string appName = "Sandbox";
-    int windowWidth = 1280;
-    int windowHeight = 720;
-    float pollInterval = 0.5f;
+    std::string build_dir = "../build";
+    std::string game_so_path = "libSandboxApp.so";
+    std::string app_name = "Sandbox";
+    int window_width = 1280;
+    int window_height = 720;
+    float poll_interval = 0.5f;
 };
 
 class ConfigLoader {
 public:
     ConfigLoader(int argc = 0, char** argv = nullptr);
 
-    const HotReloadConfig& GetConfig() const { return mConfig; }
+    const HotReloadConfig& get_config() const { return m_config; }
 
 private:
-    void LoadDefaults();
-    void LoadEngineConfig(const std::filesystem::path& engineDir);
-    void LoadCwdConfig();
-    void LoadEnvConfig();
-    void LoadCliConfig(int argc, char** argv);
+    void load_defaults();
+    void load_engine_config(const std::filesystem::path& engineDir);
+    void load_cwd_config();
+    void load_env_config();
+    void load_cli_config(int argc, char** argv);
 
-    void OverrideFromFile(const std::filesystem::path& path);
-    void OverrideFromEnv();
-    void OverrideFromCli(int argc, char** argv);
+    void override_from_file(const std::filesystem::path& path);
+    void override_from_env();
+    void override_from_cli(int argc, char** argv);
     
-    void ResolvePaths();
+    void resolve_paths();
 
-    HotReloadConfig mConfig;
-    std::filesystem::path mEngineDir;
+    HotReloadConfig m_config;
+    std::filesystem::path m_engine_dir;
 };

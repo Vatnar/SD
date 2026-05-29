@@ -13,7 +13,7 @@
 #include "types.hpp"
 
 
-namespace SD {
+namespace sd {
 class View;
 class Layer;
 template<typename T> concept IsLayer = std::is_base_of_v<Layer, T>;
@@ -30,37 +30,37 @@ public:
   virtual ~Layer() = default;
 
   explicit Layer(const std::string& name = "Layer", Scene* scene = nullptr) :
-    mDebugName(name), mScene(scene), mStageId(0), mViewId{} {}
+    m_debug_name(name), m_scene(scene), m_stage_id(0), m_view_id{} {}
 
-  virtual void OnAttach() {}
-  virtual void OnDetach() {}
+  virtual void on_attach() {}
+  virtual void on_detach() {}
 
-  virtual void OnActivate() {}
-  virtual void OnDeactivate() {}
+  virtual void on_activate() {}
+  virtual void on_deactivate() {}
 
-  virtual void OnSwapchainRecreated() {}
+  virtual void on_swapchain_recreated() {}
 
-  const std::string& GetName() const { return mDebugName; }
+  const std::string& get_name() const { return m_debug_name; }
 
-  void SetScene(Scene* scene) { mScene = scene; }
-  [[nodiscard]] Scene* GetScene() const { return mScene; }
+  void set_scene(Scene* scene) { m_scene = scene; }
+  [[nodiscard]] Scene* get_scene() const { return m_scene; }
 
-  virtual void OnEvent(Event&) {}
-  virtual void OnFixedUpdate([[maybe_unused]] double fixedDelta) {}
-  virtual void OnUpdate([[maybe_unused]] float dt) { (void)dt; }
-  virtual void OnRender([[maybe_unused]] vk::CommandBuffer cmd) {}
-  virtual void OnGuiRender() {}
-  virtual void OnImGuiMenuBar() {}
+  virtual void on_event(Event&) {}
+  virtual void on_fixed_update([[maybe_unused]] double fixedDelta) {}
+  virtual void on_update([[maybe_unused]] float dt) { (void)dt; }
+  virtual void on_render([[maybe_unused]] vk::CommandBuffer cmd) {}
+  virtual void on_gui_render() {}
+  virtual void on_im_gui_menu_bar() {}
 
-  [[nodiscard]] bool IsActive() const noexcept { return mActive; }
+  [[nodiscard]] bool is_active() const noexcept { return m_is_active; }
 
 protected:
-  bool mActive = true;
-  std::string mDebugName;
-  Scene* mScene = nullptr;
-  int mStageId;
-  ViewId mViewId;
-  View* mView = nullptr;
+  bool m_is_active = true;
+  std::string m_debug_name;
+  Scene* m_scene = nullptr;
+  int m_stage_id;
+  ViewId m_view_id;
+  View* m_view = nullptr;
 
   friend class View;
 };
@@ -78,10 +78,10 @@ public:
   // OnEvent, OnUpdate, OnFixedUpdate, OnAttach, OnDetach
 
   // --- Sealed (not for Systems) ---
-  void OnRender(vk::CommandBuffer) final {}
-  void OnGuiRender() final {}
-  void OnImGuiMenuBar() final {}
-  void OnSwapchainRecreated() final {}
+  void on_render(vk::CommandBuffer) final {}
+  void on_gui_render() final {}
+  void on_im_gui_menu_bar() final {}
+  void on_swapchain_recreated() final {}
 };
 
 /// GPU command recording layer: bound to a View + render stage. No logic or UI.
@@ -93,10 +93,10 @@ public:
   // OnRender, OnSwapchainRecreated, OnAttach, OnDetach
 
   // --- Sealed (not for RenderStages) ---
-  void OnUpdate(float) final {}
-  void OnFixedUpdate(double) final {}
-  void OnGuiRender() final {}
-  void OnImGuiMenuBar() final {}
+  void on_update(float) final {}
+  void on_fixed_update(double) final {}
+  void on_gui_render() final {}
+  void on_im_gui_menu_bar() final {}
 };
 
 /// ImGui UI layer: panels, inspectors, debug tools. No GPU rendering.
@@ -108,8 +108,8 @@ public:
   // OnGuiRender, OnImGuiMenuBar, OnUpdate, OnEvent, OnAttach, OnDetach
 
   // --- Sealed (not for Panels) ---
-  void OnRender(vk::CommandBuffer) final {}
-  void OnSwapchainRecreated() final {}
+  void on_render(vk::CommandBuffer) final {}
+  void on_swapchain_recreated() final {}
 };
 
 } // namespace SD

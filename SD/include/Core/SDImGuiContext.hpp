@@ -12,7 +12,7 @@
 #include "Core/Vulkan/VulkanWindow.hpp"
 #include "Core/Window.hpp"
 
-namespace SD {
+namespace sd {
 
 // TODO(docs): Document SDImGuiContext class
 //   - Purpose: Manages ImGui context and Vulkan integration
@@ -26,37 +26,37 @@ public:
   SDImGuiContext() = default;
   ~SDImGuiContext();
 
-  void Init(Window& window, VulkanWindow& vw);
+  void init(Window& window, VulkanWindow& vw);
 
-  void Shutdown();
+  void shutdown();
 
-  void BeginFrame();
-  void EndFrame();
-  void RenderDrawData(vk::CommandBuffer cmd);
-  void UpdatePlatformWindows();
+  void begin_frame();
+  void end_frame();
+  void render_draw_data(vk::CommandBuffer cmd);
+  void update_platform_windows();
 
-  void BeginDockSpace(const std::string& title = "SDEngine Editor");
-  void EndDockSpace();
+  void begin_dock_space(const std::string& title = "SDEngine Editor");
+  void end_dock_space();
 
-  ImGuiContext* GetContext() const { return mContext; }
-  vk::DescriptorPool GetDescriptorPool() const { return *mDescriptorPool; }
+  ImGuiContext* get_context() const { return m_context; }
+  vk::DescriptorPool get_descriptor_pool() const { return *m_descriptor_pool; }
 
-  VkDescriptorSet CreateTextureFromView(VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  void RemoveTexture(VkDescriptorSet descriptorSet);
+  VkDescriptorSet create_texture_from_view(VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  void remove_texture(VkDescriptorSet descriptor_set);
 
-
-private:
-  void CreateDescriptorPool(VulkanContext& ctx);
-  void CreateCompatibleRenderPass(VulkanContext& ctx, vk::Format format);
 
 private:
-  ImGuiContext* mContext = nullptr;
+  void create_descriptor_pool(VulkanContext& ctx);
+  void create_compatible_render_pass(VulkanContext& ctx, vk::Format format);
 
 private:
-  vk::UniqueDescriptorPool mDescriptorPool;
-  vk::UniqueRenderPass mRenderPass;
-  vk::UniqueSampler mDefaultSampler;
-  bool mVulkanInitialized = false;
+  ImGuiContext* m_context = nullptr;
+
+private:
+  vk::UniqueDescriptorPool m_descriptor_pool;
+  vk::UniqueRenderPass m_render_pass;
+  vk::UniqueSampler m_default_sampler;
+  bool m_is_vulkan_initialized = false;
 };
 
 } // namespace SD

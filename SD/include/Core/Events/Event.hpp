@@ -6,13 +6,14 @@
 #pragma once
 #include <cstddef>
 #include <string>
+#include <type_traits>
 
 #include "Core/types.hpp"
 
-namespace SD {
+namespace sd {
 // TODO(docs): Document BIT() helper
 //   - Purpose: Compile-time bit shifting for event categories
-static consteval usize BIT(usize idx) {
+static consteval usize bit(usize idx) {
   return 1ULL << idx;
 }
 
@@ -22,66 +23,66 @@ static consteval usize BIT(usize idx) {
 //   - Category relationships
 enum class EventType {
   // clang-format off
-  None = 0,
+  NONE = 0,
   /* Engine */
-  /* Application*/ AppTick, AppUpdate, AppRender, AppTerminate,
-  /* Window     */ WindowClose, WindowResize, WindowFocus,
-                   WindowLostFocus, SwapChainOutOfDate, // TODO: swapchain could just be windowresize
+  /* Application*/ APP_TICK, APP_UPDATE, APP_RENDER, APP_TERMINATE,
+  /* Window     */ WINDOW_CLOSE, WINDOW_RESIZE, WINDOW_FOCUS,
+                   WINDOW_LOST_FOCUS, SWAPCHAIN_OUT_OF_DATE, // TODO: swapchain could just be windowresize
   /* Input      */
-  /* Keyboard   */ KeyPressed, KeyReleased, KeyTyped,
-  /* mouse      */ MouseMoved, MouseScrolled,
-  /* mousebutton*/ MousePressed, MouseReleased,
+  /* Keyboard   */ KEY_PRESSED, KEY_RELEASED, KEY_TYPED,
+  /* mouse      */ MOUSE_MOVED, MOUSE_SCROLLED,
+  /* mousebutton*/ MOUSE_PRESSED, MOUSE_RELEASED,
   // clang-format on
 };
-enum EventCategory : u16 {
-  None = 0,
-  EventCategoryEngine = BIT(0),
-  EventCategoryApplication = BIT(1), // For application specifics
-  EventCategoryWindow = BIT(2),
-  EventCategoryInput = BIT(3),
-  EventCategoryKeyboard = BIT(4),
-  EventCategoryMouse = BIT(5),
-  EventCategoryMouseButton = BIT(6),
-  EventCategoryController = BIT(7),
+enum class EventCategory : u16 {
+  NONE = 0,
+  EVENT_CATEGORY_ENGINE = bit(0),
+  EVENT_CATEGORY_APPLICATION = bit(1), // For application specifics
+  EVENT_CATEGORY_WINDOW = bit(2),
+  EVENT_CATEGORY_INPUT = bit(3),
+  EVENT_CATEGORY_KEYBOARD = bit(4),
+  EVENT_CATEGORY_MOUSE = bit(5),
+  EVENT_CATEGORY_MOUSE_BUTTON = bit(6),
+  EVENT_CATEGORY_CONTROLLER = bit(7),
 };
 inline EventCategory operator|(const EventCategory a, const EventCategory b) {
   return static_cast<EventCategory>(static_cast<u16>(a) | static_cast<u16>(b));
 }
 
+inline bool operator&(int lhs, EventCategory rhs) {
+  return (static_cast<u16>(lhs) & static_cast<u16>(rhs)) != 0;
+}
+
 class Event {
 public:
   virtual ~Event() = default;
-  [[nodiscard]] virtual EventType GetEventType() const = 0;
-  [[nodiscard]] virtual int GetCategoryFlags() const = 0;
+  virtual const char* get_name() const = 0;
+  [[nodiscard]] virtual EventType get_event_type() const = 0;
+  [[nodiscard]] virtual int get_category_flags() const = 0;
 
-  [[nodiscard]] bool IsInCategory(EventCategory category) const {
-    return GetCategoryFlags() & category;
+  [[nodiscard]] bool is_in_category(EventCategory category) const {
+    return get_category_flags() & category;
   }
-  [[nodiscard]] virtual const char* GetName() const = 0;
-  std::string ToString() const { return GetName(); }
-
-  void MarkHandled() { mHandled = true; }
-  [[nodiscard]] bool IsHandled() const { return mHandled; }
 
 private:
-  bool mHandled = false;
+  bool m_handled = false;
 
   friend class EventDispatcher;
   friend class LayerList;
 };
 
-#define EVENT_CLASS_TYPE(type)                      \
-  static EventType GetStaticType() {                \
-    return EventType::type;                         \
-  }                                                 \
-  virtual EventType GetEventType() const override { \
-    return GetStaticType();                         \
-  }                                                 \
-  virtual const char* GetName() const override {    \
-    return #type;                                   \
+#define EVENT_CLASS_TYPE(type)                       \
+  static EventType get_static_type() {               \
+    return EventType::type;                          \
+  }                                                  \
+  virtual EventType get_event_type() const override { \
+    return get_static_type();                        \
+  }                                                  \
+  virtual const char* get_name() const override {    \
+    return #type;                                    \
   }
 #define EVENT_CLASS_CATEGORY(category)            \
-  virtual int GetCategoryFlags() const override { \
-    return category;                              \
+  virtual int get_category_flags() const override { \
+    return static_cast<int>(category);              \
   }
 } // namespace SD

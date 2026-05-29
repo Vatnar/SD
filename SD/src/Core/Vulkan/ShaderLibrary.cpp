@@ -2,59 +2,57 @@
 
 #include <system_error>
 
-#include "Core/Logging.hpp"
+namespace sd {
 
-namespace SD {
-
-ShaderLibrary::ShaderLibrary(VkDevice device) : mDevice(device) {
+ShaderLibrary::ShaderLibrary(VkDevice device) : m_device(device) {
 }
 
 ShaderLibrary::~ShaderLibrary() = default;
 
-VkShaderModule ShaderLibrary::Load(const std::string& hlslPath, const std::string& profile) {
-  auto it = mCache.find(hlslPath);
-  if (it != mCache.end())
+VkShaderModule ShaderLibrary::load(const std::string& hlsl_path, const std::string& profile) {
+  auto it = m_cache.find(hlsl_path);
+  if (it != m_cache.end())
     return it->second.module.get();
 
-  std::string actualPath = hlslPath;
-  if (!std::filesystem::exists(actualPath)) {
-    actualPath = "../" + hlslPath;
+  std::string actual_path = hlsl_path;
+  if (!std::filesystem::exists(actual_path)) {
+    actual_path = "../" + hlsl_path;
   }
-  if (!std::filesystem::exists(actualPath)) {
-    actualPath = "../../SDEngine/" + hlslPath;
+  if (!std::filesystem::exists(actual_path)) {
+    actual_path = "../../SDEngine/" + hlsl_path;
   }
 
-  std::vector<uint32_t> spv;
-  if (!mCompiler.CompileShader(actualPath, spv, profile))
-    Abort("Shader compile fail: " + hlslPath);
+  std::vector<u32> spv;
+  if (!m_compiler.compile_shader(actual_path, spv, profile))
+    engine_abort("Shader compile fail: " + hlsl_path);
 
-  vk::ShaderModuleCreateInfo createInfo{{}, spv.size() * sizeof(uint32_t), spv.data()};
+  vk::ShaderModuleCreateInfo create_info{{}, spv.size() * sizeof(uint32_t), spv.data()};
 
   vk::UniqueShaderModule module =
-      CheckVulkanResVal(vk::Device(mDevice).createShaderModuleUnique(createInfo),
-                        "Failed to create shader module: " + hlslPath);
+      check_vulkan_res_val(vk::Device(m_device).createShaderModuleUnique(create_info),
+                        "Failed to create shader module: " + hlsl_path);
 
 
-  VkShaderModule rawModule = module.get();
+  VkShaderModule raw_module = module.get();
   ShaderEntry entry;
   entry.module = std::move(module);
   std::error_code ec;
-  entry.lastWriteTime = std::filesystem::last_write_time(hlslPath, ec);
+  entry.last_write_time = std::filesystem::last_write_time(hlsl_path, ec);
   if (ec) {
-    entry.lastWriteTime = std::filesystem::file_time_type::min();
+    entry.last_write_time = std::filesystem::file_time_type::min();
   }
   entry.profile = profile;
 
-  mCache[hlslPath] = std::move(entry);
-  return rawModule;
+  m_cache[hlsl_path] = std::move(entry);
+  return raw_module;
 }
 
-std::set<std::string> ShaderLibrary::CheckForChanges() {
+std::set<std::string> ShaderLibrary::check_for_changes() {
   std::set<std::string> changed;
-  for (auto& [path, entry] : mCache) {
+  for (auto& [path, entry] : m_cache) {
     std::error_code ec;
-    auto currentTime = std::filesystem::last_write_time(path, ec);
-    if (!ec && currentTime > entry.lastWriteTime) {
+    auto current_time = std::filesystem::last_write_time(path, ec);
+    if (!ec && current_time > entry.last_write_time) {
       changed.insert(path);
     }
   }
@@ -62,7 +60,7 @@ std::set<std::string> ShaderLibrary::CheckForChanges() {
 }
 
 void ShaderLibrary::ClearCache() {
-  mCache.clear();
+  m_cache.clear();
 }
 
 } // namespace SD

@@ -4,7 +4,6 @@
 //   - Relationship to ViewManager and Application
 #pragma once
 
-#include "Core/Base.hpp"
 #include "Core/LayerList.hpp"
 #include "Core/Window.hpp"
 #include "Core/IdTypes.hpp"
@@ -14,7 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace SD {
+namespace sd {
 
 class ViewManager;
 
@@ -39,17 +38,17 @@ public:
   WindowManager();
   ~WindowManager();
 
-  WindowId Create(const WindowProps& props);
-  void Destroy(WindowId id);
-  void ProcessPendingCloses();
+  WindowId create(const WindowProps& props);
+  void destroy(WindowId id);
+  void process_pending_closes();
 
-  Window& GetWindow(WindowId id);
-  VulkanWindow& GetRenderWindow(WindowId id);
+  Window& get_window(WindowId id);
+  VulkanWindow& get_render_window(WindowId id);
 
   struct WindowData {
     std::unique_ptr<Window> logic;
     std::unique_ptr<VulkanWindow> render;
-    LayerList viewLayers;
+    LayerList view_layers;
 
     WindowData() = default;
     WindowData(WindowData&&) = default;
@@ -58,19 +57,19 @@ public:
     WindowData& operator=(const WindowData&) = delete;
   };
 
-  auto& GetWindows() { return mWindows; }
-  const auto& GetWindows() const { return mWindows; }
+  auto& get_windows() { return m_windows; }
+  const auto& get_windows() const { return m_windows; }
 
-  void UpdateWindows(float dt);
-  void DrawWindows(ViewManager& viewManager);
+  void update_windows(float dt);
+  void draw_windows(ViewManager& viewManager);
 
 private:
-  void UpdateWindow(WindowId id, WindowData& data, float dt);
-  void DrawWindow(WindowId id, WindowData& data, ViewManager& viewManager);
+  void update_window(WindowId id, WindowData& data, float dt);
+  void draw_window(WindowId id, WindowData& data, ViewManager& viewManager);
 
-  std::unordered_map<WindowId, WindowData> mWindows;
-  WindowId mNextWindowId;
-  std::vector<WindowId> mPendingClose;
+  std::unordered_map<WindowId, WindowData> m_windows;
+  WindowId m_next_window_id;
+  std::vector<WindowId> m_pending_close;
 };
 
 } // namespace SD

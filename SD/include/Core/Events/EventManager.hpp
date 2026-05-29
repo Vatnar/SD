@@ -10,7 +10,7 @@
 
 #include "Event.hpp"
 
-namespace SD {
+namespace sd {
 // TODO(docs): Document EventManager class
 //   - Purpose: Queued event storage and type queries
 //   - Event lifetime (pushed, queried, cleared)
@@ -18,65 +18,65 @@ namespace SD {
 //   - Example: Checking for specific events
 class EventManager {
 public:
-  EventManager() { mEvents.reserve(64); }
+  EventManager() { m_events.reserve(64); }
 
   EventManager(const EventManager&) = delete;
   EventManager& operator=(const EventManager&) = delete;
   EventManager(EventManager&&) = default;
   EventManager& operator=(EventManager&&) = default;
 
-  [[nodiscard]] bool HasResizeEvent() const {
-    return std::ranges::any_of(mEvents, [](const auto& e) {
-      return e->GetEventType() == EventType::WindowResize ||
-             e->GetEventType() == EventType::SwapChainOutOfDate;
+  [[nodiscard]] bool has_resize_event() const {
+    return std::ranges::any_of(m_events, [](const auto& e) {
+      return e->get_event_type() == EventType::WINDOW_RESIZE ||
+             e->get_event_type() == EventType::SWAPCHAIN_OUT_OF_DATE;
     });
   }
 
   template<typename T>
     requires std::derived_from<T, Event>
-  [[nodiscard]] bool HasEvent() const {
+  [[nodiscard]] bool has_event() const {
     return std::ranges::any_of(
-        mEvents, [](const auto& e) { return e->GetEventType() == T::GetStaticType(); });
+        m_events, [](const auto& e) { return e->get_event_type() == T::get_static_type(); });
   }
 
 
-  void Clear() { mEvents.clear(); }
+  void clear() { m_events.clear(); }
 
 
   template<typename T, typename... Args>
     requires std::derived_from<T, Event>
-  void PushEvent(Args&&... args) {
-    mEvents.emplace_back(std::make_unique<T>(std::forward<Args>(args)...));
+  void push_event(Args&&... args) {
+    m_events.emplace_back(std::make_unique<T>(std::forward<Args>(args)...));
   }
 
   template<typename T>
     requires std::derived_from<T, Event>
-  void ClearType() {
+  void clear_type() {
     auto ret = std::ranges::remove_if(
-        mEvents, [](const auto& e) { return e->GetEventType() == T::GetStaticType(); });
+        m_events, [](const auto& e) { return e->get_event_type() == T::GetStaticType(); });
 
-    mEvents.erase(ret.begin(), mEvents.end());
+    m_events.erase(ret.begin(), m_events.end());
   }
 
 
-  auto begin() { return mEvents.begin(); }
-  auto end() { return mEvents.end(); }
-  [[nodiscard]] auto begin() const { return mEvents.begin(); }
-  [[nodiscard]] auto end() const { return mEvents.end(); }
+  auto begin() { return m_events.begin(); }
+  auto end() { return m_events.end(); }
+  [[nodiscard]] auto begin() const { return m_events.begin(); }
+  [[nodiscard]] auto end() const { return m_events.end(); }
 
 private:
-  std::vector<std::unique_ptr<Event>> mEvents;
+  std::vector<std::unique_ptr<Event>> m_events;
 };
 
 class EventDispatcher {
 public:
-  explicit EventDispatcher(Event& event) : mEvent(event) {}
+  explicit EventDispatcher(Event& event) : m_event(event) {}
 
   template<typename T, typename F>
-  bool Dispatch(const F& func) {
-    if (mEvent.GetEventType() == T::GetStaticType()) {
-      if (func(static_cast<T&>(mEvent))) {
-        mEvent.MarkHandled();
+  bool dispatch(const F& func) {
+    if (m_event.get_event_type() == T::get_static_type()) {
+      if (func(static_cast<T&>(m_event))) {
+        m_event.m_handled = true;
       }
       return true;
     }
@@ -84,6 +84,6 @@ public:
   }
 
 private:
-  Event& mEvent;
+  Event& m_event;
 };
 } // namespace SD
