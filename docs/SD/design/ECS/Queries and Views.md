@@ -8,19 +8,19 @@ A view selects the *smallest* component pool as its iteration base, which minimi
 
 ```cpp
 template<typename... Components>
-std::tuple<Components&...> GetComponentGroup(Entity e);
+std::tuple<Components&...> get_component_group(Entity e);
 
-bool Iterator::IsValid() const {
+bool Iterator::is_valid() const {
   return (manager.HasComponent<Components>(currentEntity) && ...);
 }
 ```
 
 The iteration loop advances until it finds a valid entity or reaches the end:
 ```cpp
-void Next() {
+void next() {
   do {
     index++;
-  } while (index < entities->size() && !IsValid());
+  } while (index < entities->size() && !is_valid());
 }
 ```
 
@@ -43,7 +43,7 @@ If the per-entity validity check becomes a bottleneck, we could fix it with **ar
 
 ```cpp
 // Archetype storage
-std::unordered_map<ComponentMask, std::vector<Entity>> archetypeGroups;
+std::unordered_map<ComponentMask, std::vector<Entity>> archetype_groups;
 
 // View becomes: direct iteration over matching archetype(s)
 // No per-entity HasComponent() check needed

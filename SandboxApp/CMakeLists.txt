@@ -1,6 +1,7 @@
 # SCRATCH
-add_library(SandboxApp SHARED SDScratch.cpp
-        GameRenderLayer.cpp)
+add_library(SandboxApp SHARED
+        GameRenderLayer.cpp
+        sandbox.cpp)
 
 set_target_properties(SandboxApp PROPERTIES OUTPUT_NAME "SandboxApp_tmp")
 
@@ -8,7 +9,7 @@ target_link_libraries(SandboxApp PRIVATE SD)
 
 # Build to .tmp, then atomically rename to final name, then copy to bin
 add_custom_command(TARGET SandboxApp POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E rename 
+        COMMAND ${CMAKE_COMMAND} -E rename
         $<TARGET_FILE:SandboxApp>
         ${CMAKE_BINARY_DIR}/lib/libSandboxApp.so
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -35,13 +36,13 @@ add_custom_command(TARGET SandboxAppStandalone POST_BUILD
 
 
 # AddressSanitizer - Debug builds only
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(SandboxApp PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(SandboxApp PRIVATE -fsanitize=address)
 
     target_compile_options(SandboxAppStandalone PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(SandboxAppStandalone PRIVATE -fsanitize=address)
-endif()
+endif ()
 
 target_compile_options(SandboxApp PRIVATE -Wall -Wextra -Werror -fno-exceptions)
 target_compile_options(SandboxAppStandalone PRIVATE -Wall -Wextra -Werror -fno-exceptions)

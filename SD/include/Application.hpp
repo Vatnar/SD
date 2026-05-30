@@ -16,14 +16,14 @@
 #include <utility>
 #include <vector>
 
-#include "Core/Base.hpp"
-#include "Core/Events/EventManager.hpp"
-#include "Core/FrameTimer.hpp"
-#include "Core/LayerList.hpp"
-#include "Core/Scene.hpp"
-#include "Core/View.hpp"
-#include "Core/ViewManager.hpp"
-#include "Core/WindowManager.hpp"
+#include "core/base.hpp"
+#include "core/events/EventManager.hpp"
+#include "core/FrameTimer.hpp"
+#include "core/LayerList.hpp"
+#include "core/Scene.hpp"
+#include "core/View.hpp"
+#include "core/ViewManager.hpp"
+#include "core/WindowManager.hpp"
 
 namespace sd {
 class Event;

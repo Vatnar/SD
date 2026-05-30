@@ -2,19 +2,19 @@
 #include <memory>
 
 #include "Application.hpp"
-#include "Core/ECS/Components.hpp"
-#include "Core/Layers/EngineDebugLayer.hpp"
-#include "Core/Vulkan/VulkanRenderer.hpp"
+#include "core/ecs/components.hpp"
+#include "core/layers/EngineDebugLayer.hpp"
+#include "core/vulkan/VulkanRenderer.hpp"
 #include "GameContext.hpp"
 #include "GameRenderLayer.hpp"
-#include "Logging.hpp"
+#include "logging.hpp"
 #include "RuntimeStateManager.hpp"
 
 static void register_game_categories() {
-  sd::log::register_category("Game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
-  sd::log::register_category("Game/Combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
-  sd::log::register_category("Game/UI", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
-  sd::log::register_category("Game/Audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
+  sd::log::register_category("game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+  sd::log::register_category("game/combat", ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
+  sd::log::register_category("game/ui", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
+  sd::log::register_category("game/audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
 }
 
 class SandboxGame : public sd::GameContext {
@@ -97,8 +97,9 @@ private:
 
 int main() {
   sd::log::init();
+  register_game_categories();
 
-  sd::log::Game::info("Starting game");
+  sd::log::game::info("Starting game");
 
   std::unique_ptr<sd::RuntimeStateManager> state_manager;
   state_manager = std::make_unique<sd::RuntimeStateManager>();
@@ -119,7 +120,6 @@ int main() {
 
   app->set_game_context(game.get());
 
-  register_game_categories();
   game->on_load(*app);
 
   std::atomic stop_flag{false};

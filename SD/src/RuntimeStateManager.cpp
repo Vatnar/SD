@@ -1,7 +1,7 @@
 #include "RuntimeStateManager.hpp"
 
 #include "Application.hpp"
-#include "Core/Logging.hpp"
+#include "../include/core/logging.hpp"
 
 namespace sd {
 

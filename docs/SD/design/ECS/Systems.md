@@ -14,8 +14,8 @@ Views are lightweight, no allocations, no heap storage. The iterator dereference
 
 **Example: Physics system applying gravity**
 ```cpp
-void PhysicsSystem::Update(float dt) {
-    auto view = entityManager.View<Transform, RigidBody>();
+void PhysicsSystem::update(float dt) {
+    auto view = entity_manager.View<Transform, RigidBody>();
     for (auto [entity, transform, body] : view) {
         body.velocity += Vec3{0, -9.81f, 0} * dt;
         transform.position += body.velocity * dt;

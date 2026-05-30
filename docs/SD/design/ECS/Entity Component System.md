@@ -25,8 +25,8 @@ Or using the command system:
 ```cpp
 CommandQueue queue;
 EntityHandle h(0); // Handles resolve within the queue on Apply()
-queue.Add<CreateEntityCmd>(h); // Add a CreateEntity Cmd
-queue.Apply(em); // Execute the queue on the ECS in sequential order
+queue.add<CreateEntityCmd>(h); // Add a CreateEntity Cmd
+queue.apply(em); // Execute the queue on the ECS in sequential order
 ```
 To read more about [[CommandQueue]].
 

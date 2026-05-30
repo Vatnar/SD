@@ -38,12 +38,12 @@ The macro specialises `ComponentTraits<T>` with:
 ```cpp
 template<>
 struct ComponentSerializer<Transform> {
-    static void Serialize(const Transform& c, Serializer& s) {
-        s.Write(c.position);
-        s.Write(c.rotation);
-        s.Write(c.scale);
+    static void serialize(const Transform& c, Serializer& s) {
+        s.write(c.position);
+        s.write(c.rotation);
+        s.write(c.scale);
     }
-    static void Deserialize(Transform& c, Serializer& s) {
+    static void deserialize(Transform& c, Serializer& s) {
         c.position = s.Read<Vec3>();
         c.rotation = s.Read<Quat>();
         c.scale = s.Read<Vec3>();

@@ -1,13 +1,5 @@
 # SD Coding Style Guide
 
-This document defines the naming conventions, formatting rules, and general code style for the SD engine. The goal is
-consistency across the entire codebase.
-
-All rules are enforced by `.clang-format` and `.clang-tidy` where technically possible. Any deviation must be justified
-with a code-review comment.
-
----
-
 ## 1. Naming Conventions
 
 ### 1.1 General Entity Naming
@@ -15,7 +7,7 @@ with a code-review comment.
 | Category                                                               | Case       | Prefix / Suffix       | Example                                     |
 |------------------------------------------------------------------------|------------|-----------------------|---------------------------------------------|
 | Classes, structs, unions, enums                                        | PascalCase | —                     | `RenderPass`, `Entity`, `WindowMode`        |
-| Type aliases (`using` / `typedef`)                                     | PascalCase | `_t` optional         | `ViewResult_t`, `ComponentId`               |
+| Type aliases (`using` / `typedef`)                                     | PascalCase | _                     | `ViewResult_t`, `ComponentId`               |
 | Template parameters                                                    | PascalCase | —                     | `TComponent`, `TAlloc`                      |
 | Concepts                                                               | PascalCase | —                     | `Renderable`, `Serializable`                |
 | Functions, methods                                                     | snake_case | —                     | `push_layer()`, `get_name()`                |
@@ -40,34 +32,23 @@ with a code-review comment.
 | Class / struct static members     | snake_case | `s_`   | `s_instance`     |
 | Global variables (any scope)      | snake_case | `g_`   | `g_application`  |
 
-**Notes**
-
-- The prefix is *always* required, even for private members.
-- Static local variables inside functions should also use the `s_` prefix.
-
 ### 1.3 Files
 
-- **C++ headers**: PascalCase matching the primary exported type (`Application.hpp`, `EntityManager.hpp`).
-- **C++ sources**: PascalCase matching the header (`Application.cpp`).
+- **C++ headers with a primary exported type**: PascalCase matching that type (`Application.hpp`, `EntityManager.hpp`).
+- **C++ sources with a primary exported type**: PascalCase matching the header (`Application.cpp`).
+- **C++ files without a primary exported type** (entry points, free-function utilities, implementation-detail files):
+  `snake_case` (`main.cpp`, `string_utils.cpp`, `shader_compiler.cpp`).
 - **C headers**: snake_case with `.h` extension (`game.h`).
 
 ---
 
 ## 2. Header Guards
 
-Use `#pragma once` in every header. Do **not** use traditional `#ifndef` / `#define` / `#endif` guards.
-
-```cpp
-#pragma once
-
-// ... header contents ...
-```
+Use `#pragma once` in every header.
 
 ---
 
 ## 3. Include Order
-
-Includes must be grouped and ordered as follows, separated by blank lines:
 
 1. **Matching header** — the `.hpp` that corresponds to the current `.cpp` file.
 2. **Standard library** — C++ standard headers and C/POSIX system headers (angle brackets, no vendor directory).
@@ -88,10 +69,6 @@ Example:
 #include "Core/Base.hpp"                    // 4. project headers
 #include "Core/Logging.hpp"
 ```
-
-**Rationale**: The matching header first validates that it is self-contained. Separating standard, third-party, and
-project headers makes it immediately obvious where a dependency comes from and prevents accidental project→third-party
-circular includes.
 
 ---
 

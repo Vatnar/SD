@@ -4,11 +4,11 @@
 #include <dlfcn.h>
 #include <filesystem>
 
-#include "Core/Events/app/AppEvents.hpp"
-#include "Core/Layers/PerformanceLayer.hpp"
-#include "Core/LayoutManager.hpp"
-#include "Core/SDImGuiContext.hpp"
-#include "Core/Vulkan/VulkanRenderer.hpp"
+#include "../include/core/events/app/app_events.hpp"
+#include "../include/core/layers/PerformanceLayer.hpp"
+#include "../include/core/LayoutManager.hpp"
+#include "../include/core/SDImGuiContext.hpp"
+#include "../include/core/vulkan/VulkanRenderer.hpp"
 #include "GameContext.hpp"
 #include "RuntimeStateManager.hpp"
 

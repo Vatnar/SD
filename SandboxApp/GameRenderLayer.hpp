@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Layer.hpp"
-#include "Core/Vulkan/PipelineFactory.hpp"
+#include "core/Layer.hpp"
+#include "core/vulkan/PipelineFactory.hpp"
 
 class GameRenderLayer : public sd::RenderStage {
   sd::PipelineFactory::Handle m_pipeline_handle;

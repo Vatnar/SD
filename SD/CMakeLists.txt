@@ -19,29 +19,29 @@ set_target_properties(vma PROPERTIES
 #############
 # sd ENGINE #
 #############
-file(GLOB_RECURSE ECS_IMPL_headers "include/Core/ECS/impl/*.inl")
+file(GLOB_RECURSE ECS_IMPL_headers "include/core/ecs/impl/*.inl")
 set(ENGINE_SOURCES
-        src/Core/Vulkan/VulkanContext.cpp
-        src/Core/Window.cpp
-        src/Core/Layers/SDImGuiContext.cpp
-        src/Core/Layers/EngineDebugLayer.cpp
-        src/Core/Logging.cpp
-        src/Core/Vulkan/VulkanRenderer.cpp
-        src/Core/Vulkan/PipelineFactory.cpp
-        src/Core/Vulkan/VulkanWindow.cpp
-        src/Core/Vulkan/VulkanFramebuffer.cpp
-        src/Core/SDImGuiViewport.cpp
-        src/Core/LayoutManager.cpp
+        src/core/vulkan/VulkanContext.cpp
+        src/core/Window.cpp
+        src/core/layers/SDImGuiContext.cpp
+        src/core/layers/EngineDebugLayer.cpp
+        src/core/logging.cpp
+        src/core/vulkan/VulkanRenderer.cpp
+        src/core/vulkan/PipelineFactory.cpp
+        src/core/vulkan/VulkanWindow.cpp
+        src/core/vulkan/VulkanFramebuffer.cpp
+        src/core/SDImGuiViewport.cpp
+        src/core/LayoutManager.cpp
         src/Application.cpp
-        src/Core/WindowManager.cpp
-        src/Core/ViewManager.cpp
-        src/Core/Vulkan/ShaderLibrary.cpp
-        src/Core/View.cpp
+        src/core/WindowManager.cpp
+        src/core/ViewManager.cpp
+        src/core/vulkan/ShaderLibrary.cpp
+        src/core/View.cpp
         src/RuntimeStateManager.cpp
-        src/Core/ECS/CommandQueue.cpp
-        src/Core/ECS/ComponentFactory.cpp
-        include/Core/ECS/CommandQueue.hpp
-        include/Core/ECS/ComponentFactory.hpp
+        src/core/ecs/CommandQueue.cpp
+        src/core/ecs/ComponentFactory.cpp
+        include/core/ecs/CommandQueue.hpp
+        include/core/ecs/ComponentFactory.hpp
 )
 
 add_library(SD SHARED ${ENGINE_SOURCES} ${ECS_IMPL_headers})
@@ -124,7 +124,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     if (MSVC)
         target_compile_options(SD PUBLIC -fsanitize=address)
     else ()
-        target_compile_options(SD PUBLIC -fsanitize=address -fno-omit-frame-pointer)
+        target_compile_options(SD PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     endif ()
     target_link_options(SD PRIVATE -fsanitize=address)
 endif ()
@@ -135,7 +135,7 @@ if (MSVC)
             $<$<CONFIG:Debug>:/Od /Zi /EHsc->
     )
 else ()
-    target_compile_options(SD PUBLIC
+    target_compile_options(SD PRIVATE
             $<$<CONFIG:Release>:-O3 -fno-exceptions>
             $<$<CONFIG:Debug>:-g -O0 -fno-exceptions>
             -Wall -Wextra -Werror
@@ -143,7 +143,7 @@ else ()
 endif ()
 
 # Hot reloading
-add_executable(HotReloadApp src/HotReloader.cpp src/ConfigLoader.cpp)
+add_executable(HotReloadApp src/hot_reloader.cpp src/ConfigLoader.cpp)
 target_link_libraries(HotReloadApp PRIVATE SD dl spdlog::spdlog)
 target_include_directories(HotReloadApp PRIVATE
         include
@@ -221,7 +221,7 @@ if (IWYU_TOOL OR IWYU_TOOL_PY)
             COMMAND ${CMAKE_COMMAND} -E echo "Testing IWYU on test file..."
             COMMAND ${CMAKE_COMMAND} -E echo "File: SD/src/Core/IWYU_Test.cpp"
             COMMAND ${CMAKE_COMMAND} -E echo ""
-            COMMAND ${IWYU_CMD} -p ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/IWYU_Test.cpp 2>&1
+            COMMAND ${IWYU_CMD} -p ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src/core/IWYU_Test.cpp 2>&1
             | grep -v "bits/unicode-data.h"
             | grep -v "bits/mofunc_impl.h"
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

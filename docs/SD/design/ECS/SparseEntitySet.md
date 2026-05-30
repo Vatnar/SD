@@ -14,8 +14,8 @@ Since entity indexes are assigned incrementally, we then only need to assign sto
 
 Conceptually, this is a sparse array of arrays: the outer array maps to pages, while each inner array stores indices into the dense array for that page.
 ```cpp
-usize denseIdx = sparse[page][offset];
-auto& value = denseData[dense_idx];
+usize dense_idx = sparse[page][offset];
+auto& value = dense_data[dense_idx];
 ```
 
 This allows for efficient memory usage and a flexible component system. While maintaining fast sequential lookup for systems.

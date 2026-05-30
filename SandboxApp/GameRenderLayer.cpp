@@ -1,8 +1,8 @@
 #include "GameRenderLayer.hpp"
 
-#include "Core/ECS/Components.hpp"
-#include "Core/View.hpp"
-#include "Utils/Utils.hpp"
+#include "core/ecs/components.hpp"
+#include "core/View.hpp"
+#include "utils/utils.hpp"
 #include "VLA/Matrix.hpp"
 #include "imgui.h"
 

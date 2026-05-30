@@ -3,7 +3,7 @@
 #include <cstring>
 #include <toml++/toml.hpp>
 
-#include "Core/Logging.hpp"
+#include "../include/core/logging.hpp"
 
 ConfigLoader::ConfigLoader(int argc, char* argv[]) {
   load_defaults();
