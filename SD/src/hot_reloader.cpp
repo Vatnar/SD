@@ -9,11 +9,11 @@
 #include "ConfigLoader.hpp"
 #include "game.h"
 
-static void* g_game_handle = nullptr;
-static GameAPI g_game_api = {};
-static GameState g_game_state = {};
+static void*                           g_game_handle = nullptr;
+static GameAPI                         g_game_api    = {};
+static GameState                       g_game_state  = {};
 static std::filesystem::file_time_type g_last_so_write_time;
-static int g_reload_count = 0;
+static int                             g_reload_count = 0;
 
 static std::string get_live_so_name(const std::string& game_so) {
   g_reload_count++;
@@ -21,11 +21,12 @@ static std::string get_live_so_name(const std::string& game_so) {
 }
 
 // Wait for file to stop changing (build system finished writing)
-static bool wait_for_file_stable(const std::filesystem::path& path,
-                              std::chrono::milliseconds timeout = std::chrono::seconds(2),
-                              std::chrono::milliseconds check_interval = std::chrono::milliseconds(50)) {
+static bool
+wait_for_file_stable(const std::filesystem::path& path,
+                     std::chrono::milliseconds    timeout        = std::chrono::seconds(2),
+                     std::chrono::milliseconds    check_interval = std::chrono::milliseconds(50)) {
   std::error_code ec;
-  auto last_size = std::filesystem::file_size(path, ec);
+  auto            last_size = std::filesystem::file_size(path, ec);
   if (ec) {
     sd::log::engine::error("File stability check failed (file_size): {}", ec.message());
     return false;
@@ -52,29 +53,30 @@ static bool wait_for_file_stable(const std::filesystem::path& path,
     }
 
     if (current_size == last_size && current_time == last_time) {
-      return true;  // File stable
+      return true; // File stable
     }
 
     last_size = current_size;
     last_time = current_time;
   }
 
-  sd::log::engine::warn("File {} still changing after {}ms, skipping reload", path.string(), timeout.count());
+  sd::log::engine::warn("File {} still changing after {}ms, skipping reload", path.string(),
+                        timeout.count());
   return false;
 }
 
 // Load new game code while keeping old code mapped
 // Returns true on success, false on failure (old code remains valid)
-static bool load_game_code_safe(const std::string& game_so_path,
-                             void** out_new_handle, GameAPI* out_new_api) {
+static bool load_game_code_safe(const std::string& game_so_path, void** out_new_handle,
+                                GameAPI* out_new_api) {
   // Wait for file to be stable (build finished)
   if (!wait_for_file_stable(game_so_path)) {
     return false;
   }
 
   std::string game_so_filename = std::filesystem::path(game_so_path).filename().string();
-  std::string live_so = get_live_so_name(game_so_filename);
-  std::string temp_so = live_so + ".tmp";
+  std::string live_so          = get_live_so_name(game_so_filename);
+  std::string temp_so          = live_so + ".tmp";
 
   // Copy to temp file first (not the watched file)
   std::error_code ec;
@@ -118,15 +120,18 @@ static bool load_game_code_safe(const std::string& game_so_path,
   sd::log::engine::info("New game code loaded successfully");
 
   *out_new_handle = new_handle;
-  *out_new_api = new_api;
+  *out_new_api    = new_api;
   return true;
 }
 
 int main(int argc, char* argv[]) {
   sd::log::init();
   ConfigLoader config(argc, argv);
-  const auto& cfg = config.get_config();
+  const auto&  cfg = config.get_config();
 
+#ifndef NDEBUG
+  sd::log::engine::warn("Running in debug mode");
+#endif
   sd::log::engine::info("HotReloadApp starting");
   sd::log::engine::info("  game-so-path: {}", cfg.game_so_path);
   sd::log::engine::info("  build-dir: {}", cfg.build_dir);
@@ -136,8 +141,8 @@ int main(int argc, char* argv[]) {
   // Initial load (old style - no fallback possible)
   {
     std::string game_so_filename = std::filesystem::path(cfg.game_so_path).filename().string();
-    std::string live_so = get_live_so_name(game_so_filename);
-    std::string temp_so = live_so + ".tmp";
+    std::string live_so          = get_live_so_name(game_so_filename);
+    std::string temp_so          = live_so + ".tmp";
 
     std::error_code ec;
     if (!std::filesystem::copy_file(cfg.game_so_path, temp_so,
@@ -166,13 +171,20 @@ int main(int argc, char* argv[]) {
 
   g_last_so_write_time = std::filesystem::last_write_time(cfg.game_so_path);
 
-  sd::Application app({cfg.app_name.c_str(), cfg.window_width, cfg.window_height});
+  sd::ApplicationSpecification app_spec{
+      .name            = cfg.app_name,
+      .width           = cfg.window_width,
+      .height          = cfg.window_height,
+      .enableHotReload = true,
+      .gameSoPath      = cfg.game_so_path,
+  };
+  sd::Application app(app_spec);
 
   // Initial load
   g_game_api.on_load(reinterpret_cast<SD_Application*>(&app), &g_game_state);
 
   // Run loop - check for .so changes
-  while (app.is_running()) {
+  while (app.is_running) {
     // Check for reload (when user clicks Build in CLion)
     if (std::filesystem::exists(cfg.game_so_path)) {
       auto current_time = std::filesystem::last_write_time(cfg.game_so_path);
@@ -182,11 +194,11 @@ int main(int argc, char* argv[]) {
         sd::log::engine::info("Detected change, reloading game code...");
 
         // Load NEW code first (while old code is still mapped)
-        void* new_handle = nullptr;
-        GameAPI new_api = {};
+        void*   new_handle = nullptr;
+        GameAPI new_api    = {};
         if (!load_game_code_safe(cfg.game_so_path, &new_handle, &new_api)) {
           sd::log::engine::error("Failed to load new game code - keeping old code running");
-          continue;  // Don't reload, keep using current code
+          continue; // Don't reload, keep using current code
         }
 
         // New code loaded successfully - now safe to unload old
@@ -199,7 +211,7 @@ int main(int argc, char* argv[]) {
 
         // CRITICAL: Wait for GPU to finish all work before destroying layers
         // This prevents use-after-free of Vulkan resources
-        (void)app.get_vulkan_context().get_vulkan_device()->waitIdle();
+        (void)app.services().vulkan.get_vulkan_device()->waitIdle();
 
         // Clear engine state before loading new code
         app.clear_game_layers();
@@ -211,7 +223,7 @@ int main(int argc, char* argv[]) {
 
         // Switch to new code
         g_game_handle = new_handle;
-        g_game_api = new_api;
+        g_game_api    = new_api;
 
         // Load new code with existing state
         g_game_api.on_load(reinterpret_cast<SD_Application*>(&app), &g_game_state);

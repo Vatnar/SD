@@ -9,9 +9,23 @@
 #include "core/events/window/mouse_events.hpp"
 #include "core/LayoutManager.hpp"
 #include "core/logging.hpp"
+#include "core/SceneManager.hpp"
 #include "core/View.hpp"
+#include "core/ViewManager.hpp"
+#include "core/vulkan/VulkanRenderer.hpp"
 
 namespace sd {
+
+EngineDebugLayer::EngineDebugLayer(ApplicationRuntime runtime, EngineServices services, Scene* scene)
+    : Panel("EngineDebug", scene),
+      m_views(runtime.views),
+      m_scenes(runtime.scenes),
+      m_layout(runtime.layout),
+      m_events(runtime.events),
+      m_frame_timer(runtime.timer),
+      m_hot_reload_enabled(runtime.hot_reload_enabled),
+      m_global_layers(runtime.global_layers),
+      m_renderer(services.renderer) {}
 
 void EngineDebugLayer::on_update(float dt) {
   m_update_count++;
@@ -25,14 +39,12 @@ void EngineDebugLayer::on_update(float dt) {
     m_timer = 0.0f;
   }
 
-  // Capture resizes if logging is enabled
-  auto& app = Application::get();
-  for (const auto& view : app.get_views() | std::views::values) {
-    if (m_log_view_resizes && view->consume_extent_changed()) {
-      log::engine::debug("View '{}' resized to {}x{}", view->get_name(), view->get_extent().width,
-                      view->get_extent().height);
+  m_views.for_each([&](View& view) {
+    if (m_log_view_resizes && view.consume_extent_changed()) {
+      log::engine::debug("View '{}' resized to {}x{}", view.get_name(), view.get_extent().width,
+                      view.get_extent().height);
     }
-  }
+  });
 
   // Track entity lifecycle changes if logging is enabled
   if (m_selected_scene && m_log_entity_lifecycle) {
@@ -106,7 +118,7 @@ void EngineDebugLayer::on_event(Event& e) {
 
 void EngineDebugLayer::on_im_gui_menu_bar() {
   // Apply pending layout once dockspace is ready
-  Application::get().get_layout_manager().apply_pending_layout();
+  m_layout.apply_pending_layout(make_runtime());
   
   if (ImGui::BeginMenu("Debug")) {
     ImGui::MenuItem("View Inspector", nullptr, &m_show_view_inspector);
@@ -119,7 +131,7 @@ void EngineDebugLayer::on_im_gui_menu_bar() {
     
     ImGui::Separator();
     if (ImGui::MenuItem("Reload Shaders", "Ctrl+Shift+D, R")) {
-      Application::get().reload_shaders();
+      m_renderer.reload_shaders();
     }
     
     ImGui::EndMenu();
@@ -129,27 +141,23 @@ void EngineDebugLayer::on_im_gui_menu_bar() {
 void EngineDebugLayer::on_gui_render() {
   if (m_show_view_inspector) {
     if (ImGui::Begin("View Inspector", &m_show_view_inspector)) {
-      auto& app = Application::get();
-      const auto& views = app.get_views();
-      
-      // Resolve ID to View* safely (prevents dangling pointer)
       View* selected_view = nullptr;
       if (m_selected_view_id.has_value()) {
-        auto view_result = app.get_view(m_selected_view_id.value());
+        auto view_result = m_views.get(m_selected_view_id.value());
         if (view_result) {
           selected_view = &view_result->get();
         } else {
-          m_selected_view_id.reset();  // View was deleted
+          m_selected_view_id.reset();
         }
       }
       
       if (ImGui::BeginCombo("View Selector",
                             selected_view ? selected_view->get_name().c_str() : "None")) {
-        for (const auto& [id, view] : views) {
-          if (ImGui::Selectable(view->get_name().c_str(), m_selected_view_id == view->get_view_id())) {
-            m_selected_view_id = view->get_view_id();
+        m_views.for_each([&](View& view) {
+          if (ImGui::Selectable(view.get_name().c_str(), m_selected_view_id == view.get_view_id())) {
+            m_selected_view_id = view.get_view_id();
           }
-        }
+        });
         ImGui::EndCombo();
       }
       if (selected_view)
@@ -197,19 +205,17 @@ void EngineDebugLayer::on_gui_render() {
         ImGui::TableNextColumn();
         ImGui::Text("Frame Work Time");
         ImGui::TableNextColumn();
-        ImGui::Text("%.3f ms", Application::get().get_frame_work_time() * 1000.0f);
+        ImGui::Text("%.3f ms", m_frame_timer.get_frame_work_time() * 1000.0f);
 
         ImGui::EndTable();
       }
 
       ImGui::Separator();
-      auto& app = Application::get();
-      bool auto_reload = app.is_hot_reload_enabled();
-      if (ImGui::Checkbox("Auto-Reload Shaders", &auto_reload)) {
-        app.set_hot_reload_enabled(auto_reload);
+      if (ImGui::Checkbox("Auto-Reload Shaders", &m_hot_reload_enabled)) {
+        m_hot_reload_enabled = !m_hot_reload_enabled;
       }
       if (ImGui::Button("Force Reload Shaders")) {
-        app.reload_shaders();
+        m_renderer.reload_shaders();
       }
     }
     ImGui::End();
@@ -217,26 +223,25 @@ void EngineDebugLayer::on_gui_render() {
 
   if (m_show_context_overlay) {
     auto mouse_pos = ImGui::GetMousePos();
-    auto& app = Application::get();
-    for (const auto& view : app.get_views() | std::views::values) {
-      ImVec2 region_pos = view->get_content_region_pos();
-      ImVec2 region_extent = view->get_content_region_extent();
+    m_views.for_each([&](View& view) {
+      ImVec2 region_pos = view.get_content_region_pos();
+      ImVec2 region_extent = view.get_content_region_extent();
       if (mouse_pos.x >= region_pos.x && mouse_pos.x <= region_pos.x + region_extent.x &&
           mouse_pos.y >= region_pos.y && mouse_pos.y <= region_pos.y + region_extent.y) {
         ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 15, mouse_pos.y + 15));
         if (ImGui::Begin("##ContextOverlay", nullptr,
-                         ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar |
-                             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                             ImGuiWindowFlags_AlwaysAutoResize |
-                             ImGuiWindowFlags_NoSavedSettings)) {
+                          ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar |
+                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                              ImGuiWindowFlags_AlwaysAutoResize |
+                              ImGuiWindowFlags_NoSavedSettings)) {
           float ndc_x = ((mouse_pos.x - region_pos.x) / region_extent.x) * 2.0f - 1.0f;
           float ndc_y = ((mouse_pos.y - region_pos.y) / region_extent.y) * 2.0f - 1.0f;
-          ImGui::Text("View: %s", view->get_name().c_str());
+          ImGui::Text("View: %s", view.get_name().c_str());
           ImGui::Text("NDC: %.3f, %.3f", ndc_x, ndc_y);
           ImGui::End();
         }
       }
-    }
+    });
   }
   
   // Display dialogs
@@ -314,17 +319,21 @@ void EngineDebugLayer::display_scene_selector() {
     ImGui::TreePop();
   }
   ImGui::Separator();
-  auto scenes = Application::get().get_scenes();
-  if (!m_selected_scene && !scenes.empty())
-    m_selected_scene = scenes[0];
+
+  Scene* initial_scene = nullptr;
+  m_scenes.for_each([&](Scene& scene) {
+    if (!initial_scene) initial_scene = &scene;
+  });
+  if (!m_selected_scene && initial_scene)
+    m_selected_scene = initial_scene;
 
   std::string current_label = m_selected_scene ? m_selected_scene->get_name() : "None";
   if (ImGui::BeginCombo("Inspect Scene", current_label.c_str())) {
-    for (auto* s : scenes) {
-      if (ImGui::Selectable(s->get_name().c_str(), m_selected_scene == s)) {
-        m_selected_scene = s;
+    m_scenes.for_each([&](Scene& scene) {
+      if (ImGui::Selectable(scene.get_name().c_str(), m_selected_scene == &scene)) {
+        m_selected_scene = &scene;
       }
-    }
+    });
     ImGui::EndCombo();
   }
 }
@@ -583,18 +592,18 @@ void EngineDebugLayer::display_event_log() {
 
 void EngineDebugLayer::display_layout_menu() {
   if (ImGui::BeginMenu("Layout")) {
-    auto& layout_manager = Application::get().get_layout_manager();
+    auto& layout_manager = m_layout;
     const std::string& current_layout = layout_manager.get_current_layout();
     
     // Presets
     bool is_minimal = current_layout == "Minimal";
     if (ImGui::MenuItem("Minimal", "Alt+1", is_minimal)) {
-      layout_manager.apply_preset(LayoutManager::Preset::MINIMAL);
+      layout_manager.apply_preset(LayoutManager::Preset::MINIMAL, make_runtime());
     }
     
     bool isDefault = current_layout == "Default";
     if (ImGui::MenuItem("Default", "Alt+2", isDefault)) {
-      layout_manager.apply_preset(LayoutManager::Preset::DEFAULT);
+      layout_manager.apply_preset(LayoutManager::Preset::DEFAULT, make_runtime());
     }
     
     // Custom layouts
@@ -606,7 +615,7 @@ void EngineDebugLayer::display_layout_menu() {
         bool is_current = name == current_layout;
         std::string shortcut = (shortcut_num <= 9) ? "Alt+" + std::to_string(shortcut_num) : "";
         if (ImGui::MenuItem(name.c_str(), shortcut.c_str(), is_current)) {
-          layout_manager.load_layout(name);
+          layout_manager.load_layout(name, make_runtime());
         }
         shortcut_num++;
       }
@@ -651,7 +660,7 @@ void EngineDebugLayer::display_save_layout_dialog() {
     }
     
     if (save_clicked && m_layout_name_buffer[0] != '\0') {
-      auto& layout_manager = Application::get().get_layout_manager();
+      auto& layout_manager = m_layout;
       std::string layout_name(m_layout_name_buffer.data());
       
       if (layout_manager.has_layout(layout_name)) {
@@ -675,7 +684,7 @@ void EngineDebugLayer::display_delete_layout_dialog() {
   ImGui::OpenPopup("Delete Layout");
   
   if (ImGui::BeginPopupModal("Delete Layout", &m_show_delete_layout_dialog)) {
-    auto& layout_manager = Application::get().get_layout_manager();
+    auto& layout_manager = m_layout;
     auto layouts = layout_manager.get_user_layout_names();
     
     ImGui::Text("Select layout to delete:");
@@ -684,7 +693,7 @@ void EngineDebugLayer::display_delete_layout_dialog() {
     for (const auto& name : layouts) {
       ImGui::PushID(name.c_str());
       if (ImGui::Button("Delete", ImVec2(200, 0))) {
-        layout_manager.delete_layout(name);
+        layout_manager.delete_layout(name, make_runtime());
       }
       ImGui::SameLine();
       ImGui::Text("\"%s\"", name.c_str());
@@ -715,8 +724,7 @@ void EngineDebugLayer::display_overwrite_confirmation_dialog() {
     ImGui::Spacing();
     
     if (ImGui::Button("Yes")) {
-      auto& layout_manager = Application::get().get_layout_manager();
-      layout_manager.save_layout(m_pending_layout_name);
+      m_layout.save_layout(m_pending_layout_name);
       m_show_overwrite_confirmation = false;
       m_pending_layout_name.clear();
     }
@@ -736,13 +744,13 @@ void EngineDebugLayer::handle_layout_shortcuts() {
   ImGuiIO& io = ImGui::GetIO();
   
   if (io.KeyAlt && !io.KeyCtrl && !io.KeyShift) {
-    auto& layout_manager = Application::get().get_layout_manager();
+    auto& layout_manager = m_layout;
     
     // Check each number key individually
     if (ImGui::IsKeyPressed(ImGuiKey_1)) {
-      layout_manager.apply_preset(LayoutManager::Preset::MINIMAL);
+      layout_manager.apply_preset(LayoutManager::Preset::MINIMAL, make_runtime());
     } else if (ImGui::IsKeyPressed(ImGuiKey_2)) {
-      layout_manager.apply_preset(LayoutManager::Preset::DEFAULT);
+      layout_manager.apply_preset(LayoutManager::Preset::DEFAULT, make_runtime());
     } else if (ImGui::IsKeyPressed(ImGuiKey_0)) {
       m_show_save_layout_dialog = true;
     } else {
@@ -759,7 +767,7 @@ void EngineDebugLayer::handle_layout_shortcuts() {
       if (custom_index >= 0) {
         auto layouts = layout_manager.get_user_layout_names();
         if (custom_index < static_cast<int>(layouts.size())) {
-          layout_manager.load_layout(layouts[custom_index]);
+          layout_manager.load_layout(layouts[custom_index], make_runtime());
         }
       }
     }
@@ -784,11 +792,10 @@ void EngineDebugLayer::handle_debug_shortcuts() {
     
     // Check for second key
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-      Application::get().reload_shaders();
+      m_renderer.reload_shaders();
       m_debug_mode_active = false;
     } else if (ImGui::IsKeyPressed(ImGuiKey_H)) {
-      auto& app = Application::get();
-      app.set_hot_reload_enabled(!app.is_hot_reload_enabled());
+      m_hot_reload_enabled = !m_hot_reload_enabled;
       m_debug_mode_active = false;
     } else if (ImGui::IsKeyPressed(ImGuiKey_L)) {
       m_show_context_overlay = !m_show_context_overlay;

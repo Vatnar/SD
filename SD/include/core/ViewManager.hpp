@@ -64,6 +64,20 @@ public:
   const std::unordered_map<ViewId, std::unique_ptr<View>>& get_views() const { return m_views_by_id; }
   auto& get_views() { return m_views_by_id; }
 
+  template<typename F>
+  void for_each(F&& fn) {
+    for (auto& [id, view] : m_views_by_id) {
+      fn(*view);
+    }
+  }
+
+  template<typename F>
+  void for_each(F&& fn) const {
+    for (const auto& [id, view] : m_views_by_id) {
+      fn(*view);
+    }
+  }
+
   std::vector<Scene*> get_scenes();
 
   void update_views(float dt);

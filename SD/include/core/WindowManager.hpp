@@ -4,14 +4,17 @@
 //   - Relationship to ViewManager and Application
 #pragma once
 
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
+#include "SDImGuiContext.hpp"
+#include "core/EngineServices.hpp"
 #include "core/LayerList.hpp"
 #include "core/Window.hpp"
 #include "core/id_types.hpp"
 #include "core/vulkan/VulkanWindow.hpp"
-
-#include <memory>
-#include <unordered_map>
-#include <vector>
+#include "vulkan/VulkanRenderer.hpp"
 
 namespace sd {
 
@@ -22,11 +25,15 @@ class ViewManager;
 //   - Default values rationale
 struct WindowProps {
   std::string title;
-  int width, height;
+  int         width, height;
   explicit WindowProps(const std::string& title = "SD Engine", int width = 1280, int height = 720) :
     title(title), width(width), height(height) {}
 };
 
+struct WindowManagerCallbacks {
+  std::function<void()>       close_app;
+  std::function<void(Event&)> on_app_event;
+};
 // TODO(docs): Document WindowManager class
 //   - Purpose: Manages multiple windows (GLFW + Vulkan)
 //   - Window lifecycle (Create, Destroy, ProcessPendingCloses)
@@ -35,29 +42,29 @@ struct WindowProps {
 //   - Example: Creating and managing multiple windows
 class WindowManager {
 public:
-  WindowManager();
+  WindowManager(const EngineServices& services, const WindowManagerCallbacks& callbacks);
   ~WindowManager();
 
   WindowId create(const WindowProps& props);
-  void destroy(WindowId id);
-  void process_pending_closes();
+  void     destroy(WindowId id);
+  void     process_pending_closes();
 
-  Window& get_window(WindowId id);
+  Window&       get_window(WindowId id);
   VulkanWindow& get_render_window(WindowId id);
 
   struct WindowData {
-    std::unique_ptr<Window> logic;
+    std::unique_ptr<Window>       logic;
     std::unique_ptr<VulkanWindow> render;
-    LayerList view_layers;
+    LayerList                     view_layers;
 
-    WindowData() = default;
-    WindowData(WindowData&&) = default;
-    WindowData& operator=(WindowData&&) = default;
-    WindowData(const WindowData&) = delete;
+    WindowData()                             = default;
+    WindowData(WindowData&&)                 = default;
+    WindowData& operator=(WindowData&&)      = default;
+    WindowData(const WindowData&)            = delete;
     WindowData& operator=(const WindowData&) = delete;
   };
 
-  auto& get_windows() { return m_windows; }
+  auto&       get_windows() { return m_windows; }
   const auto& get_windows() const { return m_windows; }
 
   void update_windows(float dt);
@@ -67,9 +74,15 @@ private:
   void update_window(WindowId id, WindowData& data, float dt);
   void draw_window(WindowId id, WindowData& data, ViewManager& viewManager);
 
+  VulkanContext&  m_vulkan_ctx;
+  SDImGuiContext& m_imgui_ctx;
+  VulkanRenderer& m_renderer;
+
+  WindowManagerCallbacks m_callbacks;
+
   std::unordered_map<WindowId, WindowData> m_windows;
-  WindowId m_next_window_id;
-  std::vector<WindowId> m_pending_close;
+  WindowId                                 m_next_window_id;
+  std::vector<WindowId>                    m_pending_close;
 };
 
-} // namespace SD
+} // namespace sd

@@ -7,7 +7,7 @@ namespace sd {
 
 u32 CommandRegistry::register_(const char* name, u32 component_id) {
   std::string key = std::string(name) + "_" + std::to_string(component_id);
-  auto it = map.find(key);
+  auto        it  = map.find(key);
   if (it != map.end()) {
     return it->second;
   }
@@ -19,7 +19,7 @@ u32 CommandRegistry::register_(const char* name, u32 component_id) {
 
 u32 CommandRegistry::get_id(const char* name, u32 component_id) {
   std::string key = std::string(name) + "_" + std::to_string(component_id);
-  auto it = map.find(key);
+  auto        it  = map.find(key);
   if (it != map.end()) {
     return it->second;
   }
@@ -54,7 +54,7 @@ void CommandQueue::apply(EntityManager& em) {
   m_commands.clear();
 }
 void CommandQueue::set_entity_for_handle(EntityHandle entity_handle, Entity entity) {
-  assert(entity_handle.is_valid() && "Cannot set entity for invalid (sentinel) handle");
+  ASSERT(entity_handle.is_valid() && "Cannot set entity for invalid (sentinel) handle");
   if (entity_handle.id >= m_handle_to_entity.size()) {
     m_handle_to_entity.resize(entity_handle.id + 1);
   }
@@ -71,7 +71,7 @@ usize CommandQueue::get_count() const {
   return m_commands.size();
 }
 Entity CommandQueue::get_entity(EntityHandle handle) const {
-  assert(handle.id < m_handle_to_entity.size() && "Entity has not been resolved");
+  ASSERT(handle.id < m_handle_to_entity.size() && "Entity has not been resolved");
   return m_handle_to_entity[handle.id];
 }
 
@@ -81,7 +81,7 @@ void CommandQueue::serialize(Serializer& serializer) const {
     serializer.write(cmd->get_type_id());
     // Serialize command to temp buffer to know its size
     std::vector<std::byte> payload;
-    Serializer payload_serializer(payload);
+    Serializer             payload_serializer(payload);
     cmd->serialize(payload_serializer);
     serializer.write(static_cast<u32>(payload.size()));
     serializer.write(payload.data(), payload.size());
@@ -94,17 +94,18 @@ void CommandQueue::deserialize(Serializer& serializer) {
   m_commands.reserve(count);
 
   for (u32 i = 0; i < count; ++i) {
-    u32 type_id = serializer.read<u32>();
-    u32 payload_size = serializer.read<u32>();
+    u32   type_id       = serializer.read<u32>();
+    u32   payload_size  = serializer.read<u32>();
     usize payload_start = serializer.get_offset();
     if (auto cmd = CommandFactory::create(type_id)) {
       cmd->deserialize(serializer);
       m_commands.push_back(std::move(cmd));
     } else {
-      log::engine::error("Unknown command type ID {} during deserialization, skipping {} bytes", type_id, payload_size);
+      log::engine::error("Unknown command type ID {} during deserialization, skipping {} bytes",
+                         type_id, payload_size);
       serializer.SetOffset(payload_start + payload_size);
     }
   }
 }
 
-} // namespace SD
+} // namespace sd

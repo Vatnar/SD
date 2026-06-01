@@ -1,10 +1,10 @@
 #include "core/vulkan/VulkanContext.hpp"
-#include "core/base.hpp"
 
 #include <algorithm>
 
 #include "core/GlfwContext.hpp"
 #include "core/LayerList.hpp"
+#include "core/base.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 namespace sd {
@@ -19,7 +19,6 @@ VulkanContext::VulkanContext(const GlfwContext& glfw_ctx) : m_glfw_ctx(glfw_ctx)
   VULKAN_HPP_DEFAULT_DISPATCHER.init(m_vk_get_instance_proc_addr);
 
   m_instance = create_vulkan_application_instance();
-  // Temp surface, dies at end of func
 }
 
 void VulkanContext::init(const Window& window) {
@@ -28,9 +27,9 @@ void VulkanContext::init(const Window& window) {
   setup_queues(temp_surface.get());
 
   auto surface_formats = check_vulkan_res_val(m_phys_dev.getSurfaceFormatsKHR(temp_surface.get()),
-                                          "Failed to get surface formats: ");
+                                              "Failed to get surface formats: ");
   if (surface_formats.size() == 1 && surface_formats[0].format == vk::Format::eUndefined) {
-    m_surface_format.format = vk::Format::eB8G8R8A8Srgb;
+    m_surface_format.format     = vk::Format::eB8G8R8A8Srgb;
     m_surface_format.colorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
   } else {
     m_surface_format = surface_formats[0];
@@ -48,17 +47,17 @@ void VulkanContext::init(const Window& window) {
   m_graphics_queue = m_vulkan_device->getQueue(m_graphics_family_index, 0);
 
   // Initialize VMA
-  VmaVulkanFunctions vulkan_functions = {};
+  VmaVulkanFunctions vulkan_functions    = {};
   vulkan_functions.vkGetInstanceProcAddr = m_vk_get_instance_proc_addr;
-  vulkan_functions.vkGetDeviceProcAddr = m_vk_get_device_proc_addr;
+  vulkan_functions.vkGetDeviceProcAddr   = m_vk_get_device_proc_addr;
 
   VmaAllocatorCreateInfo allocator_create_info = {};
-  allocator_create_info.vulkanApiVersion = VK_API_VERSION_1_3;
-  allocator_create_info.physicalDevice = m_phys_dev;
-  allocator_create_info.device = m_vulkan_device.get();
-  allocator_create_info.instance = m_instance.get();
-  allocator_create_info.pVulkanFunctions = &vulkan_functions;
-  allocator_create_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+  allocator_create_info.vulkanApiVersion       = VK_API_VERSION_1_3;
+  allocator_create_info.physicalDevice         = m_phys_dev;
+  allocator_create_info.device                 = m_vulkan_device.get();
+  allocator_create_info.instance               = m_instance.get();
+  allocator_create_info.pVulkanFunctions       = &vulkan_functions;
+  allocator_create_info.flags                  = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
   if (vmaCreateAllocator(&allocator_create_info, &m_allocator) != VK_SUCCESS) {
     engine_abort("Failed to create VMA allocator");
@@ -117,19 +116,19 @@ vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
 
   // TODO: Enable validation layers if in debug mode
   vk::InstanceCreateInfo inst_info({}, &app_info, {}, instance_exts);
-  vk::UniqueInstance instance =
-      check_vulkan_res_val(vk::createInstanceUnique(inst_info), "Failed to create unique Instance: ");
+  vk::UniqueInstance     instance = check_vulkan_res_val(vk::createInstanceUnique(inst_info),
+                                                         "Failed to create unique Instance: ");
 
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
 
   m_phys_dev = check_vulkan_res_val(instance->enumeratePhysicalDevices(),
-                               "Failed to enumerate physical devices: ")
-                 .front();
+                                    "Failed to enumerate physical devices: ")
+                   .front();
   return instance;
 }
 void VulkanContext::setup_queues(vk::SurfaceKHR surface) {
-  auto queue_families = m_phys_dev.getQueueFamilyProperties();
-  u32 graphics_family_index = UINT32_MAX;
+  auto queue_families        = m_phys_dev.getQueueFamilyProperties();
+  u32  graphics_family_index = UINT32_MAX;
 
   for (u32 i = 0; i < queue_families.size(); ++i) {
     if ((queue_families[i].queueFlags & vk::QueueFlagBits::eGraphics) ==
@@ -155,16 +154,16 @@ void VulkanContext::setup_queues(vk::SurfaceKHR surface) {
 void VulkanContext::setup_device_extensions() {
   // Enable features for wireframe rendering (VK_POLYGON_MODE_LINE)
   m_features2.features.fillModeNonSolid = VK_TRUE;
-  
-  m_features12.timelineSemaphore = VK_TRUE;
+
+  m_features12.timelineSemaphore   = VK_TRUE;
   m_features12.bufferDeviceAddress = VK_TRUE;
   m_features13.setDynamicRendering(true).setSynchronization2(true);
   m_features12.pNext = &m_features13;
   m_features2.setPNext(&m_features12);
 
   auto available = check_vulkan_res_val(m_phys_dev.enumerateDeviceExtensionProperties(),
-                                     "Failed to enumerate device extension properties: ");
-  auto supports = [&](const char* name) {
+                                        "Failed to enumerate device extension properties: ");
+  auto supports  = [&](const char* name) {
     return std::ranges::any_of(available, [&](const vk::ExtensionProperties& e) {
       return std::strcmp(e.extensionName, name) == 0;
     });
@@ -179,15 +178,18 @@ void VulkanContext::setup_device_extensions() {
   require_ext(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 }
 void VulkanContext::create_vulkan_device() {
-  float priority = 1.0f;
+  float                     priority = 1.0f;
   vk::DeviceQueueCreateInfo queue_info({}, m_graphics_family_index, 1, &priority);
 
   vk::DeviceCreateInfo dev_info({}, queue_info, {}, m_device_exts);
   dev_info.setPNext(&m_features2);
 
-  m_vulkan_device =
-      check_vulkan_res_val(m_phys_dev.createDeviceUnique(dev_info), "Failed to create unique device: ");
-  m_vk_get_device_proc_addr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(m_vulkan_device->getProcAddr("vkGetDeviceProcAddr"));
+  m_vulkan_device = check_vulkan_res_val(m_phys_dev.createDeviceUnique(dev_info),
+                                         "Failed to create unique device: ");
+  ASSERT(m_vulkan_device.get() != nullptr);
+
+  m_vk_get_device_proc_addr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(
+      m_vulkan_device->getProcAddr("vkGetDeviceProcAddr"));
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*m_instance, m_vulkan_device.get());
 }
-} // namespace SD
+} // namespace sd

@@ -6,6 +6,8 @@
 
 namespace sd {
 
+struct ApplicationRuntime;
+
 /// Manages window layouts using ImGui DockBuilder for presets and INI for user layouts
 class LayoutManager {
 public:
@@ -21,19 +23,19 @@ public:
   void init();
   
   /// Apply a preset layout (uses DockBuilder API) - call this after dockspace exists
-  void apply_preset(Preset preset);
+  void apply_preset(Preset preset, ApplicationRuntime runtime);
   
   /// Apply the pending layout (call from first frame when dockspace is ready)
-  void apply_pending_layout();
+  void apply_pending_layout(ApplicationRuntime runtime);
   
   /// Save current layout to a user-named file
   void save_layout(const std::string& name);
   
   /// Load a user-saved layout
-  bool load_layout(const std::string& name);
+  bool load_layout(const std::string& name, ApplicationRuntime runtime);
   
   /// Delete a user layout
-  void delete_layout(const std::string& name);
+  void delete_layout(const std::string& name, ApplicationRuntime runtime);
   
   /// Get list of user-saved layout names
   std::vector<std::string> get_user_layout_names() const;
@@ -50,9 +52,9 @@ private:
   void save_current_layout_name();
   void refresh_layout_list();
   
-  std::map<std::string, std::string> m_user_layouts; // name -> filepath
+  std::map<std::string, std::string> m_user_layouts;
   std::string m_current_layout = "Default";
-  std::string m_pending_layout; // Layout to apply once dockspace exists
+  std::string m_pending_layout;
   bool m_is_initialized = false;
   bool m_has_applied_initial_layout = false;
 };

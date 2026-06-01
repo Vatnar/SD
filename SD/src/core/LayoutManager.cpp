@@ -1,16 +1,17 @@
 #include "core/LayoutManager.hpp"
 
 #include <imgui.h>
-#include <imgui_internal.h>  // For DockBuilder API
+#include <imgui_internal.h>
 
 #include <filesystem>
 #include <fstream>
 
-#include "Application.hpp"
+#include "core/ApplicationRuntime.hpp"
 #include "core/Layer.hpp"
+#include "core/SceneManager.hpp"
+#include "core/ViewManager.hpp"
 #include "core/layers/EngineDebugLayer.hpp"
 #include "core/logging.hpp"
-#include "core/View.hpp"
 
 namespace sd {
 
@@ -44,7 +45,7 @@ void LayoutManager::init() {
   m_is_initialized = true;
 }
 
-void LayoutManager::apply_preset(Preset preset) {
+void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
   if (!ImGui::GetCurrentContext()) {
     log::engine::warn("Cannot apply preset: ImGui context not available");
     return;
@@ -65,11 +66,9 @@ void LayoutManager::apply_preset(Preset preset) {
   };
   DockBuilderGuard guard(dockspace_id);
   
-  auto& app = Application::get();
-  
   // Find EngineDebugLayer to control inspector windows
   EngineDebugLayer* debug_layer = nullptr;
-  for (auto& layer : app.get_global_layers()) {
+  for (auto& layer : runtime.global_layers) {
     if (auto* edl = dynamic_cast<EngineDebugLayer*>(layer.get())) {
       debug_layer = edl;
       break;
@@ -78,14 +77,14 @@ void LayoutManager::apply_preset(Preset preset) {
 
   if (preset == Preset::MINIMAL) {
     // Close all views except Game
-    for (const auto& [id, view] : app.get_views()) {
-      if (view->get_name() != "Game") {
-        view->SetOpen(false);
+    runtime.views.for_each([&](View& view) {
+      if (view.get_name() != "Game") {
+        view.SetOpen(false);
       }
-    }
+    });
 
     // Open Game view
-    auto game_view = app.get_view("Game");
+    auto game_view = runtime.views.get("Game");
     if (game_view) {
       game_view->get().SetOpen(true);
       ImGui::DockBuilderDockWindow("Game", dockspace_id);
@@ -101,9 +100,9 @@ void LayoutManager::apply_preset(Preset preset) {
 
   } else { // Default
     // Ensure all views are open
-    for (const auto& view : app.get_views() | std::views::values) {
-      view->SetOpen(true);
-    }
+    runtime.views.for_each([](View& view) {
+      view.SetOpen(true);
+    });
 
     // Show all inspector windows
     if (debug_layer) {
@@ -119,7 +118,7 @@ void LayoutManager::apply_preset(Preset preset) {
     ImGui::DockBuilderSplitNode(dock_id_right, ImGuiDir_Up, 0.50f, &dock_id_right_top, &dock_id_right_bottom);
 
     // Dock windows
-    auto game_view = app.get_view("Game");
+    auto game_view = runtime.views.get("Game");
     if (game_view) {
       ImGui::DockBuilderDockWindow("Game", dock_id_left);
     }
@@ -140,7 +139,7 @@ void LayoutManager::apply_preset(Preset preset) {
   // DockBuilderFinish called automatically by guard
 }
 
-void LayoutManager::apply_pending_layout() {
+void LayoutManager::apply_pending_layout(ApplicationRuntime runtime) {
   if (m_has_applied_initial_layout || m_pending_layout.empty()) return;
   
   // Check if dockspace exists
@@ -150,11 +149,11 @@ void LayoutManager::apply_pending_layout() {
   
   // Apply the pending layout
   if (m_pending_layout == "Minimal") {
-    apply_preset(Preset::MINIMAL);
+    apply_preset(Preset::MINIMAL, runtime);
   } else if (m_pending_layout == "Default") {
-    apply_preset(Preset::DEFAULT);
+    apply_preset(Preset::DEFAULT, runtime);
   } else if (has_layout(m_pending_layout)) {
-    load_layout(m_pending_layout);
+    load_layout(m_pending_layout, runtime);
   }
   
   m_pending_layout.clear();
@@ -183,7 +182,7 @@ void LayoutManager::save_layout(const std::string& name) {
   log::engine::info("Layout '{}' saved to {}", name, path);
 }
 
-bool LayoutManager::load_layout(const std::string& name) {
+bool LayoutManager::load_layout(const std::string& name, ApplicationRuntime runtime) {
   if (!has_layout(name)) {
     log::engine::warn("Layout '{}' not found", name);
     return false;
@@ -203,19 +202,14 @@ bool LayoutManager::load_layout(const std::string& name) {
   io.IniFilename = old_ini_filename;
   
   // Update view visibility based on what ImGui knows
-  auto& app = Application::get();
   ImGuiContext* ctx = ImGui::GetCurrentContext();
   if (ctx) {
-    for (const auto& view : app.get_views() | std::views::values) {
-      // Check if ImGui has this window
-      ImGuiWindow* imgui_window = ImGui::FindWindowByName(view->get_name().c_str());
+    runtime.views.for_each([&](View& view) {
+      ImGuiWindow* imgui_window = ImGui::FindWindowByName(view.get_name().c_str());
       if (imgui_window) {
-        // Sync ImGui's collapsed state to View's open state
-        // Note: ImGui doesn't track "closed" vs "collapsed" the same way
-        // For now, we'll just ensure the view is open
-        view->SetOpen(true);
+        view.SetOpen(true);
       }
-    }
+    });
   }
   
   m_current_layout = name;
@@ -225,7 +219,7 @@ bool LayoutManager::load_layout(const std::string& name) {
   return true;
 }
 
-void LayoutManager::delete_layout(const std::string& name) {
+void LayoutManager::delete_layout(const std::string& name, ApplicationRuntime runtime) {
   if (!has_layout(name)) return;
   
   std::string path = m_user_layouts[name];
@@ -239,7 +233,7 @@ void LayoutManager::delete_layout(const std::string& name) {
   
   if (m_current_layout == name) {
     m_current_layout = "Default";
-    apply_preset(Preset::DEFAULT);
+    apply_preset(Preset::DEFAULT, runtime);
   }
   
   refresh_layout_list();

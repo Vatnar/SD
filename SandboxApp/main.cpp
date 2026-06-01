@@ -26,7 +26,7 @@ public:
     m_another_scene = app.create_scene("AnotherScene");
 
     auto& game_view = app.create_view<sd::View>("Game");
-    auto& renderer = app.get_renderer();
+    auto& renderer = app.services().renderer;
     auto& pipelines = renderer.get_pipeline_factory();
     game_view.setup_layered_render(3);
 
@@ -53,7 +53,7 @@ public:
 
     game_view.push_layer<GameRenderLayer>(1, "GameRender", m_shared_scene, world_pipe_handle,
                                         wire_pipe_handle, push_layout, &pipelines);
-    app.push_global_layer<sd::EngineDebugLayer>(m_shared_scene);
+    app.push_global_layer<sd::EngineDebugLayer>(app.runtime(), app.services(), m_shared_scene);
 
     auto ent = m_shared_scene->em.create();
     m_shared_scene->em.add_component<sd::DebugName>(ent, "Triangle");
@@ -118,7 +118,7 @@ int main() {
   std::unique_ptr<sd::GameContext> game;
   game = std::make_unique<SandboxGame>(state_manager.get());
 
-  app->set_game_context(game.get());
+  app->game_context = game.get();
 
   game->on_load(*app);
 

@@ -4,16 +4,19 @@
 //   - Dock space management
 //   - Texture descriptor set utilities
 #pragma once
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
 
+#include <backends/imgui_impl_vulkan.h>
+
+#include "core/Window.hpp"
 #include "core/vulkan/VulkanContext.hpp"
 #include "core/vulkan/VulkanWindow.hpp"
-#include "core/Window.hpp"
 
 namespace sd {
 
+struct SDImGuiCallbacks {
+  std::function<void()> close_app;
+};
 // TODO(docs): Document SDImGuiContext class
 //   - Purpose: Manages ImGui context and Vulkan integration
 //   - Init/Shutdown lifecycle
@@ -23,8 +26,13 @@ namespace sd {
 //   - Example: Setting up ImGui in a custom layer
 class SDImGuiContext {
 public:
-  SDImGuiContext() = default;
+  explicit SDImGuiContext(const SDImGuiCallbacks& callbacks) : m_callbacks(callbacks) {}
   ~SDImGuiContext();
+  SDImGuiContext(const SDImGuiContext& other)                = delete;
+  SDImGuiContext(SDImGuiContext&& other) noexcept            = delete;
+  SDImGuiContext& operator=(const SDImGuiContext& other)     = delete;
+  SDImGuiContext& operator=(SDImGuiContext&& other) noexcept = delete;
+
 
   void init(Window& window, VulkanWindow& vw);
 
@@ -38,10 +46,12 @@ public:
   void begin_dock_space(const std::string& title = "SDEngine Editor");
   void end_dock_space();
 
-  ImGuiContext* get_context() const { return m_context; }
+  ImGuiContext*      get_context() const { return m_context; }
   vk::DescriptorPool get_descriptor_pool() const { return *m_descriptor_pool; }
 
-  VkDescriptorSet create_texture_from_view(VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  VkDescriptorSet
+       create_texture_from_view(VkImageView   view,
+                                VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   void remove_texture(VkDescriptorSet descriptor_set);
 
 
@@ -52,11 +62,12 @@ private:
 private:
   ImGuiContext* m_context = nullptr;
 
-private:
+  SDImGuiCallbacks m_callbacks;
+
   vk::UniqueDescriptorPool m_descriptor_pool;
-  vk::UniqueRenderPass m_render_pass;
-  vk::UniqueSampler m_default_sampler;
-  bool m_is_vulkan_initialized = false;
+  vk::UniqueRenderPass     m_render_pass;
+  vk::UniqueSampler        m_default_sampler;
+  bool                     m_is_vulkan_initialized = false;
 };
 
-} // namespace SD
+} // namespace sd

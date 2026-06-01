@@ -8,11 +8,37 @@
 #include <format>
 #include <iostream>
 #include <source_location>
+
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
 #include "core/logging.hpp"
 #include "core/types.hpp"
+
+#if defined(_MSC_VER)
+#define TRAP() __debugbreak()
+#elif defined(__GNUC__) || defined(__clang__)
+#define TRAP() __builtin_trap()
+#else
+#error Unknown trap intrinsic for compiler.
+#endif
+#define ASSERT_ALWAYS(x)                                                                                           \
+  do {                                                                                                              \
+    if (!(x)) {                                                                                                     \
+      spdlog::critical("ASSERT FAILED: {} at {}:{}", #x, __FILE__, __LINE__);                                      \
+      TRAP();                                                                                                       \
+    }                                                                                                               \
+  } while (0)
+
+#ifndef NDEBUG
+#define ASSERT(x) ASSERT_ALWAYS(x)
+#else
+#define ASSERT(x) (void)(x)
+#endif
+#define INVALID_PATH    ASSERT(!"Invalid Path!")
+#define NOT_IMPLEMENTED ASSERT(!"Not Implemented!")
+#define NO_OP           ((void)0)
+
 
 namespace sd {
 
@@ -26,7 +52,7 @@ consteval usize log2_int(std::unsigned_integral auto n) {
   // log2(n) = bit_width(n) - 1
   return n == 0 ? 0 : std::bit_width(n) - 1;
 }
-} // namespace Math
+} // namespace math
 
 // TODO(docs): Document Abort() overloads
 //   - Explain when to use vs exceptions
@@ -51,7 +77,7 @@ consteval usize log2_int(std::unsigned_integral auto n) {
 //   - When to use each function
 //   - Example usage patterns
 inline void check_vulkan_res(vk::Result result, std::string_view message,
-                           std::source_location loc = std::source_location::current()) {
+                             std::source_location loc = std::source_location::current()) {
   if (result != vk::Result::eSuccess) {
     auto p =
         std::format("{}:{} {}: {}", loc.file_name(), loc.line(), message, vk::to_string(result));
@@ -61,7 +87,7 @@ inline void check_vulkan_res(vk::Result result, std::string_view message,
 
 template<typename T>
 auto check_vulkan_res_val(T&& result, std::string_view message,
-                       std::source_location loc = std::source_location::current()) {
+                          std::source_location loc = std::source_location::current()) {
   // Try to detect if it's a vk::ResultValue or something like std::expected
   if constexpr (requires { result.result; }) {
     check_vulkan_res(result.result, message, loc);
@@ -78,7 +104,7 @@ auto check_vulkan_res_val(T&& result, std::string_view message,
 }
 
 inline u32 find_memory_type(const vk::PhysicalDevice& physical_device, u32 type_filter,
-                          vk::MemoryPropertyFlags properties) {
+                            vk::MemoryPropertyFlags properties) {
   vk::PhysicalDeviceMemoryProperties mem_properties = physical_device.getMemoryProperties();
   for (u32 i = 0; i < mem_properties.memoryTypeCount; i++) {
     if ((type_filter & (1 << i)) &&
@@ -88,4 +114,4 @@ inline u32 find_memory_type(const vk::PhysicalDevice& physical_device, u32 type_
   engine_abort("Failed to find memory type");
 }
 
-} // namespace SD
+} // namespace sd

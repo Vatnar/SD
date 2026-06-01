@@ -7,9 +7,10 @@
 
 namespace sd {
 
-SDImGuiViewport::SDImGuiViewport(VulkanContext& ctx, const std::string& name, u32 width,
-                                 u32 height) : m_name(name), m_ctx(ctx) {
-  m_framebuffer = std::make_unique<VulkanFramebuffer>(ctx, width, height);
+SDImGuiViewport::SDImGuiViewport(EngineServices& services, const std::string& name, u32 width,
+                                 u32 height) :
+  m_name(name), m_vulkan_ctx(services.vulkan), m_imgui_ctx(services.imgui) {
+  m_framebuffer = std::make_unique<VulkanFramebuffer>(m_vulkan_ctx, width, height);
 
   // Create Sampler for ImGui
   vk::SamplerCreateInfo sampler_info(
@@ -17,8 +18,9 @@ SDImGuiViewport::SDImGuiViewport(VulkanContext& ctx, const std::string& name, u3
       vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
       vk::SamplerAddressMode::eRepeat, 0.0f, VK_FALSE, 1.0f, VK_FALSE, vk::CompareOp::eAlways, 0.0f,
       0.0f, vk::BorderColor::eIntOpaqueBlack, VK_FALSE);
-  m_sampler = check_vulkan_res_val(m_ctx.get_vulkan_device()->createSamplerUnique(sampler_info),
-                               "Failed to create viewport sampler");
+  m_sampler =
+      check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createSamplerUnique(sampler_info),
+                           "Failed to create viewport sampler");
 
   // Descriptor set for ImGui
   // We need to access the descriptor pool from ImGui context
@@ -29,7 +31,7 @@ SDImGuiViewport::SDImGuiViewport(VulkanContext& ctx, const std::string& name, u3
 SDImGuiViewport::~SDImGuiViewport() {
   // Clean up ImGui texture descriptor set
   if (m_texture_id != nullptr) {
-    Application::get().get_im_gui_context().remove_texture(m_texture_id);
+    m_imgui_ctx.remove_texture(m_texture_id);
     m_texture_id = nullptr;
   }
 }
@@ -40,10 +42,11 @@ void SDImGuiViewport::begin() {
 
   ImVec2 viewport_panel_size = ImGui::GetContentRegionAvail();
   if (viewport_panel_size.x > 0 && viewport_panel_size.y > 0) {
-    u32 width = static_cast<u32>(viewport_panel_size.x);
+    u32 width  = static_cast<u32>(viewport_panel_size.x);
     u32 height = static_cast<u32>(viewport_panel_size.y);
 
-    if (m_framebuffer->get_extent().width != width || m_framebuffer->get_extent().height != height) {
+    if (m_framebuffer->get_extent().width != width ||
+        m_framebuffer->get_extent().height != height) {
       m_framebuffer->resize(width, height);
       m_texture_id = VK_NULL_HANDLE; // Force recreation
     }
@@ -54,7 +57,7 @@ void SDImGuiViewport::begin() {
     // auto pool = app.GetImGuiContext().GetDescriptorPool();
 
     m_texture_id = ImGui_ImplVulkan_AddTexture(*m_sampler, m_framebuffer->get_color_image_view(),
-                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   }
 
   ImGui::Image(m_texture_id, viewport_panel_size);
@@ -65,4 +68,4 @@ void SDImGuiViewport::end() {
   ImGui::PopStyleVar();
 }
 
-} // namespace SD
+} // namespace sd

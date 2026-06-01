@@ -30,12 +30,13 @@ set(ENGINE_SOURCES
         src/core/vulkan/PipelineFactory.cpp
         src/core/vulkan/VulkanWindow.cpp
         src/core/vulkan/VulkanFramebuffer.cpp
+        src/core/vulkan/ShaderLibrary.cpp
         src/core/SDImGuiViewport.cpp
+        src/core/SceneManager.cpp
         src/core/LayoutManager.cpp
         src/Application.cpp
         src/core/WindowManager.cpp
         src/core/ViewManager.cpp
-        src/core/vulkan/ShaderLibrary.cpp
         src/core/View.cpp
         src/RuntimeStateManager.cpp
         src/core/ecs/CommandQueue.cpp
@@ -87,23 +88,15 @@ target_precompile_headers(SD PRIVATE
         <algorithm>
         <cstdint>
 )
-#########################
-# sdEngine compile defs #
-#########################
 
-target_compile_definitions(SD PUBLIC
+target_compile_definitions(SD PRIVATE
         SPDLOG_COMPILED_LIB
         SPDLOG_NO_EXCEPTIONS
-        VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
-        VULKAN_HPP_USE_STD_EXPECTED=1
-        VULKAN_HPP_NO_EXCEPTIONS=1
         # Debug-only definitions
         $<$<CONFIG:Debug>:ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_TRACE>
-        $<$<CONFIG:Debug>:_DEBUG>
 
         # Release-only definitions
         $<$<CONFIG:Release>:ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_INFO>
-        $<$<CONFIG:Release>:NDEBUG>
 )
 # PIC
 set_target_properties(SD PROPERTIES POSITION_INDEPENDENT_CODE ON)

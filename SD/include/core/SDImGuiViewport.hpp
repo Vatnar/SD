@@ -1,31 +1,36 @@
 #pragma once
 
 #include <imgui.h>
-#include <string>
 #include <memory>
+#include <string>
+
+#include "SDImGuiContext.hpp"
+#include "core/EngineServices.hpp"
 #include "core/vulkan/VulkanFramebuffer.hpp"
 
 namespace sd {
 
 class SDImGuiViewport {
 public:
-    SDImGuiViewport(VulkanContext& ctx, const std::string& name, uint32_t width = 1280, uint32_t height = 720);
-    ~SDImGuiViewport();
+  SDImGuiViewport(EngineServices& services, const std::string& name, uint32_t width = 1280,
+                  uint32_t height = 720);
+  ~SDImGuiViewport();
 
-    void begin();
-    void end();
+  void begin();
+  void end();
 
-    VulkanFramebuffer& get_framebuffer() { return *m_framebuffer; }
-    const std::string& get_name() const { return m_name; }
-    
-    ImTextureID get_im_gui_texture_id() const { return reinterpret_cast<ImTextureID>(m_texture_id); }
+  VulkanFramebuffer& get_framebuffer() { return *m_framebuffer; }
+  const std::string& get_name() const { return m_name; }
+
+  ImTextureID get_im_gui_texture_id() const { return reinterpret_cast<ImTextureID>(m_texture_id); }
 
 private:
-    std::string m_name;
-    std::unique_ptr<VulkanFramebuffer> m_framebuffer;
-    vk::UniqueSampler m_sampler;
-    VkDescriptorSet m_texture_id = VK_NULL_HANDLE;
-    VulkanContext& m_ctx;
+  std::string                        m_name;
+  std::unique_ptr<VulkanFramebuffer> m_framebuffer;
+  vk::UniqueSampler                  m_sampler;
+  VkDescriptorSet                    m_texture_id = VK_NULL_HANDLE;
+  VulkanContext&                     m_vulkan_ctx;
+  SDImGuiContext&                    m_imgui_ctx;
 };
 
-} // namespace SD
+} // namespace sd

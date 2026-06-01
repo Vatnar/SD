@@ -7,7 +7,6 @@
 #pragma once
 #include <atomic>
 #include <expected>
-#include <format>
 #include <functional>
 #include <memory>
 #include <string>
@@ -16,28 +15,26 @@
 #include <utility>
 #include <vector>
 
-#include "core/base.hpp"
-#include "core/events/EventManager.hpp"
+#include "core/ApplicationRuntime.hpp"
+#include "core/EngineServices.hpp"
 #include "core/FrameTimer.hpp"
 #include "core/LayerList.hpp"
+#include "core/SceneManager.hpp"
 #include "core/Scene.hpp"
 #include "core/View.hpp"
 #include "core/ViewManager.hpp"
 #include "core/WindowManager.hpp"
+#include "core/events/EventManager.hpp"
 
 namespace sd {
 class Event;
 class GameContext;
-class GlfwContext;
 class Layer;
 class LayoutManager;
 class RuntimeStateManager;
-class SDImGuiContext;
-class VulkanContext;
-class VulkanRenderer;
 class VulkanWindow;
 class Window;
-} // namespace SD
+} // namespace sd
 
 
 namespace sd {
@@ -46,11 +43,11 @@ namespace sd {
 //   - Each field's purpose and default value rationale
 //   - Example configuration
 struct ApplicationSpecification {
-  std::string name = "SDEngine App";
-  int width = 1600;
-  int height = 900;
-  bool enableHotReload = true;
-  std::string gameSoPath = "libSandboxApp.so";
+  std::string name            = "SDEngine App";
+  int         width           = 1600;
+  int         height          = 900;
+  bool        enableHotReload = true;
+  std::string gameSoPath      = "libSandboxApp.so";
 };
 
 // TODO(docs): Document Application class thoroughly
@@ -61,138 +58,142 @@ struct ApplicationSpecification {
 //   - Example minimal application setup
 class Application {
 public:
-  explicit Application(const ApplicationSpecification& spec, RuntimeStateManager* state_manager = nullptr);
+  explicit Application(const ApplicationSpecification& spec,
+                       RuntimeStateManager*            state_manager = nullptr);
   virtual ~Application();
 
+  Application(const Application&)            = delete;
+  Application& operator=(const Application&) = delete;
+  Application(Application&&)                 = delete;
+  Application& operator=(Application&&)      = delete;
+
+
+  using ViewResult = ViewManager::ViewResult;
+
   void run(const std::atomic<bool>* external_stop);
+
   void frame();
-  bool is_running() const { return m_is_running; }
-  void close() { m_is_running = false; }
+
+  void close() { is_running = false; }
+
   void on_app_event(Event& e);
 
   // Layer management
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
   T& push_global_layer(Args&&... args) {
-    return m_global_layers.push_layer<T>(std::forward<Args>(args)...);
+    return global_layers.push_layer<T>(std::forward<Args>(args)...);
   }
 
   // Window management
-  WindowId create_window(const WindowProps& props) { return m_window_manager->create(props); }
-  Window& get_window(WindowId id) { return m_window_manager->get_window(id); }
-  VulkanWindow& get_render_window(WindowId id) { return m_window_manager->get_render_window(id); }
+  [[nodiscard]] WindowId create_window(const WindowProps& props) {
+    return window_manager->create(props);
+  }
+  [[nodiscard]] Window& get_window(const WindowId id) const {
+    return window_manager->get_window(id);
+  }
+  [[nodiscard]] VulkanWindow& get_render_window(const WindowId id) const {
+    return window_manager->get_render_window(id);
+  }
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
-  T& push_view_layer(WindowId id, Args&&... args) {
-    auto& windows = m_window_manager->get_windows();
-    if (!windows.contains(id)) {
-      engine_abort(std::format("Attempted to push layer to invalid window ID: {}",
-                        static_cast<uint32_t>(id)));
-    }
-    return windows[id].view_layers.push_layer<T>(std::forward<Args>(args)...);
-  }
+  T& push_view_layer(WindowId id, Args&&... args);
 
-  // View management
   template<typename T, typename... Args>
     requires std::is_base_of_v<View, T>
   T& create_view(std::string name, Args&&... args) {
-    return m_view_manager->create<T>(std::move(name), std::forward<Args>(args)...);
+    return view_manager->create<T>(std::move(name), std::forward<Args>(args)...);
   }
 
-  using ViewResult = ViewManager::ViewResult;
 
-  ViewResult get_view(ViewId id) { return m_view_manager->get(id); }
-  ViewResult get_view(const std::string& name) { return m_view_manager->get(name); }
-  std::expected<ViewId, ViewError> get_view_id(const std::string& name) const {
-    return m_view_manager->GetId(name);
+  [[nodiscard]] ViewResult get_view(const ViewId id) const { return view_manager->get(id); }
+  [[nodiscard]] ViewResult get_view(const std::string& name) const {
+    return view_manager->get(name);
+  }
+  [[nodiscard]] std::expected<ViewId, ViewError> get_view_id(const std::string& name) const {
+    return view_manager->GetId(name);
   }
 
-  ViewError remove_view(ViewId id) { return m_view_manager->remove(id); }
-  ViewError remove_view(const std::string& name) { return m_view_manager->remove(name); }
+[[nodiscard]] ViewError remove_view(ViewId id) { return view_manager->remove(id); }
+  [[nodiscard]] ViewError remove_view(const std::string& name) {
+    return view_manager->remove(name);
+  }
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
-  std::expected<std::reference_wrapper<T>, ViewError> push_layer_to_view(ViewId id, Args&&... args) {
-    return m_view_manager->push_layer<T>(id, std::forward<Args>(args)...);
-  }
+  std::expected<std::reference_wrapper<T>, ViewError> push_layer_to_view(ViewId id, Args&&... args);
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
   std::expected<std::reference_wrapper<T>, ViewError> push_layer_to_view(const std::string& name,
-                                                                      Args&&... args) {
-    auto id_res = m_view_manager->GetId(name);
-    if (!id_res)
-      return std::unexpected(id_res.error());
-    return m_view_manager->push_layer<T>(*id_res, std::forward<Args>(args)...);
-  }
-
-  const std::unordered_map<ViewId, std::unique_ptr<View>>& get_views() const {
-    return m_view_manager->get_views();
-  }
-
-  // Global layer access (needed for layout management)
-  LayerList& get_global_layers() { return m_global_layers; }
-  const LayerList& get_global_layers() const { return m_global_layers; }
+                                                                          Args&&... args);
 
   // Scene management
-  Scene* create_scene(const std::string& name);
-  Scene* get_scene(const std::string& name) const;
-  std::vector<Scene*> get_scenes();
+  Scene*               create_scene(const std::string& name) { return scene_manager.create(name); }
+  [[nodiscard]] Scene* get_scene(const std::string& name) const { return scene_manager.get(name); }
 
-  // Game Context (for hot reload)
-  void set_game_context(GameContext* ctx);
-  void set_game_handle(void* handle) { m_game_handle = handle; }
-  GameContext* get_game_context() const { return m_game_context; }
   void clear_game_layers();
   void reload_game();
 
-  // Hot Reload
-  void set_hot_reload_enabled(bool enabled) { m_hot_reload_enabled = enabled; }
-  bool is_hot_reload_enabled() const { return m_hot_reload_enabled; }
   void reload_shaders() const;
 
-  // Accessors
-  VulkanContext& get_vulkan_context() { return *m_vulkan_ctx; }
-  VulkanRenderer& get_renderer() { return *m_renderer; }
-  SDImGuiContext& get_im_gui_context() { return *m_im_gui_ctx; }
-  WindowManager& get_window_manager() { return *m_window_manager; }
-  ViewManager& get_view_manager() { return *m_view_manager; }
-  LayoutManager& get_layout_manager() { return *m_layout_manager; }
-
-  static Application& get() {
-    assert(s_instance && "Application::Get() called before Application was constructed");
-    return *s_instance;
+  [[nodiscard]] EngineServices services() const {
+    return EngineServices{
+        .glfw     = *m_glfw_ctx,
+        .vulkan   = *m_vulkan_ctx,
+        .renderer = *m_renderer,
+        .imgui    = *m_imgui_ctx,
+    };
   }
-  float get_frame_work_time() const { return m_timer.get_frame_work_time(); }
-  void add_gpu_wait_time(float t) { m_timer.add_gpu_wait_time(t); }
-  FrameTimer& get_frame_timer() { return m_timer; }
+
+  [[nodiscard]] ApplicationRuntime runtime() {
+    return ApplicationRuntime{
+        .views              = *view_manager,
+        .scenes             = scene_manager,
+        .layout             = *layout_manager,
+        .events             = app_event_manager,
+        .timer              = timer,
+        .global_layers      = global_layers,
+        .hot_reload_enabled = hot_reload_enabled,
+    };
+  }
+
+public:
+  bool  is_running         = true;
+  bool  hot_reload_enabled = true;
+  float hot_reload_timer   = 0.0f;
+
+
+  ApplicationSpecification app_spec;
+
+
+  // todo: abstract
+
+
+  std::unique_ptr<WindowManager> window_manager;
+  std::unique_ptr<ViewManager>   view_manager;
+  std::unique_ptr<LayoutManager> layout_manager;
+  SceneManager                    scene_manager;
+
+  LayerList    global_layers;
+  EventManager app_event_manager;
+  GameContext*                        game_context = nullptr;
+
+  RuntimeStateManager* state_manager;
+  FrameTimer           timer;
 
 private:
-  static Application* s_instance;
-  ApplicationSpecification m_spec;
-  bool m_is_running = true;
-  bool m_hot_reload_enabled = true;
-  float m_hot_reload_timer = 0.0f;
-
-  std::unique_ptr<GlfwContext> m_glfw_ctx;
-  std::unique_ptr<VulkanContext> m_vulkan_ctx;
+  std::unique_ptr<GlfwContext>    m_glfw_ctx;
+  std::unique_ptr<VulkanContext>  m_vulkan_ctx;
   std::unique_ptr<VulkanRenderer> m_renderer;
-  std::unique_ptr<SDImGuiContext> m_im_gui_ctx;
+  std::unique_ptr<SDImGuiContext> m_imgui_ctx;
 
-  std::unique_ptr<WindowManager> m_window_manager;
-  std::unique_ptr<ViewManager> m_view_manager;
-  std::unique_ptr<LayoutManager> m_layout_manager;
-
-  LayerList m_global_layers;
-  EventManager m_app_event_manager;
-
-  std::vector<std::unique_ptr<Scene>> m_scenes;
-  GameContext* m_game_context = nullptr;
   void* m_game_handle = nullptr;
-
-  FrameTimer m_timer;
-  RuntimeStateManager* m_state_manager;
 };
 
-} // namespace SD
+
+} // namespace sd
+
+
+#include "impl/Application.inl"

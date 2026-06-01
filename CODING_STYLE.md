@@ -63,7 +63,7 @@ Example:
 #include <algorithm>                        // 2. standard library
 #include <vector>
 
-#include <vulkan/vulkan.hpp>                // 3. third-party
+#include "core/vulkan/vulkan_config.hpp"                // 3. third-party
 #include <spdlog/spdlog.h>
 
 #include "Core/Base.hpp"                    // 4. project headers
