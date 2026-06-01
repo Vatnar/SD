@@ -25,9 +25,8 @@ jobs:
       
       - name: Setup Doxygen Awesome Theme
         run: |
-          rm -rf docs/theme
-          git clone https://github.com/jothepro/doxygen-awesome-css.git docs/theme
-          sed -i 's|/theme/|docs/theme/|g' docs/Doxyfile
+          git clone https://github.com/jothepro/doxygen-awesome-css.git docs/awesome-theme
+          sed -i 's|/awesome-theme/|docs/awesome-theme/|g' docs/Doxyfile
           sed -i 's|OUTPUT_DIRECTORY.*|OUTPUT_DIRECTORY = docs_output|' docs/Doxyfile
           sed -i 's|HTML_OUTPUT.*|HTML_OUTPUT = html|' docs/Doxyfile
       
@@ -52,6 +51,7 @@ jobs:
         run: |
           mkdir -p public
           echo "sd.vatnar.dev" > public/CNAME
+          touch public/.nojekyll
           cp -r docs_output/html public/docs
           cp -r docs/website/public/* public/
       
