@@ -1,7 +1,7 @@
-#include "core/SceneManager.hpp"
+#include "SD/core/SceneManager.hpp"
 
-#include "core/Scene.hpp"
-#include "core/logging.hpp"
+#include "SD/core/Scene.hpp"
+#include "SD/core/logging.hpp"
 
 namespace sd {
 

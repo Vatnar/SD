@@ -58,16 +58,16 @@ Use `#pragma once` in every header.
 Example:
 
 ```cpp
-#include "Core/Vulkan/VulkanRenderer.hpp"  // 1. matching header
+#include "SD/core/Vulkan/VulkanRenderer.hpp"  // 1. matching header
 
 #include <algorithm>                        // 2. standard library
 #include <vector>
 
-#include "core/vulkan/vulkan_config.hpp"                // 3. third-party
+#include "SD/core/vulkan/vulkan_config.hpp"                // 3. third-party
 #include <spdlog/spdlog.h>
 
-#include "Core/Base.hpp"                    // 4. project headers
-#include "Core/Logging.hpp"
+#include "SD/core/Base.hpp"                    // 4. project headers
+#include "SD/core/Logging.hpp"
 ```
 
 ---

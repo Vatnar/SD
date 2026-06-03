@@ -1,7 +1,7 @@
-#include "core/ecs/CommandQueue.hpp"
+#include "SD/core/ecs/CommandQueue.hpp"
 
-#include "core/ecs/commands.hpp"
-#include "utils/utils.hpp"
+#include "SD/core/ecs/commands.hpp"
+#include "SD/utils/utils.hpp"
 
 namespace sd {
 

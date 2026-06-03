@@ -25,17 +25,49 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
       }
+    },
+    {
+      "name": "release-unity",
+      "displayName": "Release (unity build)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_UNITY_BUILD": "ON",
+        "CMAKE_UNITY_BUILD_BATCH_SIZE": "8",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
+      }
+    },
+    {
+      "name": "debug-asan",
+      "displayName": "Debug + ASan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SD_ENABLE_ASAN": "ON",
+        "CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP": "OFF",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
+      }
     }
   ],
   "buildPresets": [
     {
-      "name": "debug",
+      "name": "debug-build",
       "configurePreset": "debug",
       "jobs": 0
     },
     {
-      "name": "release",
+      "name": "release-build",
       "configurePreset": "release",
+      "jobs": 0
+    },
+    {
+      "name": "release-unity-build",
+      "configurePreset": "release-unity",
+      "jobs": 0
+    },
+    {
+      "name": "debug-asan-build",
+      "configurePreset": "debug-asan",
       "jobs": 0
     }
   ]

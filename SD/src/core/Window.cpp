@@ -1,10 +1,10 @@
-#include "core/Window.hpp"
+#include "SD/core/Window.hpp"
 
-#include "core/events/window/keyboard_events.hpp"
-#include "core/events/window/mouse_events.hpp"
-#include "core/events/window/window_events.hpp"
-#include "core/logging.hpp"
-#include "utils/utils.hpp"
+#include "SD/core/events/window/keyboard_events.hpp"
+#include "SD/core/events/window/mouse_events.hpp"
+#include "SD/core/events/window/window_events.hpp"
+#include "SD/core/logging.hpp"
+#include "SD/utils/utils.hpp"
 
 
 sd::Window::Window(int width, int height, const std::string& title) {
@@ -91,13 +91,14 @@ sd::Window::Window(const WindowDesc& desc) {
   };
 
   m_resize_callback = desc.resize_callback ? desc.resize_callback : default_resize_callback;
-  m_key_callback = desc.key_callback ? desc.key_callback : default_key_callback;
+  m_key_callback    = desc.key_callback ? desc.key_callback : default_key_callback;
   m_scroll_callback = desc.scroll_callback ? desc.scroll_callback : default_scroll_callback;
   m_cursor_callback = desc.cursor_callback ? desc.cursor_callback : default_cursor_callback;
-  m_mouse_button_callback = desc.mouse_button_callback ? desc.mouse_button_callback : default_mouse_callback;
+  m_mouse_button_callback =
+      desc.mouse_button_callback ? desc.mouse_button_callback : default_mouse_callback;
   m_refresh_callback = desc.refresh_callback ? desc.refresh_callback : []() {
   };
-  m_char_callback = desc.char_callback ? desc.char_callback : default_char_callback;
+  m_char_callback    = desc.char_callback ? desc.char_callback : default_char_callback;
 
   glfwSetWindowSizeCallback(m_handle, dispatch_resize);
   glfwSetFramebufferSizeCallback(m_handle, dispatch_resize);
@@ -128,10 +129,10 @@ std::pair<int, int> sd::Window::get_framebuffer_size() const {
 
 
 vk::UniqueSurfaceKHR
-sd::Window::create_window_surface(vk::UniqueInstance& instance,
-                                const VkAllocationCallbacks* allocation_callback) const {
+sd::Window::create_window_surface(vk::UniqueInstance&          instance,
+                                  const VkAllocationCallbacks* allocation_callback) const {
   VkSurfaceKHR surface;
-  auto res = glfwCreateWindowSurface(*instance, m_handle, allocation_callback, &surface);
+  auto         res = glfwCreateWindowSurface(*instance, m_handle, allocation_callback, &surface);
   if (res != VK_SUCCESS) {
     // TODO: Maybe give this info to caller
     engine_abort("Failed to create window surface");
@@ -184,7 +185,7 @@ sd::WindowBuilder& sd::WindowBuilder::set_title(const char* title) {
   return *this;
 }
 sd::WindowBuilder& sd::WindowBuilder::set_size(const int width, const int height) {
-  m_desc.width = width;
+  m_desc.width  = width;
   m_desc.height = height;
   return *this;
 }
@@ -212,11 +213,13 @@ sd::WindowBuilder& sd::WindowBuilder::set_cursor_callback(const CursorCallbackFn
   m_desc.cursor_callback = callback;
   return *this;
 }
-sd::WindowBuilder& sd::WindowBuilder::set_mouse_button_callback(const MouseButtonCallbackFn& callback) {
+sd::WindowBuilder&
+sd::WindowBuilder::set_mouse_button_callback(const MouseButtonCallbackFn& callback) {
   m_desc.mouse_button_callback = callback;
   return *this;
 }
-sd::WindowBuilder& sd::WindowBuilder::set_refresh_callback_set_refresh_callback(const RefreshCallbackFn& callback) {
+sd::WindowBuilder&
+sd::WindowBuilder::set_refresh_callback_set_refresh_callback(const RefreshCallbackFn& callback) {
   m_desc.refresh_callback = callback;
   return *this;
 }

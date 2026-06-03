@@ -1,6 +1,8 @@
-#include "core/vulkan/ShaderLibrary.hpp"
+#include "SD/core/vulkan/ShaderLibrary.hpp"
 
 #include <system_error>
+
+#include "SD/core/vulkan/vulkan_utils.hpp"
 
 namespace sd {
 
@@ -15,12 +17,12 @@ VkShaderModule ShaderLibrary::load(const std::string& hlsl_path, const std::stri
     return it->second.module.get();
 
   std::string actual_path = hlsl_path;
-  if (!std::filesystem::exists(actual_path)) {
-    actual_path = "../" + hlsl_path;
-  }
-  if (!std::filesystem::exists(actual_path)) {
-    actual_path = "../../SDEngine/" + hlsl_path;
-  }
+  // if (!std::filesystem::exists(actual_path)) {
+  //   actual_path = "../" + hlsl_path;
+  // }
+  // if (!std::filesystem::exists(actual_path)) {
+  //   actual_path = "../../" + hlsl_path;
+  // }
 
   std::vector<u32> spv;
   if (!m_compiler.compile_shader(actual_path, spv, profile))
@@ -30,11 +32,11 @@ VkShaderModule ShaderLibrary::load(const std::string& hlsl_path, const std::stri
 
   vk::UniqueShaderModule module =
       check_vulkan_res_val(vk::Device(m_device).createShaderModuleUnique(create_info),
-                        "Failed to create shader module: " + hlsl_path);
+                           "Failed to create shader module: " + hlsl_path);
 
 
   VkShaderModule raw_module = module.get();
-  ShaderEntry entry;
+  ShaderEntry    entry;
   entry.module = std::move(module);
   std::error_code ec;
   entry.last_write_time = std::filesystem::last_write_time(hlsl_path, ec);
@@ -51,7 +53,7 @@ std::set<std::string> ShaderLibrary::check_for_changes() {
   std::set<std::string> changed;
   for (auto& [path, entry] : m_cache) {
     std::error_code ec;
-    auto current_time = std::filesystem::last_write_time(path, ec);
+    auto            current_time = std::filesystem::last_write_time(path, ec);
     if (!ec && current_time > entry.last_write_time) {
       changed.insert(path);
     }
@@ -59,8 +61,8 @@ std::set<std::string> ShaderLibrary::check_for_changes() {
   return changed;
 }
 
-void ShaderLibrary::ClearCache() {
+void ShaderLibrary::clear_cache() {
   m_cache.clear();
 }
 
-} // namespace SD
+} // namespace sd

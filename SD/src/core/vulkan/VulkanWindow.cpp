@@ -1,8 +1,8 @@
-#include "core/vulkan/VulkanWindow.hpp"
+#include "SD/core/vulkan/VulkanWindow.hpp"
 
-#include "core/LayerList.hpp"
-#include "core/Window.hpp"
-#include "utils/utils.hpp"
+#include "SD/core/LayerList.hpp"
+#include "SD/core/Window.hpp"
+#include "SD/utils/utils.hpp"
 
 namespace sd {
 VulkanWindow::VulkanWindow(Window& window, VulkanContext& vulkan_context) :

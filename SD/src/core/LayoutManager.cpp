@@ -1,4 +1,4 @@
-#include "core/LayoutManager.hpp"
+#include "SD/core/LayoutManager.hpp"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -6,12 +6,12 @@
 #include <filesystem>
 #include <fstream>
 
-#include "core/ApplicationRuntime.hpp"
-#include "core/Layer.hpp"
-#include "core/SceneManager.hpp"
-#include "core/ViewManager.hpp"
-#include "core/layers/EngineDebugLayer.hpp"
-#include "core/logging.hpp"
+#include "SD/core/ApplicationRuntime.hpp"
+#include "SD/core/Layer.hpp"
+#include "SD/core/SceneManager.hpp"
+#include "SD/core/ViewManager.hpp"
+#include "SD/core/layers/EngineDebugLayer.hpp"
+#include "SD/core/logging.hpp"
 
 namespace sd {
 
@@ -79,14 +79,14 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
     // Close all views except Game
     runtime.views.for_each([&](View& view) {
       if (view.get_name() != "Game") {
-        view.SetOpen(false);
+        view.set_open(false);
       }
     });
 
     // Open Game view
     auto game_view = runtime.views.get("Game");
     if (game_view) {
-      game_view->get().SetOpen(true);
+      game_view->get().set_open(true);
       ImGui::DockBuilderDockWindow("Game", dockspace_id);
     }
 
@@ -101,7 +101,7 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
   } else { // Default
     // Ensure all views are open
     runtime.views.for_each([](View& view) {
-      view.SetOpen(true);
+      view.set_open(true);
     });
 
     // Show all inspector windows
@@ -207,7 +207,7 @@ bool LayoutManager::load_layout(const std::string& name, ApplicationRuntime runt
     runtime.views.for_each([&](View& view) {
       ImGuiWindow* imgui_window = ImGui::FindWindowByName(view.get_name().c_str());
       if (imgui_window) {
-        view.SetOpen(true);
+        view.set_open(true);
       }
     });
   }
@@ -293,4 +293,4 @@ void LayoutManager::refresh_layout_list() {
   }
 }
 
-} // namespace SD
+} // namespace sd

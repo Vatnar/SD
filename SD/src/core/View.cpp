@@ -1,10 +1,10 @@
-#include "core/View.hpp"
+#include "SD/core/View.hpp"
 
 #include <limits>
 
-#include "Application.hpp"
-#include "core/SDImGuiContext.hpp"
-#include "utils/utils.hpp"
+#include "SD/Application.hpp"
+#include "SD/core/SDImGuiContext.hpp"
+#include "SD/utils/utils.hpp"
 
 sd::View::~View() {
   // Detach layers first while resources are still valid

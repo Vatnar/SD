@@ -1,8 +1,9 @@
-#include "core/vulkan/PipelineFactory.hpp"
+#include "SD/core/vulkan/PipelineFactory.hpp"
 
 #include <array>
 
-#include "utils/utils.hpp"
+#include "SD/core/vulkan/vulkan_utils.hpp"
+#include "SD/utils/utils.hpp"
 
 namespace sd {
 PipelineFactory::PipelineFactory(VkDevice device, ShaderLibrary& shaders) :

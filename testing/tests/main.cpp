@@ -2,7 +2,7 @@
 #undef Error
 #endif
 
-#include "core/logging.hpp"
+#include "SD/core/logging.hpp"
 #include "gtest/gtest.h"
 
 int main(int argc, char** argv) {

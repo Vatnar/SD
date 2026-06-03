@@ -1,11 +1,13 @@
-#include "core/vulkan/VulkanRenderer.hpp"
+#include "SD/core/vulkan/VulkanRenderer.hpp"
 
 #include <GLFW/glfw3.h>
 
-#include "core/logging.hpp"
+#include "SD/core/logging.hpp"
+#include "SD/core/vulkan/vulkan_utils.hpp"
 
 namespace sd {
-VulkanRenderer::VulkanRenderer(VulkanContext& ctx, FrameTimer& timer) : ctx{ctx}, m_timer(timer) {
+VulkanRenderer::VulkanRenderer(VulkanContext& ctx, FrameTimer& timer) :
+  ctx{ctx}, m_device(nullptr), m_timer(timer) {
 }
 
 void VulkanRenderer::init() {
@@ -123,7 +125,7 @@ vk::Result VulkanRenderer::end_frame(VulkanWindow& vw) {
 
 void VulkanRenderer::reload_shaders() {
   (void)ctx.get_vulkan_device()->waitIdle();
-  m_shaders->ClearCache();
+  m_shaders->clear_cache();
   auto failures = m_pipelines->recreate_all_pipelines();
   if (!failures.empty()) {
     log::engine::warn("{} pipeline(s) failed to recreate during hot reload", failures.size());

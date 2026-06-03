@@ -1,8 +1,8 @@
 #include <core/ecs/Entity.hpp>
 
-#include "core/ecs/component_registration.hpp"
-#include "core/ecs/EntityManager.hpp"
-#include "core/logging.hpp"
+#include "SD/core/ecs/component_registration.hpp"
+#include "SD/core/ecs/EntityManager.hpp"
+#include "SD/core/logging.hpp"
 #include "VLA/Matrix.hpp"
 #include "gtest/gtest.h"
 #include "spdlog/fmt/bundled/ostream.h"
@@ -23,7 +23,7 @@ struct Health {
   int max;
 };
 REGISTER_SD_COMPONENT(Health);
-} // namespace SD
+} // namespace sd
 
 TEST(ECSTest, ReplaceComponent) {
   sd::EntityManager entityManager;

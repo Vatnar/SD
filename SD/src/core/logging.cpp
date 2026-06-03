@@ -1,4 +1,4 @@
-#include "core/logging.hpp"
+#include "SD/core/logging.hpp"
 
 #include "spdlog/async.h"
 #include "spdlog/sinks/basic_file_sink.h"
@@ -168,7 +168,7 @@ void init() {
     register_category("engine/network",  ImVec4(0.0f, 1.0f, 0.6f, 1.0f));   // Teal
 }
 
-} // namespace SD::Log
+} // namespace sd::log
 
 namespace sd::log::game {
 SD_LOG_CATEGORY_IMPL("game", ENGINE_LOG_LEVEL_GAME)

@@ -1,6 +1,7 @@
-#include "core/SDImGuiContext.hpp"
+#include "SD/core/SDImGuiContext.hpp"
 
-#include "Application.hpp"
+#include "SD/Application.hpp"
+#include "SD/core/vulkan/vulkan_utils.hpp"
 #include "imgui_impl_glfw.h"
 
 namespace sd {

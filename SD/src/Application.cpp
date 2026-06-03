@@ -1,21 +1,15 @@
-#include "Application.hpp"
+#include "SD/Application.hpp"
 
-#include <algorithm>
 #include <dlfcn.h>
 #include <filesystem>
 
-#include "GameContext.hpp"
-#include "RuntimeStateManager.hpp"
-#include "core/LayoutManager.hpp"
-#include "core/SDImGuiContext.hpp"
-#include "core/events/app/app_events.hpp"
-#include "core/layers/PerformanceLayer.hpp"
-#include "core/vulkan/VulkanRenderer.hpp"
-
-#if defined(NDEBUG)
-#error "NDEBUG is defined here"
-#endif
-
+#include "SD/GameContext.hpp"
+#include "SD/RuntimeStateManager.hpp"
+#include "SD/core/LayoutManager.hpp"
+#include "SD/core/SDImGuiContext.hpp"
+#include "SD/core/events/app/app_events.hpp"
+#include "SD/core/layers/PerformanceLayer.hpp"
+#include "SD/core/vulkan/VulkanRenderer.hpp"
 
 namespace sd {
 

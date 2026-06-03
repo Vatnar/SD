@@ -1,10 +1,9 @@
-#include "core/WindowManager.hpp"
+#include "SD/core/WindowManager.hpp"
 
-#include "Application.hpp"
-#include "core/SDImGuiContext.hpp"
-#include "core/ViewManager.hpp"
-#include "core/events/window/window_events.hpp"
-#include "core/vulkan/VulkanRenderer.hpp"
+#include "SD/core/SDImGuiContext.hpp"
+#include "SD/core/ViewManager.hpp"
+#include "SD/core/events/window/window_events.hpp"
+#include "SD/core/vulkan/VulkanRenderer.hpp"
 
 namespace sd {
 

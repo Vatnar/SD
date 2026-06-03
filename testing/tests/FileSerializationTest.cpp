@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "core/ecs/CommandQueue.hpp"
-#include "core/ecs/commands.hpp"
-#include "core/ecs/components.hpp"
-#include "core/ecs/EntityManager.hpp"
+#include "SD/core/ecs/CommandQueue.hpp"
+#include "SD/core/ecs/commands.hpp"
+#include "SD/core/ecs/components.hpp"
+#include "SD/core/ecs/EntityManager.hpp"
 #include "utils/file_utils.hpp"
 #include "utils/serialization.hpp"
 
@@ -648,4 +648,4 @@ TEST_F(FileSerializationTest, ECS_IdempotentSerialization) {
   EXPECT_EQ(b2, b3);
 }
 
-} // namespace SD
+} // namespace sd

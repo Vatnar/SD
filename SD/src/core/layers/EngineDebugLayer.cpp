@@ -1,18 +1,18 @@
-#include "core/layers/EngineDebugLayer.hpp"
+#include "SD/core/layers/EngineDebugLayer.hpp"
 
 #include <array>
 
 #include <imgui.h>
 
-#include "core/ecs/components.hpp"
-#include "core/events/window/keyboard_events.hpp"
-#include "core/events/window/mouse_events.hpp"
-#include "core/LayoutManager.hpp"
-#include "core/logging.hpp"
-#include "core/SceneManager.hpp"
-#include "core/View.hpp"
-#include "core/ViewManager.hpp"
-#include "core/vulkan/VulkanRenderer.hpp"
+#include "SD/core/ecs/components.hpp"
+#include "SD/core/events/window/keyboard_events.hpp"
+#include "SD/core/events/window/mouse_events.hpp"
+#include "SD/core/LayoutManager.hpp"
+#include "SD/core/logging.hpp"
+#include "SD/core/SceneManager.hpp"
+#include "SD/core/View.hpp"
+#include "SD/core/ViewManager.hpp"
+#include "SD/core/vulkan/VulkanRenderer.hpp"
 
 namespace sd {
 
@@ -816,4 +816,4 @@ void EngineDebugLayer::apply_preset_configuration(bool inspectors_visible, bool 
   m_show_renderer_info = renderer_visible;
 }
 
-} // namespace SD
+} // namespace sd

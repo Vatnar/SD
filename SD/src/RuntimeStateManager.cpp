@@ -1,11 +1,11 @@
-#include "RuntimeStateManager.hpp"
+#include "SD/RuntimeStateManager.hpp"
 
-#include "Application.hpp"
-#include "../include/core/logging.hpp"
+#include "SD/Application.hpp"
+#include "SD/core/logging.hpp"
 
 namespace sd {
 
-RuntimeStateManager::RuntimeStateManager() = default;
+RuntimeStateManager::RuntimeStateManager()  = default;
 RuntimeStateManager::~RuntimeStateManager() = default;
 
 // TODO: this doesnt make sense since game doesnt own state
@@ -21,7 +21,7 @@ void RuntimeStateManager::restore(Application* app) {
   m_app = app;
   if (!app)
     return;
- log::engine::debug("RuntimeStateManager::Restore() called (state persists externally)");
+  log::engine::debug("RuntimeStateManager::Restore() called (state persists externally)");
 }
 
 void RuntimeStateManager::set_application(Application* app) {
@@ -33,4 +33,4 @@ bool RuntimeStateManager::has_state() const {
   return false;
 }
 
-} // namespace SD
+} // namespace sd

@@ -6,11 +6,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-
 enable_testing()
 
-file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "tests/*.cpp")
-add_executable(SDGTest ${TEST_SOURCES})
+set(SD_TEST_SOURCES
+        tests/main.cpp
+        tests/ecs_tests.cpp
+        tests/CommandQueueTest.cpp
+        tests/FileSerializationTest.cpp
+)
+add_executable(SDGTest ${SD_TEST_SOURCES})
 target_link_libraries(SDGTest PRIVATE
         SD
         GTest::gtest
@@ -19,10 +23,14 @@ target_link_libraries(SDGTest PRIVATE
 # Tests need exceptions (GoogleTest requirement); override -fno-exceptions inherited from SD
 target_compile_options(SDGTest PRIVATE -fexceptions)
 
-# AddressSanitizer - Debug builds only
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(SDGTest PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-    target_link_options(SDGTest PRIVATE -fsanitize=address)
-endif()
+if (SD_ENABLE_ASAN)
+    if (NOT MSVC)
+        target_compile_options(SDGTest PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+        target_link_options(SDGTest PRIVATE -fsanitize=address)
+    else ()
+        message(WARNING "SD_ENABLE_ASAN is ON, but ASan is not configured for MSVC yet.")
+    endif ()
+endif ()
+
 include(GoogleTest)
 gtest_discover_tests(SDGTest)

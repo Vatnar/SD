@@ -1,4 +1,4 @@
-#include "core/ecs/ComponentFactory.hpp"
+#include "SD/core/ecs/ComponentFactory.hpp"
 
 namespace sd {
 
@@ -20,4 +20,4 @@ bool ComponentFactory::is_registered(u32 component_id) {
   return component_id < m_creators.size() && m_creators[component_id] != nullptr;
 }
 
-} // namespace SD
+} // namespace sd

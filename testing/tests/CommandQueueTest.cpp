@@ -125,4 +125,4 @@ TEST_F(CommandSerializationTest, CommandQueue_SerializeDeserialize) {
 
   EXPECT_EQ(queue2.get_count(), 2u);
 }
-} // namespace SD
+} // namespace sd

@@ -1,4 +1,4 @@
-#include "core/ViewManager.hpp"
+#include "SD/core/ViewManager.hpp"
 
 #include <algorithm>
 
@@ -23,7 +23,7 @@ ViewManager::ViewResult ViewManager::get(const std::string& name) {
   return get(it_name->second);
 }
 
-std::expected<ViewId, ViewError> ViewManager::GetId(const std::string& name) const {
+std::expected<ViewId, ViewError> ViewManager::get_id(const std::string& name) const {
   ASSERT(!name.empty() && "View name must not be empty");
   auto it_name = m_view_name_to_id.find(name);
   if (it_name == m_view_name_to_id.end())

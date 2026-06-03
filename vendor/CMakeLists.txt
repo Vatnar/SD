@@ -1,4 +1,3 @@
-
 add_subdirectory(glfw)
 
 # Disable exceptions in spdlog so it aborts instead of throwing through -fno-exceptions code
@@ -9,12 +8,9 @@ add_subdirectory(dxc)
 add_subdirectory(VLA)
 add_subdirectory(tomlplusplus)
 
-# Disable unity builds for vendor libraries that don't support them
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_UNITY_BUILD)
-    # glfw and spdlog need unity disabled due to macro conflicts
-    # Must be set BEFORE they are added as dependencies
-    set_target_properties(glfw spdlog PROPERTIES UNITY_BUILD OFF)
-endif()
+# glfw and spdlog have macro conflicts in unity builds; these exclusions
+# are safe to set unconditionally — they are no-ops when unity is off.
+set_target_properties(glfw spdlog PROPERTIES UNITY_BUILD OFF)
 
 add_library(imgui STATIC
         imgui/imgui.cpp
@@ -25,36 +21,43 @@ add_library(imgui STATIC
         imgui/backends/imgui_impl_vulkan.cpp
 )
 
-
 target_include_directories(imgui
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends
 )
 
-target_include_directories(imgui
-        PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends
-)
 target_link_libraries(imgui PRIVATE glfw)
 
-# Unity builds for ImGui - Release only
-# Core ImGui files benefit from unity builds, but backends have macro conflicts
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_UNITY_BUILD)
-    message(STATUS "ImGui: Unity build enabled (batch size 4)")
-    set_target_properties(imgui PROPERTIES
-        UNITY_BUILD ON
-        UNITY_BUILD_BATCH_SIZE 4
-    )
-    
-    # Exclude backends with X11/Vulkan macro conflicts from unity builds
-    set_source_files_properties(
+# Unity build settings for imgui are controlled via CMAKE_UNITY_BUILD
+# in the preset. Backends are excluded unconditionally due to X11/Vulkan
+# macro conflicts — safe to set even when unity is off.
+set_source_files_properties(
         imgui/backends/imgui_impl_glfw.cpp
         imgui/backends/imgui_impl_vulkan.cpp
         PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
-    )
-else()
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        message(STATUS "ImGui: Unity build disabled")
-    endif()
-endif()
+)
+
+add_library(stb STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/stbi_impl.cpp
+)
+target_include_directories(stb
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/stb/include
+)
+set_target_properties(stb PROPERTIES
+        DISABLE_PRECOMPILE_HEADERS ON
+        POSITION_INDEPENDENT_CODE ON
+)
+
+add_library(vma STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/vma_impl.cpp
+)
+target_include_directories(vma
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/VMA/include
+)
+set_target_properties(vma PROPERTIES
+        DISABLE_PRECOMPILE_HEADERS ON
+        POSITION_INDEPENDENT_CODE ON
+)

@@ -1,6 +1,6 @@
-#include "core/vulkan/VulkanFramebuffer.hpp"
+#include "SD/core/vulkan/VulkanFramebuffer.hpp"
 
-#include "utils/utils.hpp"
+#include "SD/utils/utils.hpp"
 
 namespace sd {
 
@@ -17,7 +17,7 @@ void VulkanFramebuffer::resize(u32 width, u32 height) {
   if (m_extent.width == width && m_extent.height == height)
     return;
 
-  m_extent.width = width;
+  m_extent.width  = width;
   m_extent.height = height;
 
   (void)m_ctx.get_vulkan_device()->waitIdle();
@@ -26,24 +26,24 @@ void VulkanFramebuffer::resize(u32 width, u32 height) {
 }
 
 void VulkanFramebuffer::create_resources() {
-  auto& device = m_ctx.get_vulkan_device();
+  auto& device   = m_ctx.get_vulkan_device();
   auto& phys_dev = m_ctx.get_physical_device();
 
   // 1. Create Color Image
   auto [image, memory] =
       create_image(*device, phys_dev, m_extent.width, m_extent.height, vk::Format::eR8G8B8A8Srgb,
-                  vk::ImageTiling::eOptimal,
-                  vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-                  vk::MemoryPropertyFlagBits::eDeviceLocal);
-  m_color_image = std::move(image);
+                   vk::ImageTiling::eOptimal,
+                   vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                   vk::MemoryPropertyFlagBits::eDeviceLocal);
+  m_color_image        = std::move(image);
   m_color_image_memory = std::move(memory);
 
   // 2. Create Image View
   vk::ImageViewCreateInfo view_info({}, *m_color_image, vk::ImageViewType::e2D,
-                                   vk::Format::eR8G8B8A8Srgb, {},
-                                   {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+                                    vk::Format::eR8G8B8A8Srgb, {},
+                                    {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
   m_color_image_view = check_vulkan_res_val(device->createImageViewUnique(view_info),
-                                      "Failed to create color image view");
+                                            "Failed to create color image view");
 
   // 3. Create Render Pass
   vk::AttachmentDescription color_attachment{};
@@ -73,14 +73,14 @@ void VulkanFramebuffer::create_resources() {
 
   vk::RenderPassCreateInfo render_pass_info({}, 1, &color_attachment, 1, &subpass, 1, &dependency);
   m_render_pass = check_vulkan_res_val(device->createRenderPassUnique(render_pass_info),
-                                  "Failed to create offscreen render pass");
+                                       "Failed to create offscreen render pass");
 
   // 4. Create Framebuffer
-  vk::ImageView attachments[] = {*m_color_image_view};
+  vk::ImageView             attachments[] = {*m_color_image_view};
   vk::FramebufferCreateInfo framebuffer_info({}, *m_render_pass, 1, attachments, m_extent.width,
-                                            m_extent.height, 1);
+                                             m_extent.height, 1);
   m_framebuffer = check_vulkan_res_val(device->createFramebufferUnique(framebuffer_info),
-                                   "Failed to create offscreen framebuffer");
+                                       "Failed to create offscreen framebuffer");
 }
 
 void VulkanFramebuffer::destroy_resources() {
@@ -91,4 +91,4 @@ void VulkanFramebuffer::destroy_resources() {
   m_color_image_memory.reset();
 }
 
-} // namespace SD
+} // namespace sd
