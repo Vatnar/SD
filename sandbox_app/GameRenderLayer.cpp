@@ -88,7 +88,7 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
     memcpy(push.color, renderable.color, sizeof(float) * 4);
 
     if (inside) {
-      push.color[0] = 0.0f;
+      push.color[0] = 1.0f;
       push.color[1] = 1.0f;
       push.color[2] = 1.0f;
     }

@@ -2,7 +2,9 @@
   <configuration default="false" name="HotReload" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="SD" TARGET_NAME="HotReloadApp" CONFIG_NAME="debug" RUN_TARGET_PROJECT_NAME="SD" RUN_TARGET_NAME="HotReloadApp">
     <method v="2">
       <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      <option name="CMake.Explicit.Target" predefinedTargetName="SandboxApp" />
       <option name="CMake.Explicit.Target" predefinedTargetName="sd_assets" />
+      <option name="CMake.Explicit.Target" predefinedTargetName="sandbox_assets" />
     </method>
   </configuration>
 </component>
