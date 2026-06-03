@@ -1,12 +1,13 @@
 #include <cstdio>
 
-#include "../SD/include/SD/Application.hpp"
+#include <SD/Application.hpp>
+#include <SD/core/SceneView.hpp>
+#include <SD/core/ecs/components.hpp>
+#include <SD/core/layers/EngineDebugLayer.hpp>
+#include <SD/core/vulkan/VulkanRenderer.hpp>
+#include <SD/game.h>
+
 #include "GameRenderLayer.hpp"
-#include "SD/core/SceneView.hpp"
-#include "SD/core/ecs/components.hpp"
-#include "SD/core/layers/EngineDebugLayer.hpp"
-#include "SD/core/vulkan/VulkanRenderer.hpp"
-#include "SD/game.h"
 #include "logging.hpp"
 
 // Wrap sd types for C interface
@@ -50,28 +51,31 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
   auto& pipelines = renderer.get_pipeline_factory();
   game_view.setup_layered_render(3);
 
-  struct Push {
-    VLA::Matrix4x4f mvp{};
-    float           color[4]{};
-  };
-  VkPipelineLayout push_layout =
-      pipelines.create_push_constant_layout(VK_SHADER_STAGE_VERTEX_BIT, sizeof(Push));
+  {
+    struct Push {
+      VLA::Matrix4x4f mvp{};
+      float           color[4]{};
+    };
+    VkPipelineLayout push_layout =
+        pipelines.create_push_constant_layout(VK_SHADER_STAGE_VERTEX_BIT, sizeof(Push));
 
-  sd::PipelineFactory::PipelineDesc world_desc{.vert_path   = "assets/engine/shaders/world.vert",
-                                               .frag_path   = "assets/engine/shaders/world.frag",
-                                               .render_pass = game_view.get_layered_render_pass(),
-                                               .subpass     = 1};
+    sd::PipelineFactory::PipelineDesc world_desc{.vert_path   = "assets/engine/shaders/world.vert",
+                                                 .frag_path   = "assets/engine/shaders/world.frag",
+                                                 .render_pass = game_view.get_layered_render_pass(),
+                                                 .subpass     = 1};
 
-  auto world_pipe_handle = pipelines.create_graphics_pipeline(world_desc, push_layout);
+    auto world_pipe_handle = pipelines.create_graphics_pipeline(world_desc, push_layout);
 
-  sd::PipelineFactory::PipelineDesc wire_desc = world_desc;
-  wire_desc.polygon_mode                      = VK_POLYGON_MODE_LINE;
-  auto wire_pipe_handle = pipelines.create_graphics_pipeline(wire_desc, push_layout);
+    sd::PipelineFactory::PipelineDesc wire_desc = world_desc;
+    wire_desc.polygon_mode                      = VK_POLYGON_MODE_LINE;
+    auto wire_pipe_handle = pipelines.create_graphics_pipeline(wire_desc, push_layout);
 
-  sd::log::game::info("Pushing GameRenderLayer");
-  game_view.push_layer<GameRenderLayer>(1, "GameRender", to_scene(state->shared_scene),
-                                        world_pipe_handle, wire_pipe_handle, push_layout,
-                                        &pipelines);
+    sd::log::game::info("Pushing GameRenderLayer");
+    game_view.push_layer<GameRenderLayer>(1, "GameRender", to_scene(state->shared_scene),
+                                          world_pipe_handle, wire_pipe_handle, push_layout,
+                                          &pipelines);
+  }
+
   app.push_global_layer<sd::EngineDebugLayer>(app.runtime(), app.services(),
                                               to_scene(state->shared_scene));
 
@@ -90,13 +94,13 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
   sd::log::game::info("Game loaded, version {}", state->version);
 }
 
-static void GameOnUpdate(SD_Application* app_ptr, GameState* state, float dt) {
+static void game_on_update(SD_Application* app_ptr, GameState* state, float dt) {
   (void)app_ptr;
   (void)state;
   (void)dt;
 }
 
-static void GameOnUnload(SD_Application* app_ptr, GameState* state) {
+static void game_on_unload(SD_Application* app_ptr, GameState* state) {
   (void)app_ptr;
   printf("GAME VERSION %d UNLOADING\n", state->version);
   state->shared_scene  = nullptr;
@@ -110,7 +114,7 @@ extern "C" GameAPI get_game_api(void) {
   api.api_version = GAME_API_VERSION;
   api.struct_size = sizeof(GameAPI);
   api.on_load     = game_on_load;
-  api.on_update   = GameOnUpdate;
-  api.on_unload   = GameOnUnload;
+  api.on_update   = game_on_update;
+  api.on_unload   = game_on_unload;
   return api;
 }

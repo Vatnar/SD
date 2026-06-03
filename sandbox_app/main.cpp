@@ -1,13 +1,14 @@
 #include <iostream>
 #include <memory>
 
-#include "../SD/include/SD/Application.hpp"
-#include "GameContext.hpp"
+#include <SD/Application.hpp>
+#include <SD/GameContext.hpp>
+#include <SD/RuntimeStateManager.hpp>
+#include <SD/core/ecs/components.hpp>
+#include <SD/core/layers/EngineDebugLayer.hpp>
+#include <SD/core/vulkan/VulkanRenderer.hpp>
+
 #include "GameRenderLayer.hpp"
-#include "RuntimeStateManager.hpp"
-#include "SD/core/ecs/components.hpp"
-#include "SD/core/layers/EngineDebugLayer.hpp"
-#include "SD/core/vulkan/VulkanRenderer.hpp"
 #include "logging.hpp"
 
 static void register_game_categories() {

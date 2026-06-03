@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SD/core/logging.hpp"
+#include <SD/core/logging.hpp>
 
 namespace sd::log::game {
 SD_LOG_CATEGORY_IMPL("game", ENGINE_LOG_LEVEL_GAME)
