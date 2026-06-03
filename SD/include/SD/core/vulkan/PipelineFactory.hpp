@@ -65,7 +65,7 @@ public:
   /// Subsequent GetPipeline() calls will return VK_NULL_HANDLE.
   void destroy_pipeline(Handle handle);
 
-  VkPipelineLayout create_push_constant_layout(VkShaderStageFlags stages, u32 size);
+  VkPipelineLayout create_push_constant_layout(vk::ShaderStageFlags stages, u32 size);
 
   /// Recreates all tracked pipelines.
   /// Usually called after clearing ShaderLibrary cache.

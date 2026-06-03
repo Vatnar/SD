@@ -39,7 +39,7 @@ vk::CommandBuffer VulkanRenderer::begin_command_buffer(VulkanWindow& vw) {
   auto res = cmd.reset();
   ASSERT(res == vk::Result::eSuccess);
 
-  vk::CommandBufferBeginInfo begin_info(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+  vk::CommandBufferBeginInfo begin_info{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   res = cmd.begin(begin_info);
   ASSERT(res == vk::Result::eSuccess);
 
@@ -57,13 +57,14 @@ void VulkanRenderer::begin_render_pass(VulkanWindow& vw) {
   std::array<vk::ClearValue, 1> clear_values{};
   clear_values[0].color = vk::ClearColorValue{m_clear_color};
 
-  vk::RenderPassBeginInfo render_pass_begin(vw.get_render_pass(),
-                                            *vw.get_framebuffers()[vw.current_image_index],
-                                            {
-                                                {0, 0},
-                                                vw.get_swapchain_extent()
-  },
-                                            clear_values);
+
+  vk::RenderPassBeginInfo render_pass_begin{
+      .renderPass      = vw.get_render_pass(),
+      .framebuffer     = *vw.get_framebuffers()[vw.current_image_index],
+      .renderArea      = vk::Rect2D{.offset = {0, 0}, .extent = vw.get_swapchain_extent()},
+      .clearValueCount = clear_values.size(),
+      .pClearValues    = clear_values.data()
+  };
 
   cmd.beginRenderPass(render_pass_begin, vk::SubpassContents::eInline);
 

@@ -187,23 +187,27 @@ void SDImGuiContext::end_dock_space() {
 }
 
 void SDImGuiContext::create_descriptor_pool(VulkanContext& ctx) {
-  vk::DescriptorPoolSize pool_sizes[] = {
-      {             vk::DescriptorType::eSampler, 1000},
-      {vk::DescriptorType::eCombinedImageSampler, 1000},
-      {        vk::DescriptorType::eSampledImage, 1000},
-      {        vk::DescriptorType::eStorageImage, 1000},
-      {  vk::DescriptorType::eUniformTexelBuffer, 1000},
-      {  vk::DescriptorType::eStorageTexelBuffer, 1000},
-      {       vk::DescriptorType::eUniformBuffer, 1000},
-      {       vk::DescriptorType::eStorageBuffer, 1000},
-      {vk::DescriptorType::eUniformBufferDynamic, 1000},
-      {vk::DescriptorType::eStorageBufferDynamic, 1000},
-      {     vk::DescriptorType::eInputAttachment, 1000}
+  // todo: define 1000
+  std::array pool_sizes = {
+      vk::DescriptorPoolSize{             vk::DescriptorType::eSampler, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1000},
+      vk::DescriptorPoolSize{        vk::DescriptorType::eSampledImage, 1000},
+      vk::DescriptorPoolSize{        vk::DescriptorType::eStorageImage, 1000},
+      vk::DescriptorPoolSize{  vk::DescriptorType::eUniformTexelBuffer, 1000},
+      vk::DescriptorPoolSize{  vk::DescriptorType::eStorageTexelBuffer, 1000},
+      vk::DescriptorPoolSize{       vk::DescriptorType::eUniformBuffer, 1000},
+      vk::DescriptorPoolSize{       vk::DescriptorType::eStorageBuffer, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eUniformBufferDynamic, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eStorageBufferDynamic, 1000},
+      vk::DescriptorPoolSize{     vk::DescriptorType::eInputAttachment, 1000}
   };
 
-  vk::DescriptorPoolCreateInfo pool_info(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                                         1000 * std::size(pool_sizes), std::size(pool_sizes),
-                                         pool_sizes);
+  vk::DescriptorPoolCreateInfo pool_info{
+      .flags      = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+      .maxSets    = 1000 * pool_sizes.size(),
+      .pPoolSizes = pool_sizes.data()
+
+  };
 
   m_descriptor_pool =
       check_vulkan_res_val(ctx.get_vulkan_device()->createDescriptorPoolUnique(pool_info),
@@ -236,7 +240,12 @@ void SDImGuiContext::create_compatible_render_pass(VulkanContext& ctx, vk::Forma
       .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
       .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 
-  vk::RenderPassCreateInfo info({}, 1, &attachment, 1, &subpass, 1, &dependency);
+  vk::RenderPassCreateInfo info{.attachmentCount = 1,
+                                .pAttachments    = &attachment,
+                                .subpassCount    = 1,
+                                .pSubpasses      = &subpass,
+                                .dependencyCount = 1,
+                                .pDependencies   = &dependency};
 
   m_render_pass = check_vulkan_res_val(ctx.get_vulkan_device()->createRenderPassUnique(info),
                                        "Failed to create ImGui RenderPass");

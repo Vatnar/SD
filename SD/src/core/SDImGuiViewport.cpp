@@ -14,11 +14,23 @@ SDImGuiViewport::SDImGuiViewport(EngineServices& services, const std::string& na
   m_framebuffer = std::make_unique<VulkanFramebuffer>(m_vulkan_ctx, width, height);
 
   // Create Sampler for ImGui
-  vk::SamplerCreateInfo sampler_info(
-      {}, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear,
-      vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
-      vk::SamplerAddressMode::eRepeat, 0.0f, VK_FALSE, 1.0f, VK_FALSE, vk::CompareOp::eAlways, 0.0f,
-      0.0f, vk::BorderColor::eIntOpaqueBlack, VK_FALSE);
+  vk::SamplerCreateInfo sampler_info{
+      .magFilter               = vk::Filter::eLinear,
+      .minFilter               = vk::Filter::eLinear,
+      .mipmapMode              = vk::SamplerMipmapMode::eLinear,
+      .addressModeU            = vk::SamplerAddressMode::eRepeat,
+      .addressModeV            = vk::SamplerAddressMode::eRepeat,
+      .addressModeW            = vk::SamplerAddressMode::eRepeat,
+      .mipLodBias              = 0.0f,
+      .anisotropyEnable        = false,
+      .maxAnisotropy           = 1.0f,
+      .compareEnable           = false,
+      .compareOp               = vk::CompareOp::eAlways,
+      .minLod                  = 0.0f,
+      .maxLod                  = 0.0f,
+      .borderColor             = vk::BorderColor::eIntOpaqueBlack,
+      .unnormalizedCoordinates = false,
+  };
   m_sampler =
       check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createSamplerUnique(sampler_info),
                            "Failed to create viewport sampler");

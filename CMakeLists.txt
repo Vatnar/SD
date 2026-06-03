@@ -15,12 +15,7 @@ option(SD_ENABLE_IWYU "Enable IWYU helper targets/scripts when available" ON)
 option(SD_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
 option(SD_ENABLE_CCACHE "Enable ccache compiler launcher when available" ON)
 
-#TODO: shouldnt be global, only SD will link to vulkan so
-add_compile_definitions(
-        VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1
-        VULKAN_HPP_USE_STD_EXPECTED=1
-        VULKAN_HPP_NO_EXCEPTIONS=1
-)
+
 #~ caching
 if (SD_ENABLE_CCACHE)
     find_program(CCACHE_PROGRAM ccache)

@@ -109,13 +109,18 @@ vk::Queue VulkanContext::get_graphics_queue() const {
 }
 
 vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
-  vk::ApplicationInfo app_info("Engine", 1, "NoEngine", 1, VK_API_VERSION_1_3);
+  vk::ApplicationInfo app_info{.pApplicationName   = "Engine",
+                               .applicationVersion = 1,
+                               .pEngineName        = "NoEngine",
+                               .engineVersion      = 1,
+                               .apiVersion         = VK_API_VERSION_1_3};
 
   auto [glfw_exts, ext_count] = GlfwContext::get_required_instance_extensions();
   std::vector instance_exts(glfw_exts, glfw_exts + ext_count);
 
   // TODO: Enable validation layers if in debug mode
-  vk::InstanceCreateInfo inst_info({}, &app_info, {}, instance_exts);
+  vk::InstanceCreateInfo inst_info{.pApplicationInfo        = &app_info,
+                                   .ppEnabledExtensionNames = instance_exts.data()};
   vk::UniqueInstance     instance = check_vulkan_res_val(vk::createInstanceUnique(inst_info),
                                                          "Failed to create unique Instance: ");
 
@@ -179,9 +184,17 @@ void VulkanContext::setup_device_extensions() {
 }
 void VulkanContext::create_vulkan_device() {
   float                     priority = 1.0f;
-  vk::DeviceQueueCreateInfo queue_info({}, m_graphics_family_index, 1, &priority);
+  vk::DeviceQueueCreateInfo queue_info{.queueFamilyIndex = m_graphics_family_index,
+                                       .queueCount       = 1,
+                                       .pQueuePriorities = &priority};
 
-  vk::DeviceCreateInfo dev_info({}, queue_info, {}, m_device_exts);
+
+  vk::DeviceCreateInfo dev_info{
+      .pNext                   = &m_features2,
+      .queueCreateInfoCount    = 1,
+      .pQueueCreateInfos       = &queue_info,
+      .ppEnabledExtensionNames = m_device_exts.data(),
+  };
   dev_info.setPNext(&m_features2);
 
   m_vulkan_device = check_vulkan_res_val(m_phys_dev.createDeviceUnique(dev_info),

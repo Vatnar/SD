@@ -26,7 +26,7 @@ public:
   GlfwContext() {
     // Set GLFW error callback
     m_error_callback = [](int error_code, const char* description) {
-      log::engine::error("Glfw: ERROR:{}\n{}", error_code, description);
+      log::engine::error("Glfw: ERROR:{} \n{}", error_code, description);
     };
     glfwSetErrorCallback(&GlfwContext::glfw_error_callback_trampoline);
 

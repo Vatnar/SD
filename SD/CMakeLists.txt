@@ -60,12 +60,18 @@ target_link_libraries(SD
 
 )
 
-target_compile_definitions(SD PRIVATE
+target_compile_definitions(SD
+        PUBLIC
         SPDLOG_COMPILED_LIB
         VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+        VULKAN_HPP_NO_CONSTRUCTORS
+        VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+        VULKAN_HPP_USE_STD_EXPECTED=1
+        VULKAN_HPP_NO_EXCEPTIONS=1
         SPDLOG_NO_EXCEPTIONS
         $<$<CONFIG:Debug>:ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_TRACE>
         $<$<NOT:$<CONFIG:Debug>>:ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_INFO>
+        PRIVATE
 )
 
 #~ pch

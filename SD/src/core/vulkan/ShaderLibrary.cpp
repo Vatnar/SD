@@ -16,19 +16,13 @@ VkShaderModule ShaderLibrary::load(const std::string& hlsl_path, const std::stri
   if (it != m_cache.end())
     return it->second.module.get();
 
-  std::string actual_path = hlsl_path;
-  // if (!std::filesystem::exists(actual_path)) {
-  //   actual_path = "../" + hlsl_path;
-  // }
-  // if (!std::filesystem::exists(actual_path)) {
-  //   actual_path = "../../" + hlsl_path;
-  // }
 
   std::vector<u32> spv;
-  if (!m_compiler.compile_shader(actual_path, spv, profile))
+  if (!m_compiler.compile_shader(hlsl_path, spv, profile))
     engine_abort("Shader compile fail: " + hlsl_path);
 
-  vk::ShaderModuleCreateInfo create_info{{}, spv.size() * sizeof(uint32_t), spv.data()};
+  vk::ShaderModuleCreateInfo create_info{.codeSize = spv.size() * sizeof(uint32_t),
+                                         .pCode    = spv.data()};
 
   vk::UniqueShaderModule module =
       check_vulkan_res_val(vk::Device(m_device).createShaderModuleUnique(create_info),

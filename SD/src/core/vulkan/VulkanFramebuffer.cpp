@@ -39,9 +39,16 @@ void VulkanFramebuffer::create_resources() {
   m_color_image_memory = std::move(memory);
 
   // 2. Create Image View
-  vk::ImageViewCreateInfo view_info({}, *m_color_image, vk::ImageViewType::e2D,
-                                    vk::Format::eR8G8B8A8Srgb, {},
-                                    {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+  vk::ImageViewCreateInfo view_info{
+      .image            = *m_color_image,
+      .viewType         = vk::ImageViewType::e2D,
+      .format           = vk::Format::eR8G8B8A8Srgb,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eColor,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1}
+  };
   m_color_image_view = check_vulkan_res_val(device->createImageViewUnique(view_info),
                                             "Failed to create color image view");
 
@@ -71,14 +78,28 @@ void VulkanFramebuffer::create_resources() {
       .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
       .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 
-  vk::RenderPassCreateInfo render_pass_info({}, 1, &color_attachment, 1, &subpass, 1, &dependency);
+  vk::RenderPassCreateInfo render_pass_info{
+      .attachmentCount = 1,
+      .pAttachments    = &color_attachment,
+      .subpassCount    = 1,
+      .pSubpasses      = &subpass,
+      .dependencyCount = 1,
+      .pDependencies   = &dependency,
+  };
+
   m_render_pass = check_vulkan_res_val(device->createRenderPassUnique(render_pass_info),
                                        "Failed to create offscreen render pass");
 
   // 4. Create Framebuffer
-  vk::ImageView             attachments[] = {*m_color_image_view};
-  vk::FramebufferCreateInfo framebuffer_info({}, *m_render_pass, 1, attachments, m_extent.width,
-                                             m_extent.height, 1);
+  vk::ImageView attachments[] = {*m_color_image_view};
+
+  vk::FramebufferCreateInfo framebuffer_info{.renderPass      = *m_render_pass,
+                                             .attachmentCount = 1,
+                                             .pAttachments    = attachments,
+                                             .width           = m_extent.width,
+                                             .height          = m_extent.height,
+                                             .layers          = 1};
+
   m_framebuffer = check_vulkan_res_val(device->createFramebufferUnique(framebuffer_info),
                                        "Failed to create offscreen framebuffer");
 }

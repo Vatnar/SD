@@ -13,6 +13,7 @@ using Microsoft::WRL::ComPtr;
 #include <dxc/WinAdapter.h>
 #endif
 
+// TODO: how should we package this. maybe just have the func
 namespace sd {
 class ShaderCompiler {
 public:
@@ -23,7 +24,6 @@ public:
       engine_abort("Failed to create DXC Compiler");
   }
 
-  // TODO: Add caching mechanism to avoid recompiling shaders if source hasn't changed
   bool compile_shader(const std::string& source, std::vector<uint32_t>& output,
                       const std::string& profile) const {
     if (!dxc_utils || !dxc_compiler) {

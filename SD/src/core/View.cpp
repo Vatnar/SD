@@ -20,7 +20,7 @@ sd::View::~View() {
   cleanup_layered_render();
 }
 
-VkExtent2D sd::View::get_im_gui_extent() {
+vk::Extent2D sd::View::get_im_gui_extent() {
   const ImVec2 size = ImGui::GetContentRegionAvail();
 
   auto clamp_to_u32 = [](float v) -> u32 {
@@ -33,18 +33,18 @@ VkExtent2D sd::View::get_im_gui_extent() {
 
   return {clamp_to_u32(size.x), clamp_to_u32(size.y)};
 }
-VkFormat sd::View::find_depth_format() {
-  std::vector depth_formats = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
-                               VK_FORMAT_D24_UNORM_S8_UINT};
+vk::Format sd::View::find_depth_format() {
+  std::array depth_formats = {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint,
+                              vk::Format::eD24UnormS8Uint};
 
   auto physical_device = m_vulkan_ctx.get_physical_device();
   ASSERT(physical_device && "Physical device must be valid");
 
   for (const auto& format : depth_formats) {
-    VkFormatProperties props;
-    vkGetPhysicalDeviceFormatProperties(physical_device, format, &props);
+    vk::FormatProperties props;
+    physical_device.getFormatProperties(format, &props);
 
-    if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+    if (props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) {
       return format;
     }
   }
@@ -112,39 +112,40 @@ void sd::View::create_vulkan_resources() {
   ASSERT(extent.width > 0 && extent.height > 0 && "Extent must be valid");
 
   // Color image (device-local)
-  VkImageCreateInfo color_info{
-      .sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-      .pNext       = {},
-      .flags       = {},
-      .imageType   = VK_IMAGE_TYPE_2D,
-      .format      = VK_FORMAT_R8G8B8A8_UNORM,
-      .extent      = {extent.width, extent.height, 1},
-      .mipLevels   = 1,
-      .arrayLayers = 1,
-      .samples     = VK_SAMPLE_COUNT_1_BIT,
-      .tiling      = VK_IMAGE_TILING_OPTIMAL,
-      .usage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-               VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-      .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-      .queueFamilyIndexCount = {},
-      .pQueueFamilyIndices   = {},
-      .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED
+  using enum vk::ImageUsageFlagBits;
+  vk::ImageCreateInfo color_info{
+      .imageType     = vk::ImageType::e2D,
+      .format        = vk::Format::eR8G8B8A8Unorm,
+      .extent        = {extent.width, extent.height, 1},
+      .mipLevels     = 1,
+      .arrayLayers   = 1,
+      .samples       = vk::SampleCountFlagBits::e1,
+      .tiling        = vk::ImageTiling::eOptimal,
+      .usage         = eColorAttachment | eSampled | eTransferDst,
+      .sharingMode   = vk::SharingMode::eExclusive,
+      .initialLayout = vk::ImageLayout::eUndefined
   };
 
   VmaAllocationCreateInfo color_alloc_info = {};
   color_alloc_info.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
 
-  VK_CHECK(vmaCreateImage(allocator, &color_info, &color_alloc_info, &m_color_image,
+
+  VK_CHECK(vmaCreateImage(allocator, reinterpret_cast<VkImageCreateInfo*>(&color_info),
+                          &color_alloc_info, reinterpret_cast<VkImage*>(&m_color_image),
                           &m_color_allocation, nullptr));
+
+
   ASSERT(m_color_image != VK_NULL_HANDLE && "Color image must be created");
 
   vk::ImageViewCreateInfo color_view_info{
-      {},
-      m_color_image,
-      vk::ImageViewType::e2D,
-      vk::Format::eR8G8B8A8Unorm,
-      {},
-      {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
+      .image            = m_color_image,
+      .viewType         = vk::ImageViewType::e2D,
+      .format           = vk::Format::eR8G8B8A8Unorm,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eColor,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1}
   };
   m_color_view =
       check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createImageViewUnique(color_view_info),
@@ -152,23 +153,27 @@ void sd::View::create_vulkan_resources() {
   ASSERT(m_color_view && "Color view must be created");
 
   //  Depth image
-  VkFormat          depth_format = find_depth_format();
-  VkImageCreateInfo depth_info   = color_info;
-  depth_info.format              = depth_format;
-  depth_info.usage               = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  vk::Format          depth_format = find_depth_format();
+  vk::ImageCreateInfo depth_info   = color_info;
+  depth_info.format                = depth_format;
+  depth_info.usage                 = vk::ImageUsageFlagBits::eDepthStencilAttachment;
 
-  VK_CHECK(vmaCreateImage(allocator, &depth_info, &color_alloc_info, &m_depth_image,
+  VK_CHECK(vmaCreateImage(allocator, reinterpret_cast<VkImageCreateInfo*>(&depth_info),
+                          &color_alloc_info, reinterpret_cast<VkImage*>(&m_depth_image),
                           &m_depth_allocation, nullptr));
   ASSERT(m_depth_image != VK_NULL_HANDLE && "Depth image must be created");
 
   vk::ImageViewCreateInfo depth_view_info{
-      {},
-      m_depth_image,
-      vk::ImageViewType::e2D,
-      static_cast<vk::Format>(depth_format),
-      {},
-      {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
+      .image            = m_depth_image,
+      .viewType         = vk::ImageViewType::e2D,
+      .format           = depth_format,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eDepth,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1}
   };
+
   m_depth_view =
       check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createImageViewUnique(depth_view_info),
                            "Failed to create depth view: ");
@@ -185,7 +190,8 @@ void sd::View::create_vulkan_resources() {
       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
       vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-  vk::AttachmentDescription attachments[2] = {color_attach, depth_attach};
+
+  std::array attachments = {color_attach, depth_attach};
 
   // Subpass references
   vk::AttachmentReference color_ref(0, vk::ImageLayout::eColorAttachmentOptimal);
@@ -196,35 +202,47 @@ void sd::View::create_vulkan_resources() {
   vk::SubpassDescription subpass_world = subpass_bg; // Identical for now
   vk::SubpassDescription subpass_ui({}, vk::PipelineBindPoint::eGraphics, {}, nullptr, 1,
                                     &color_ref, nullptr, nullptr);
-  vk::SubpassDescription subpasses[3] = {subpass_bg, subpass_world, subpass_ui};
+  std::array             subpasses = {subpass_bg, subpass_world, subpass_ui};
 
   // Subpass dependencies (proper progression)
-  vk::SubpassDependency dependencies[4] = {
-      {VK_SUBPASS_EXTERNAL,
-       0, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-       vk::PipelineStageFlagBits::eColorAttachmentOutput,
-       {},
-       vk::AccessFlagBits::eColorAttachmentWrite,
-       vk::DependencyFlagBits::eByRegion                                           },
-      {                  0, 1, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-       vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite,
-       vk::AccessFlagBits::eColorAttachmentWrite, vk::DependencyFlagBits::eByRegion},
-      {                  1, 2, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-       vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite,
-       vk::AccessFlagBits::eColorAttachmentWrite, vk::DependencyFlagBits::eByRegion},
-      {                  2,
-       VK_SUBPASS_EXTERNAL, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-       vk::PipelineStageFlagBits::eBottomOfPipe,
-       vk::AccessFlagBits::eColorAttachmentWrite,
-       {},
-       vk::DependencyFlagBits::eByRegion                                           }
+  std::array dependencies = {
+      vk::SubpassDependency{.srcSubpass      = VK_SUBPASS_EXTERNAL,
+                            .dstSubpass      = 0,
+                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            .dstStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            .srcAccessMask   = vk::AccessFlagBits::eNone,
+                            .dstAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
+                            .dependencyFlags = vk::DependencyFlagBits::eByRegion},
+      vk::SubpassDependency{.srcSubpass      = VK_SUBPASS_EXTERNAL,
+                            .dstSubpass      = 1,
+                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            .dstStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            .srcAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
+                            .dstAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
+                            .dependencyFlags = vk::DependencyFlagBits::eByRegion},
+      vk::SubpassDependency{                  .srcSubpass      = 1,
+                            .dstSubpass      = 2,
+                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            .dstStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            .srcAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
+                            .dstAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
+                            .dependencyFlags = vk::DependencyFlagBits::eByRegion},
+      vk::SubpassDependency{                  .srcSubpass      = 2,
+                            .dstSubpass      = VK_SUBPASS_EXTERNAL,
+                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            .dstStageMask    = vk::PipelineStageFlagBits::eBottomOfPipe,
+                            .srcAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
+                            .dstAccessMask   = vk::AccessFlagBits::eNone,
+                            .dependencyFlags = vk::DependencyFlagBits::eByRegion}
   };
 
   if (!m_layered_rp) {
-    vk::RenderPassCreateInfo rp_info{{},          static_cast<u32>(std::size(attachments)),
-                                     attachments, static_cast<u32>(std::size(subpasses)),
-                                     subpasses,   static_cast<u32>(std::size(dependencies)),
-                                     dependencies};
+    vk::RenderPassCreateInfo rp_info{.attachmentCount = attachments.size(),
+                                     .pAttachments    = attachments.data(),
+                                     .subpassCount    = subpasses.size(),
+                                     .pSubpasses      = subpasses.data(),
+                                     .dependencyCount = dependencies.size(),
+                                     .pDependencies   = dependencies.data()};
     m_layered_rp =
         check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createRenderPassUnique(rp_info),
                              "Failed to create render pass: ");
@@ -232,10 +250,14 @@ void sd::View::create_vulkan_resources() {
   }
 
   // Framebuffer (now with valid renderPass)
-  vk::ImageView             views[] = {m_color_view.get(), m_depth_view.get()};
-  vk::FramebufferCreateInfo fb_info{{},    m_layered_rp.get(), static_cast<u32>(std::size(views)),
-                                    views, extent.width,       extent.height,
-                                    1};
+  std::array views = {m_color_view.get(), m_depth_view.get()};
+
+  vk::FramebufferCreateInfo fb_info{.renderPass      = *m_layered_rp,
+                                    .attachmentCount = views.size(),
+                                    .pAttachments    = views.data(),
+                                    .width           = extent.width,
+                                    .height          = extent.height,
+                                    .layers          = 1};
   m_layered_framebuffer =
       check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createFramebufferUnique(fb_info),
                            "Failed to create framebuffer: ");
@@ -254,16 +276,17 @@ void sd::View::on_render(vk::CommandBuffer cmd) {
     return;
   }
 
-  vk::ClearValue clears[2];
-  clears[0].color        = vk::ClearColorValue(0.1f, 0.1f, 0.1f, 1.0f);
-  clears[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
+  std::array clears = {
+      vk::ClearValue{.color = vk::ClearColorValue{std::array{0.1f, 0.1f, 0.1f, 1.0f}}},
+      vk::ClearValue{.depthStencil = vk::ClearDepthStencilValue{1.0f, 0}},
+  };
 
   vk::RenderPassBeginInfo begin_info{
-      m_layered_rp.get(),
-      m_layered_framebuffer.get(),
-      {{0, 0}, m_extent},
-      2,
-      clears
+      .renderPass      = *m_layered_rp,
+      .framebuffer     = *m_layered_framebuffer,
+      .renderArea      = vk::Rect2D{.offset = {0, 0}, .extent = m_extent},
+      .clearValueCount = 2,
+      .pClearValues    = clears.data(),
   };
 
   cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);

@@ -25,9 +25,9 @@ VulkanWindow::VulkanWindow(Window& window, VulkanContext& vulkan_context) :
     FrameSync f;
     f.image_acquired = check_vulkan_res_val(m_device.createSemaphoreUnique({}),
                                             "Failed to create unique semaphore");
-    f.in_flight =
-        check_vulkan_res_val(m_device.createFenceUnique({vk::FenceCreateFlagBits::eSignaled}),
-                             "Failed to create unique fence: ");
+    f.in_flight      = check_vulkan_res_val(m_device.createFenceUnique(vk::FenceCreateInfo{
+                                                .flags = vk::FenceCreateFlagBits::eSignaled}),
+                                            "Failed to create unique fence: ");
     return f;
   });
 
@@ -284,7 +284,12 @@ void VulkanWindow::create_render_pass() {
       .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
       .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 
-  vk::RenderPassCreateInfo render_pass_info({}, 1, &color_attachment, 1, &subpass, 1, &dependency);
+  vk::RenderPassCreateInfo render_pass_info{.attachmentCount = 1,
+                                            .pAttachments    = &color_attachment,
+                                            .subpassCount    = 1,
+                                            .pSubpasses      = &subpass,
+                                            .dependencyCount = 1,
+                                            .pDependencies   = &dependency};
 
   m_render_pass = check_vulkan_res_val(m_device.createRenderPassUnique(render_pass_info),
                                        "Failed to create unique renderpass");
@@ -342,8 +347,9 @@ void VulkanWindow::create_command_pool() {
   ASSERT(m_device && "Device must be valid");
 
   // 1. Create Pool
-  vk::CommandPoolCreateInfo pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                                      m_vulkan_ctx.get_graphics_family_index());
+  vk::CommandPoolCreateInfo pool_info{.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+                                      .queueFamilyIndex = m_vulkan_ctx.get_graphics_family_index()};
+
   m_command_pool = check_vulkan_res_val(m_device.createCommandPoolUnique(pool_info),
                                         "Failed to create unique command pool");
 
