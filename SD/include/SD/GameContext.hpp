@@ -19,13 +19,13 @@ class Scene;
 //   - Example minimal game implementation
 class GameContext {
 public:
-    virtual ~GameContext() = default;
+  virtual ~GameContext() = default;
 
-    virtual void on_load(Application& app) = 0;
-    virtual void on_update(float dt) = 0;
-    virtual void on_unload() = 0;
+  virtual void on_load(Application& app) = 0;
+  virtual void on_update(float dt)       = 0;
+  virtual void on_unload()               = 0;
 
-    virtual std::vector<Scene*> get_scenes() = 0;
+  virtual std::vector<Scene*> get_scenes() = 0;
 };
 
-} // namespace SD
+} // namespace sd

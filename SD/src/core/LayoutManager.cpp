@@ -1,10 +1,9 @@
 #include "SD/core/LayoutManager.hpp"
 
-#include <imgui.h>
-#include <imgui_internal.h>
-
 #include <filesystem>
 #include <fstream>
+#include <imgui.h>
+#include <imgui_internal.h>
 
 #include "SD/core/ApplicationRuntime.hpp"
 #include "SD/core/Layer.hpp"
@@ -18,7 +17,8 @@ namespace sd {
 LayoutManager::LayoutManager() = default;
 
 void LayoutManager::init() {
-  if (m_is_initialized) return;
+  if (m_is_initialized)
+    return;
 
   ensure_layouts_directory_exists();
   refresh_layout_list();
@@ -50,14 +50,14 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
     log::engine::warn("Cannot apply preset: ImGui context not available");
     return;
   }
-  
+
   ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-  
+
   // Remove existing layout and create fresh dockspace
   ImGui::DockBuilderRemoveNode(dockspace_id);
   ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
   ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
-  
+
   // RAII guard to ensure DockBuilderFinish is always called
   struct DockBuilderGuard {
     ImGuiID id;
@@ -65,7 +65,7 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
     ~DockBuilderGuard() { ImGui::DockBuilderFinish(id); }
   };
   DockBuilderGuard guard(dockspace_id);
-  
+
   // Find EngineDebugLayer to control inspector windows
   EngineDebugLayer* debug_layer = nullptr;
   for (auto& layer : runtime.global_layers) {
@@ -100,9 +100,7 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
 
   } else { // Default
     // Ensure all views are open
-    runtime.views.for_each([](View& view) {
-      view.set_open(true);
-    });
+    runtime.views.for_each([](View& view) { view.set_open(true); });
 
     // Show all inspector windows
     if (debug_layer) {
@@ -115,7 +113,8 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
 
     // Right side: split vertically for inspector panels
     ImGuiID dock_id_right_top, dock_id_right_bottom;
-    ImGui::DockBuilderSplitNode(dock_id_right, ImGuiDir_Up, 0.50f, &dock_id_right_top, &dock_id_right_bottom);
+    ImGui::DockBuilderSplitNode(dock_id_right, ImGuiDir_Up, 0.50f, &dock_id_right_top,
+                                &dock_id_right_bottom);
 
     // Dock windows
     auto game_view = runtime.views.get("Game");
@@ -134,19 +133,21 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
     m_current_layout = "Default";
     log::engine::info("Applied Default preset");
   }
-  
+
   save_current_layout_name();
   // DockBuilderFinish called automatically by guard
 }
 
 void LayoutManager::apply_pending_layout(ApplicationRuntime runtime) {
-  if (m_has_applied_initial_layout || m_pending_layout.empty()) return;
-  
+  if (m_has_applied_initial_layout || m_pending_layout.empty())
+    return;
+
   // Check if dockspace exists
-  ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-  ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspace_id);
-  if (!node) return; // Dockspace not ready yet
-  
+  ImGuiID        dockspace_id = ImGui::GetID("MyDockSpace");
+  ImGuiDockNode* node         = ImGui::DockBuilderGetNode(dockspace_id);
+  if (!node)
+    return; // Dockspace not ready yet
+
   // Apply the pending layout
   if (m_pending_layout == "Minimal") {
     apply_preset(Preset::MINIMAL, runtime);
@@ -155,7 +156,7 @@ void LayoutManager::apply_pending_layout(ApplicationRuntime runtime) {
   } else if (has_layout(m_pending_layout)) {
     load_layout(m_pending_layout, runtime);
   }
-  
+
   m_pending_layout.clear();
   m_has_applied_initial_layout = true;
 }
@@ -163,22 +164,22 @@ void LayoutManager::apply_pending_layout(ApplicationRuntime runtime) {
 void LayoutManager::save_layout(const std::string& name) {
   ensure_layouts_directory_exists();
   std::string path = get_layout_path(name);
-  
+
   // Temporarily change ImGui's INI filename to save to our layout file
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO&    io               = ImGui::GetIO();
   const char* old_ini_filename = io.IniFilename;
-  io.IniFilename = path.c_str();
-  
+  io.IniFilename               = path.c_str();
+
   // Save ImGui settings
   ImGui::SaveIniSettingsToDisk(path.c_str());
-  
+
   // Restore original INI filename
   io.IniFilename = old_ini_filename;
-  
+
   m_current_layout = name;
   save_current_layout_name();
   refresh_layout_list();
-  
+
   log::engine::info("Layout '{}' saved to {}", name, path);
 }
 
@@ -187,20 +188,20 @@ bool LayoutManager::load_layout(const std::string& name, ApplicationRuntime runt
     log::engine::warn("Layout '{}' not found", name);
     return false;
   }
-  
+
   std::string path = m_user_layouts[name];
-  
+
   // Temporarily change ImGui's INI filename
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO&    io               = ImGui::GetIO();
   const char* old_ini_filename = io.IniFilename;
-  io.IniFilename = path.c_str();
-  
+  io.IniFilename               = path.c_str();
+
   // Load ImGui settings
   ImGui::LoadIniSettingsFromDisk(path.c_str());
-  
+
   // Restore original INI filename
   io.IniFilename = old_ini_filename;
-  
+
   // Update view visibility based on what ImGui knows
   ImGuiContext* ctx = ImGui::GetCurrentContext();
   if (ctx) {
@@ -211,31 +212,32 @@ bool LayoutManager::load_layout(const std::string& name, ApplicationRuntime runt
       }
     });
   }
-  
+
   m_current_layout = name;
   save_current_layout_name();
-  
+
   log::engine::info("Layout '{}' loaded from {}", name, path);
   return true;
 }
 
 void LayoutManager::delete_layout(const std::string& name, ApplicationRuntime runtime) {
-  if (!has_layout(name)) return;
-  
-  std::string path = m_user_layouts[name];
+  if (!has_layout(name))
+    return;
+
+  std::string     path = m_user_layouts[name];
   std::error_code ec;
   std::filesystem::remove(path, ec);
-  
+
   if (ec) {
     log::engine::warn("Failed to delete layout file '{}': {}", path, ec.message());
     return;
   }
-  
+
   if (m_current_layout == name) {
     m_current_layout = "Default";
     apply_preset(Preset::DEFAULT, runtime);
   }
-  
+
   refresh_layout_list();
   log::engine::info("Layout '{}' deleted", name);
 }
@@ -275,13 +277,15 @@ void LayoutManager::save_current_layout_name() {
 
 void LayoutManager::refresh_layout_list() {
   m_user_layouts.clear();
-  
+
   std::error_code ec;
-  if (!std::filesystem::exists("layouts")) return;
-  
+  if (!std::filesystem::exists("layouts"))
+    return;
+
   for (const auto& entry : std::filesystem::directory_iterator("layouts", ec)) {
-    if (!entry.is_regular_file()) continue;
-    
+    if (!entry.is_regular_file())
+      continue;
+
     std::string filename = entry.path().filename().string();
     if (filename.ends_with(".ini") && filename != ".current") {
       // Extract layout name from "<name>.ini"

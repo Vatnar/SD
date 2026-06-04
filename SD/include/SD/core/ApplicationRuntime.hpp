@@ -10,13 +10,13 @@ class FrameTimer;
 class LayerList;
 
 struct ApplicationRuntime {
-  ViewManager& views;
-  SceneManager& scenes;
+  ViewManager&   views;
+  SceneManager&  scenes;
   LayoutManager& layout;
-  EventManager& events;
-  FrameTimer& timer;
-  LayerList& global_layers;
-  bool& hot_reload_enabled;
+  EventManager&  events;
+  FrameTimer&    timer;
+  LayerList&     global_layers;
+  bool&          hot_reload_enabled;
 };
 
 } // namespace sd

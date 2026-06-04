@@ -1,9 +1,9 @@
 #pragma once
 #include "Command.hpp"
 #include "CommandQueue.hpp"
-#include "components.hpp"
 #include "Entity.hpp"
 #include "EntityManager.hpp"
+#include "components.hpp"
 
 namespace sd {
 
@@ -14,7 +14,7 @@ public:
   explicit CreateEntityCmd(EntityHandle handle) : m_handle(handle) {}
 
   EntityHandle m_handle;
-  Entity m_created_entity = {};
+  Entity       m_created_entity = {};
 
   void execute(EntityManager& em, CommandQueue& queue) override {
     m_created_entity = em.create();
@@ -37,7 +37,7 @@ public:
     serializer.write<u32>(m_entity.generation);
   }
   void deserialize(Serializer& serializer) override {
-    m_entity.index = serializer.read<u32>();
+    m_entity.index      = serializer.read<u32>();
     m_entity.generation = serializer.read<u32>();
   }
 };
@@ -47,7 +47,7 @@ class AddComponentCmd : public Command {
   COMMAND_ID_T(AddComponentCmd, T)
 public:
   EntityHandle m_handle;
-  T m_data;
+  T            m_data;
   AddComponentCmd() = default;
   AddComponentCmd(EntityHandle handle, T data) : m_handle(handle), m_data(data) {}
 
@@ -90,4 +90,4 @@ REGISTER_COMPONENT_COMMANDS(Camera);
 REGISTER_COMPONENT_COMMANDS(Renderable);
 REGISTER_COMPONENT_COMMANDS(DebugName);
 
-} // namespace SD
+} // namespace sd

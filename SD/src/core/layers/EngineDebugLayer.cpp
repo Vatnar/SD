@@ -1,55 +1,51 @@
 #include "SD/core/layers/EngineDebugLayer.hpp"
 
 #include <array>
-
 #include <imgui.h>
 
-#include "SD/core/ecs/components.hpp"
-#include "SD/core/events/window/keyboard_events.hpp"
-#include "SD/core/events/window/mouse_events.hpp"
 #include "SD/core/LayoutManager.hpp"
-#include "SD/core/logging.hpp"
 #include "SD/core/SceneManager.hpp"
 #include "SD/core/View.hpp"
 #include "SD/core/ViewManager.hpp"
+#include "SD/core/ecs/components.hpp"
+#include "SD/core/events/window/keyboard_events.hpp"
+#include "SD/core/events/window/mouse_events.hpp"
+#include "SD/core/logging.hpp"
 #include "SD/core/vulkan/VulkanRenderer.hpp"
 
 namespace sd {
 
-EngineDebugLayer::EngineDebugLayer(ApplicationRuntime runtime, EngineServices services, Scene* scene)
-    : Panel("EngineDebug", scene),
-      m_views(runtime.views),
-      m_scenes(runtime.scenes),
-      m_layout(runtime.layout),
-      m_events(runtime.events),
-      m_frame_timer(runtime.timer),
-      m_hot_reload_enabled(runtime.hot_reload_enabled),
-      m_global_layers(runtime.global_layers),
-      m_renderer(services.renderer) {}
+EngineDebugLayer::EngineDebugLayer(ApplicationRuntime runtime, EngineServices services,
+                                   Scene* scene) :
+  Panel("EngineDebug", scene), m_views(runtime.views), m_scenes(runtime.scenes),
+  m_layout(runtime.layout), m_events(runtime.events), m_frame_timer(runtime.timer),
+  m_hot_reload_enabled(runtime.hot_reload_enabled), m_global_layers(runtime.global_layers),
+  m_renderer(services.renderer) {
+}
 
 void EngineDebugLayer::on_update(float dt) {
   m_update_count++;
   m_timer += dt;
 
   if (m_timer >= 1.0f) {
-    m_prev_fixed = m_fixed_update_count;
-    m_prev_update = m_update_count;
+    m_prev_fixed         = m_fixed_update_count;
+    m_prev_update        = m_update_count;
     m_fixed_update_count = 0;
-    m_update_count = 0;
-    m_timer = 0.0f;
+    m_update_count       = 0;
+    m_timer              = 0.0f;
   }
 
   m_views.for_each([&](View& view) {
     if (m_log_view_resizes && view.consume_extent_changed()) {
       log::engine::debug("View '{}' resized to {}x{}", view.get_name(), view.get_extent().width,
-                      view.get_extent().height);
+                         view.get_extent().height);
     }
   });
 
   // Track entity lifecycle changes if logging is enabled
   if (m_selected_scene && m_log_entity_lifecycle) {
     if (m_selected_scene != m_prev_scene_for_entity_count) {
-      m_prev_entity_count = m_selected_scene->em.get_alive_entity_count();
+      m_prev_entity_count           = m_selected_scene->em.get_alive_entity_count();
       m_prev_scene_for_entity_count = m_selected_scene;
     } else {
       int alive = m_selected_scene->em.get_alive_entity_count();
@@ -86,7 +82,8 @@ void EngineDebugLayer::on_event(Event& e) {
       }
       case EventType::MOUSE_PRESSED: {
         if (auto* me = dynamic_cast<MousePressedEvent*>(&e)) {
-          detail = fmt::format("Button: {} (mods: {}, repeat: {})", me->button, me->mods, me->repeat);
+          detail =
+              fmt::format("Button: {} (mods: {}, repeat: {})", me->button, me->mods, me->repeat);
         }
         break;
       }
@@ -119,21 +116,21 @@ void EngineDebugLayer::on_event(Event& e) {
 void EngineDebugLayer::on_im_gui_menu_bar() {
   // Apply pending layout once dockspace is ready
   m_layout.apply_pending_layout(make_runtime());
-  
+
   if (ImGui::BeginMenu("Debug")) {
     ImGui::MenuItem("View Inspector", nullptr, &m_show_view_inspector);
     ImGui::MenuItem("Scene Inspector", nullptr, &m_show_scene_inspector);
     ImGui::MenuItem("Renderer Info", nullptr, &m_show_renderer_info);
     ImGui::MenuItem("Context Overlay", nullptr, &m_show_context_overlay);
-    
+
     ImGui::Separator();
     display_layout_menu();
-    
+
     ImGui::Separator();
     if (ImGui::MenuItem("Reload Shaders", "Ctrl+Shift+D, R")) {
       m_renderer.reload_shaders();
     }
-    
+
     ImGui::EndMenu();
   }
 }
@@ -150,11 +147,12 @@ void EngineDebugLayer::on_gui_render() {
           m_selected_view_id.reset();
         }
       }
-      
+
       if (ImGui::BeginCombo("View Selector",
                             selected_view ? selected_view->get_name().c_str() : "None")) {
         m_views.for_each([&](View& view) {
-          if (ImGui::Selectable(view.get_name().c_str(), m_selected_view_id == view.get_view_id())) {
+          if (ImGui::Selectable(view.get_name().c_str(),
+                                m_selected_view_id == view.get_view_id())) {
             m_selected_view_id = view.get_view_id();
           }
         });
@@ -224,16 +222,16 @@ void EngineDebugLayer::on_gui_render() {
   if (m_show_context_overlay) {
     auto mouse_pos = ImGui::GetMousePos();
     m_views.for_each([&](View& view) {
-      ImVec2 region_pos = view.get_content_region_pos();
+      ImVec2 region_pos    = view.get_content_region_pos();
       ImVec2 region_extent = view.get_content_region_extent();
       if (mouse_pos.x >= region_pos.x && mouse_pos.x <= region_pos.x + region_extent.x &&
           mouse_pos.y >= region_pos.y && mouse_pos.y <= region_pos.y + region_extent.y) {
         ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 15, mouse_pos.y + 15));
         if (ImGui::Begin("##ContextOverlay", nullptr,
-                          ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar |
-                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                              ImGuiWindowFlags_AlwaysAutoResize |
-                              ImGuiWindowFlags_NoSavedSettings)) {
+                         ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar |
+                             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                             ImGuiWindowFlags_AlwaysAutoResize |
+                             ImGuiWindowFlags_NoSavedSettings)) {
           float ndc_x = ((mouse_pos.x - region_pos.x) / region_extent.x) * 2.0f - 1.0f;
           float ndc_y = ((mouse_pos.y - region_pos.y) / region_extent.y) * 2.0f - 1.0f;
           ImGui::Text("View: %s", view.get_name().c_str());
@@ -243,20 +241,21 @@ void EngineDebugLayer::on_gui_render() {
       }
     });
   }
-  
+
   // Display dialogs
   display_save_layout_dialog();
   display_delete_layout_dialog();
   display_overwrite_confirmation_dialog();
-  
+
   // Handle shortcuts
   handle_layout_shortcuts();
   handle_debug_shortcuts();
 }
 
 void EngineDebugLayer::display_view_info(View* selected_view) {
-  if (!selected_view) return;  // Defensive null check
-  
+  if (!selected_view)
+    return; // Defensive null check
+
   if (ImGui::TreeNodeEx("Logging", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::Checkbox("Log Window Events", &m_log_events);
     ImGui::Checkbox("Log View Resizes", &m_log_view_resizes);
@@ -268,7 +267,7 @@ void EngineDebugLayer::display_view_info(View* selected_view) {
               selected_view->get_extent().width, selected_view->get_extent().height);
 
   AspectMode current_mode = selected_view->get_aspect_mode();
-  int modeInt = static_cast<int>(current_mode);
+  int        modeInt      = static_cast<int>(current_mode);
   ImGui::Text("Aspect Mode:");
   ImGui::SameLine();
   if (ImGui::RadioButton("Fixed Height", &modeInt, 0))
@@ -281,19 +280,19 @@ void EngineDebugLayer::display_view_info(View* selected_view) {
     selected_view->set_aspect_mode(AspectMode::BEST_FIT);
 
   ImGui::Separator();
-  RenderMode current_r_mode = selected_view->get_render_mode();
-  const char* r_modes[] = {"Shaded", "Wireframe"};
-  int r_mode_int = static_cast<int>(current_r_mode);
+  RenderMode  current_r_mode = selected_view->get_render_mode();
+  const char* r_modes[]      = {"Shaded", "Wireframe"};
+  int         r_mode_int     = static_cast<int>(current_r_mode);
   if (ImGui::Combo("Render Mode", &r_mode_int, r_modes, IM_ARRAYSIZE(r_modes))) {
     selected_view->set_render_mode((RenderMode)r_mode_int);
   }
 
-  ImVec2 mouse_pos = ImGui::GetMousePos();
-  ImVec2 region_pos = selected_view->get_content_region_pos();
+  ImVec2 mouse_pos     = ImGui::GetMousePos();
+  ImVec2 region_pos    = selected_view->get_content_region_pos();
   ImVec2 region_extent = selected_view->get_content_region_extent();
 
   bool is_hovered = (mouse_pos.x >= region_pos.x && mouse_pos.x <= region_pos.x + region_extent.x &&
-                    mouse_pos.y >= region_pos.y && mouse_pos.y <= region_pos.y + region_extent.y);
+                     mouse_pos.y >= region_pos.y && mouse_pos.y <= region_pos.y + region_extent.y);
 
   ImGui::Text("Hovered: %s", is_hovered ? "YES" : "NO");
 
@@ -322,7 +321,8 @@ void EngineDebugLayer::display_scene_selector() {
 
   Scene* initial_scene = nullptr;
   m_scenes.for_each([&](Scene& scene) {
-    if (!initial_scene) initial_scene = &scene;
+    if (!initial_scene)
+      initial_scene = &scene;
   });
   if (!m_selected_scene && initial_scene)
     m_selected_scene = initial_scene;
@@ -374,7 +374,7 @@ void EngineDebugLayer::display_ecs_inspector() {
           if (ImGui::DragInt("Stage", (int*)&renderable->render_stage, 1, 0, 10)) {
             if (m_log_scene_changes) {
               log::engine::debug("Entity {} render stage changed to {}", entity.index,
-                              renderable->render_stage);
+                                 renderable->render_stage);
             }
           }
           ImGui::TreePop();
@@ -387,14 +387,15 @@ void EngineDebugLayer::display_ecs_inspector() {
 
 void EngineDebugLayer::build_category_tree() {
   auto& categories = log::get_category_registry();
-  m_category_root = CategoryNode{"", "", true, {}};
+  m_category_root  = CategoryNode{"", "", true, {}};
 
   for (auto& cat : categories) {
-    CategoryNode* node = &m_category_root;
-    size_t start = 0;
+    CategoryNode* node  = &m_category_root;
+    size_t        start = 0;
     while (start < cat.name.size()) {
       size_t end = cat.name.find('/', start);
-      if (end == std::string::npos) end = cat.name.size();
+      if (end == std::string::npos)
+        end = cat.name.size();
       std::string segment = cat.name.substr(start, end - start);
 
       CategoryNode* child = nullptr;
@@ -408,7 +409,7 @@ void EngineDebugLayer::build_category_tree() {
         node->children.push_back(CategoryNode{segment, cat.name.substr(0, end), cat.visible, {}});
         child = &node->children.back();
       }
-      node = child;
+      node  = child;
       start = end + 1;
     }
   }
@@ -432,7 +433,8 @@ void EngineDebugLayer::render_category_node(CategoryNode& node) {
     }
   } else {
     // Parent node — TreeNode + Checkbox
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
     bool open = ImGui::TreeNodeEx(node.name.c_str(), flags);
     ImGui::SameLine();
     bool visible = node.visible;
@@ -450,11 +452,12 @@ void EngineDebugLayer::render_category_node(CategoryNode& node) {
 
 bool EngineDebugLayer::is_log_visible(const std::string& category) {
   // Walk the tree to find the category node
-  CategoryNode* node = &m_category_root;
-  size_t start = 0;
+  CategoryNode* node  = &m_category_root;
+  size_t        start = 0;
   while (start < category.size()) {
     size_t end = category.find('/', start);
-    if (end == std::string::npos) end = category.size();
+    if (end == std::string::npos)
+      end = category.size();
     std::string segment = category.substr(start, end - start);
 
     CategoryNode* child = nullptr;
@@ -464,8 +467,9 @@ bool EngineDebugLayer::is_log_visible(const std::string& category) {
         break;
       }
     }
-    if (!child) return false;
-    node = child;
+    if (!child)
+      return false;
+    node  = child;
     start = end + 1;
   }
   return node->visible;
@@ -486,12 +490,12 @@ void EngineDebugLayer::set_category_visible(CategoryNode& node, bool visible) {
 }
 
 void EngineDebugLayer::display_event_log() {
-  const auto& history = log::get_log_history();
-  auto& categories = log::get_category_registry();
+  const auto& history    = log::get_log_history();
+  auto&       categories = log::get_category_registry();
 
   // Initialize filters once
   if (!m_log_filter_initialized) {
-    m_log_search_buffer[0] = '\0';
+    m_log_search_buffer[0]   = '\0';
     m_log_filter_initialized = true;
   }
 
@@ -500,7 +504,7 @@ void EngineDebugLayer::display_event_log() {
   ImGui::SameLine();
 
   // Level filter
-  const char* level_items[] = { "All", "Debug+", "Info+", "Warn+", "Error+" };
+  const char* level_items[] = {"All", "Debug+", "Info+", "Warn+", "Error+"};
   ImGui::Combo("Level", &m_log_level_filter, level_items, IM_ARRAYSIZE(level_items));
 
   // Category tree filters
@@ -519,11 +523,20 @@ void EngineDebugLayer::display_event_log() {
   // Determine minimum level to show
   log::LogLevel min_level = log::LogLevel::TRACE;
   switch (m_log_level_filter) {
-    case 1: min_level = log::LogLevel::DEBUG; break;
-    case 2: min_level = log::LogLevel::INFO; break;
-    case 3: min_level = log::LogLevel::WARN; break;
-    case 4: min_level = log::LogLevel::ERROR; break;
-      default: break;
+    case 1:
+      min_level = log::LogLevel::DEBUG;
+      break;
+    case 2:
+      min_level = log::LogLevel::INFO;
+      break;
+    case 3:
+      min_level = log::LogLevel::WARN;
+      break;
+    case 4:
+      min_level = log::LogLevel::ERROR;
+      break;
+    default:
+      break;
   }
 
   std::string search = m_log_search_buffer;
@@ -535,13 +548,15 @@ void EngineDebugLayer::display_event_log() {
       continue;
 
     // Category filter (using tree visibility)
-    if (!is_log_visible(log.category)) continue;
+    if (!is_log_visible(log.category))
+      continue;
 
     // Search filter
     if (!search.empty()) {
       std::string msg_lower = log.message;
       std::ranges::transform(msg_lower, msg_lower.begin(), tolower);
-      if (msg_lower.find(search) == std::string::npos) continue;
+      if (msg_lower.find(search) == std::string::npos)
+        continue;
     }
 
     // Category color
@@ -556,13 +571,26 @@ void EngineDebugLayer::display_event_log() {
     // Level color for the tag
     ImVec4 level_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     switch (log.level) {
-      case log::LogLevel::TRACE:    level_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f); break;
-      case log::LogLevel::DEBUG:    level_color = ImVec4(0.0f, 0.8f, 1.0f, 1.0f); break;
-      case log::LogLevel::INFO:     level_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); break;
-      case log::LogLevel::WARN:     level_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); break;
-      case log::LogLevel::ERROR:    level_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); break;
-      case log::LogLevel::CRITICAL: level_color = ImVec4(1.0f, 0.0f, 1.0f, 1.0f); break;
-      default: break;
+      case log::LogLevel::TRACE:
+        level_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+        break;
+      case log::LogLevel::DEBUG:
+        level_color = ImVec4(0.0f, 0.8f, 1.0f, 1.0f);
+        break;
+      case log::LogLevel::INFO:
+        level_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+        break;
+      case log::LogLevel::WARN:
+        level_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+        break;
+      case log::LogLevel::ERROR:
+        level_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        break;
+      case log::LogLevel::CRITICAL:
+        level_color = ImVec4(1.0f, 0.0f, 1.0f, 1.0f);
+        break;
+      default:
+        break;
     }
 
     // Format: [+sec] [Category] [level] message
@@ -573,13 +601,26 @@ void EngineDebugLayer::display_event_log() {
 
     const char* level_str = "?";
     switch (log.level) {
-      case log::LogLevel::TRACE:    level_str = "trace"; break;
-      case log::LogLevel::DEBUG:    level_str = "debug"; break;
-      case log::LogLevel::INFO:     level_str = "info"; break;
-      case log::LogLevel::WARN:     level_str = "warn"; break;
-      case log::LogLevel::ERROR:    level_str = "error"; break;
-      case log::LogLevel::CRITICAL: level_str = "critical"; break;
-      default: break;
+      case log::LogLevel::TRACE:
+        level_str = "trace";
+        break;
+      case log::LogLevel::DEBUG:
+        level_str = "debug";
+        break;
+      case log::LogLevel::INFO:
+        level_str = "info";
+        break;
+      case log::LogLevel::WARN:
+        level_str = "warn";
+        break;
+      case log::LogLevel::ERROR:
+        level_str = "error";
+        break;
+      case log::LogLevel::CRITICAL:
+        level_str = "critical";
+        break;
+      default:
+        break;
     }
     ImGui::TextColored(level_color, "[%s]", level_str);
     ImGui::SameLine();
@@ -592,37 +633,37 @@ void EngineDebugLayer::display_event_log() {
 
 void EngineDebugLayer::display_layout_menu() {
   if (ImGui::BeginMenu("Layout")) {
-    auto& layout_manager = m_layout;
+    auto&              layout_manager = m_layout;
     const std::string& current_layout = layout_manager.get_current_layout();
-    
+
     // Presets
     bool is_minimal = current_layout == "Minimal";
     if (ImGui::MenuItem("Minimal", "Alt+1", is_minimal)) {
       layout_manager.apply_preset(LayoutManager::Preset::MINIMAL, make_runtime());
     }
-    
+
     bool isDefault = current_layout == "Default";
     if (ImGui::MenuItem("Default", "Alt+2", isDefault)) {
       layout_manager.apply_preset(LayoutManager::Preset::DEFAULT, make_runtime());
     }
-    
+
     // Custom layouts
     auto layouts = layout_manager.get_user_layout_names();
     if (!layouts.empty()) {
       ImGui::Separator();
       int shortcut_num = 3;
       for (const auto& name : layouts) {
-        bool is_current = name == current_layout;
-        std::string shortcut = (shortcut_num <= 9) ? "Alt+" + std::to_string(shortcut_num) : "";
+        bool        is_current = name == current_layout;
+        std::string shortcut   = (shortcut_num <= 9) ? "Alt+" + std::to_string(shortcut_num) : "";
         if (ImGui::MenuItem(name.c_str(), shortcut.c_str(), is_current)) {
           layout_manager.load_layout(name, make_runtime());
         }
         shortcut_num++;
       }
     }
-    
+
     ImGui::Separator();
-    
+
     // Save and Delete options
     if (ImGui::MenuItem("Save Layout...", "Alt+0")) {
       m_show_save_layout_dialog = true;
@@ -630,7 +671,7 @@ void EngineDebugLayer::display_layout_menu() {
     if (ImGui::MenuItem("Delete Layout...")) {
       m_show_delete_layout_dialog = true;
     }
-    
+
     ImGui::EndMenu();
   }
 }
@@ -640,56 +681,57 @@ void EngineDebugLayer::display_save_layout_dialog() {
     m_save_dialog_initialized = false;
     return;
   }
-  
+
   // Clear buffer only once when dialog first opens
   if (!m_save_dialog_initialized) {
     m_layout_name_buffer.fill('\0');
     m_save_dialog_initialized = true;
   }
   ImGui::OpenPopup("Save Layout");
-  
+
   if (ImGui::BeginPopupModal("Save Layout", &m_show_save_layout_dialog)) {
     ImGui::InputText("Layout Name", m_layout_name_buffer.data(), m_layout_name_buffer.size());
-    
+
     ImGui::Spacing();
-    
+
     bool save_clicked = ImGui::Button("Save");
     ImGui::SameLine();
     if (ImGui::Button("Cancel")) {
       m_show_save_layout_dialog = false;
     }
-    
+
     if (save_clicked && m_layout_name_buffer[0] != '\0') {
-      auto& layout_manager = m_layout;
+      auto&       layout_manager = m_layout;
       std::string layout_name(m_layout_name_buffer.data());
-      
+
       if (layout_manager.has_layout(layout_name)) {
         // Show overwrite confirmation
-        m_pending_layout_name = layout_name;
+        m_pending_layout_name         = layout_name;
         m_show_overwrite_confirmation = true;
-        m_show_save_layout_dialog = false;
+        m_show_save_layout_dialog     = false;
       } else {
         layout_manager.save_layout(layout_name);
         m_show_save_layout_dialog = false;
       }
     }
-    
+
     ImGui::EndPopup();
   }
 }
 
 void EngineDebugLayer::display_delete_layout_dialog() {
-  if (!m_show_delete_layout_dialog) return;
-  
+  if (!m_show_delete_layout_dialog)
+    return;
+
   ImGui::OpenPopup("Delete Layout");
-  
+
   if (ImGui::BeginPopupModal("Delete Layout", &m_show_delete_layout_dialog)) {
     auto& layout_manager = m_layout;
-    auto layouts = layout_manager.get_user_layout_names();
-    
+    auto  layouts        = layout_manager.get_user_layout_names();
+
     ImGui::Text("Select layout to delete:");
     ImGui::Spacing();
-    
+
     for (const auto& name : layouts) {
       ImGui::PushID(name.c_str());
       if (ImGui::Button("Delete", ImVec2(200, 0))) {
@@ -699,42 +741,43 @@ void EngineDebugLayer::display_delete_layout_dialog() {
       ImGui::Text("\"%s\"", name.c_str());
       ImGui::PopID();
     }
-    
+
     if (layouts.empty()) {
       ImGui::TextDisabled("No custom layouts to delete");
     }
-    
+
     ImGui::Spacing();
     if (ImGui::Button("Close")) {
       m_show_delete_layout_dialog = false;
     }
-    
+
     ImGui::EndPopup();
   }
 }
 
 void EngineDebugLayer::display_overwrite_confirmation_dialog() {
-  if (!m_show_overwrite_confirmation) return;
-  
+  if (!m_show_overwrite_confirmation)
+    return;
+
   ImGui::OpenPopup("Confirm Overwrite");
-  
+
   if (ImGui::BeginPopupModal("Confirm Overwrite", &m_show_overwrite_confirmation)) {
     ImGui::Text("Layout \"%s\" already exists.", m_pending_layout_name.c_str());
     ImGui::Text("Do you want to overwrite it?");
     ImGui::Spacing();
-    
+
     if (ImGui::Button("Yes")) {
       m_layout.save_layout(m_pending_layout_name);
       m_show_overwrite_confirmation = false;
       m_pending_layout_name.clear();
     }
-    
+
     ImGui::SameLine();
     if (ImGui::Button("No")) {
       m_show_overwrite_confirmation = false;
       m_pending_layout_name.clear();
     }
-    
+
     ImGui::EndPopup();
   }
 }
@@ -742,10 +785,10 @@ void EngineDebugLayer::display_overwrite_confirmation_dialog() {
 void EngineDebugLayer::handle_layout_shortcuts() {
   // Alt+Number shortcuts for layouts
   ImGuiIO& io = ImGui::GetIO();
-  
+
   if (io.KeyAlt && !io.KeyCtrl && !io.KeyShift) {
     auto& layout_manager = m_layout;
-    
+
     // Check each number key individually
     if (ImGui::IsKeyPressed(ImGuiKey_1)) {
       layout_manager.apply_preset(LayoutManager::Preset::MINIMAL, make_runtime());
@@ -756,14 +799,21 @@ void EngineDebugLayer::handle_layout_shortcuts() {
     } else {
       // Alt+3 through Alt+9 for custom layouts
       int custom_index = -1;
-      if (ImGui::IsKeyPressed(ImGuiKey_3)) custom_index = 0;
-      else if (ImGui::IsKeyPressed(ImGuiKey_4)) custom_index = 1;
-      else if (ImGui::IsKeyPressed(ImGuiKey_5)) custom_index = 2;
-      else if (ImGui::IsKeyPressed(ImGuiKey_6)) custom_index = 3;
-      else if (ImGui::IsKeyPressed(ImGuiKey_7)) custom_index = 4;
-      else if (ImGui::IsKeyPressed(ImGuiKey_8)) custom_index = 5;
-      else if (ImGui::IsKeyPressed(ImGuiKey_9)) custom_index = 6;
-      
+      if (ImGui::IsKeyPressed(ImGuiKey_3))
+        custom_index = 0;
+      else if (ImGui::IsKeyPressed(ImGuiKey_4))
+        custom_index = 1;
+      else if (ImGui::IsKeyPressed(ImGuiKey_5))
+        custom_index = 2;
+      else if (ImGui::IsKeyPressed(ImGuiKey_6))
+        custom_index = 3;
+      else if (ImGui::IsKeyPressed(ImGuiKey_7))
+        custom_index = 4;
+      else if (ImGui::IsKeyPressed(ImGuiKey_8))
+        custom_index = 5;
+      else if (ImGui::IsKeyPressed(ImGuiKey_9))
+        custom_index = 6;
+
       if (custom_index >= 0) {
         auto layouts = layout_manager.get_user_layout_names();
         if (custom_index < static_cast<int>(layouts.size())) {
@@ -777,29 +827,29 @@ void EngineDebugLayer::handle_layout_shortcuts() {
 void EngineDebugLayer::handle_debug_shortcuts() {
   // Ctrl+Shift+D prefix for debug shortcuts
   // Uses member variables mDebugModeActive and mDebugModeTimer (not static, for thread safety)
-  
+
   ImGuiIO& io = ImGui::GetIO();
-  
+
   // Check for Ctrl+Shift+D
   if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D)) {
     m_debug_mode_active = true;
-    m_debug_mode_timer = 0.5f; // 500ms timeout
+    m_debug_mode_timer  = 0.5f; // 500ms timeout
   }
-  
+
   if (m_debug_mode_active) {
     // Decrement timer
     m_debug_mode_timer -= io.DeltaTime;
-    
+
     // Check for second key
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
       m_renderer.reload_shaders();
       m_debug_mode_active = false;
     } else if (ImGui::IsKeyPressed(ImGuiKey_H)) {
       m_hot_reload_enabled = !m_hot_reload_enabled;
-      m_debug_mode_active = false;
+      m_debug_mode_active  = false;
     } else if (ImGui::IsKeyPressed(ImGuiKey_L)) {
       m_show_context_overlay = !m_show_context_overlay;
-      m_debug_mode_active = false;
+      m_debug_mode_active    = false;
     } else if (m_debug_mode_timer <= 0.0f) {
       // Timer expired - open debug wheel (placeholder)
       log::engine::info("Debug wheel placeholder - coming soon!");
@@ -809,11 +859,11 @@ void EngineDebugLayer::handle_debug_shortcuts() {
 }
 
 void EngineDebugLayer::apply_preset_configuration(bool inspectors_visible, bool log_visible,
-                                                bool renderer_visible) {
-  m_show_view_inspector = inspectors_visible;
+                                                  bool renderer_visible) {
+  m_show_view_inspector  = inspectors_visible;
   m_show_scene_inspector = inspectors_visible;
-  m_show_event_log = log_visible;
-  m_show_renderer_info = renderer_visible;
+  m_show_event_log       = log_visible;
+  m_show_renderer_info   = renderer_visible;
 }
 
 } // namespace sd

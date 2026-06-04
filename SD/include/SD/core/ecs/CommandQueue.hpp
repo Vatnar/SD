@@ -14,9 +14,9 @@ public:
 
   [[nodiscard]] Entity get_entity(EntityHandle handle) const;
 
-  void set_entity_for_handle(EntityHandle entity_handle, Entity entity);
-  [[nodiscard]] bool is_handle_resolved(EntityHandle handle) const;
-  void clear();
+  void                set_entity_for_handle(EntityHandle entity_handle, Entity entity);
+  [[nodiscard]] bool  is_handle_resolved(EntityHandle handle) const;
+  void                clear();
   [[nodiscard]] usize get_count() const;
 
   void serialize(Serializer& serializer) const;
@@ -24,8 +24,8 @@ public:
 
 private:
   std::vector<std::unique_ptr<Command>> m_commands;
-  std::vector<Entity> m_handle_to_entity;
-  std::mutex m_mutex;
+  std::vector<Entity>                   m_handle_to_entity;
+  std::mutex                            m_mutex;
 };
 
-} // namespace SD
+} // namespace sd

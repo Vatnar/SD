@@ -41,7 +41,7 @@ private:
 public:                                            \
   inline static u32 s_type_id;                     \
   u32               get_type_id() const override { \
-    return s_type_id;                \
+    return s_type_id;                              \
   }                                                \
                                                    \
 private:
@@ -50,7 +50,7 @@ private:
 public:                                            \
   inline static u32 s_type_id;                     \
   u32               get_type_id() const override { \
-    return s_type_id;                \
+    return s_type_id;                              \
   }                                                \
                                                    \
 private:

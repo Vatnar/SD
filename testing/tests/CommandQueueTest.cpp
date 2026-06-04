@@ -1,6 +1,6 @@
-#include <core/ecs/commands.hpp>
-#include <core/ecs/EntityManager.hpp>
 #include <core/ecs/CommandQueue.hpp>
+#include <core/ecs/EntityManager.hpp>
+#include <core/ecs/commands.hpp>
 #include <core/ecs/components.hpp>
 #include <gtest/gtest.h>
 
@@ -9,7 +9,7 @@ namespace sd {
 class CommandQueueTest : public ::testing::Test {
 protected:
   EntityManager em;
-  CommandQueue queue;
+  CommandQueue  queue;
 };
 
 TEST_F(CommandQueueTest, Add_IncreasesCount) {
@@ -78,7 +78,7 @@ TEST_F(CommandSerializationTest, CreateEntityCmd_SerializeDeserialize) {
   CreateEntityCmd cmd(EntityHandle(42));
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   cmd.serialize(serializer);
 
   EXPECT_GT(buffer.size(), 0u);
@@ -94,10 +94,10 @@ TEST_F(CommandSerializationTest, CreateEntityCmd_SerializeDeserialize) {
 TEST_F(CommandSerializationTest, AddComponentCmd_SerializeDeserialize) {
   AddComponentCmd<Transform> cmd;
   cmd.m_handle.id = 5;
-  cmd.m_data = Transform{VLA::Matrix4x4f::Identity()};
+  cmd.m_data      = Transform{VLA::Matrix4x4f::Identity()};
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   cmd.serialize(serializer);
 
   Serializer deserializer(buffer);
@@ -115,11 +115,11 @@ TEST_F(CommandSerializationTest, CommandQueue_SerializeDeserialize) {
   queue.add<CreateEntityCmd>(EntityHandle(1));
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   queue.serialize(serializer);
 
   CommandQueue queue2;
-  Serializer deserializer(buffer);
+  Serializer   deserializer(buffer);
   deserializer.reset_offset();
   queue2.deserialize(deserializer);
 

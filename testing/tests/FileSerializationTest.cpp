@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "SD/core/ecs/CommandQueue.hpp"
+#include "SD/core/ecs/EntityManager.hpp"
 #include "SD/core/ecs/commands.hpp"
 #include "SD/core/ecs/components.hpp"
-#include "SD/core/ecs/EntityManager.hpp"
 #include "utils/file_utils.hpp"
 #include "utils/serialization.hpp"
 
@@ -19,7 +19,7 @@ protected:
 };
 
 TEST_F(FileSerializationTest, Filewriting) {
-  constexpr double d{3.14};
+  constexpr double       d{3.14};
   std::vector<std::byte> buffer;
 
   Serializer(buffer).write(d);
@@ -39,7 +39,7 @@ TEST_F(FileSerializationTest, CommandQueue_FileRoundTrip) {
   queue.add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity()});
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   queue.serialize(serializer);
   Filesystem::write_binary("test_commandqueue.bin", buffer);
 
@@ -47,7 +47,7 @@ TEST_F(FileSerializationTest, CommandQueue_FileRoundTrip) {
   Filesystem::read_binary("test_commandqueue.bin", read_buffer);
 
   CommandQueue queue2;
-  Serializer deserializer(read_buffer);
+  Serializer   deserializer(read_buffer);
   deserializer.reset_offset();
   queue2.deserialize(deserializer);
 
@@ -64,7 +64,7 @@ TEST_F(FileSerializationTest, CommandQueue_FileWithMultipleEntities) {
   queue.add<AddComponentCmd<Transform>>(h2, Transform{VLA::Matrix4x4f::Identity() * 2.0f});
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   queue.serialize(serializer);
   Filesystem::write_binary("test_commandqueue.bin", buffer);
 
@@ -72,7 +72,7 @@ TEST_F(FileSerializationTest, CommandQueue_FileWithMultipleEntities) {
   Filesystem::read_binary("test_commandqueue.bin", read_buffer);
 
   CommandQueue queue2;
-  Serializer deserializer(read_buffer);
+  Serializer   deserializer(read_buffer);
   deserializer.reset_offset();
   queue2.deserialize(deserializer);
 
@@ -81,13 +81,13 @@ TEST_F(FileSerializationTest, CommandQueue_FileWithMultipleEntities) {
 
 TEST_F(FileSerializationTest, ECS_EntityManagerSerialize) {
   EntityManager em;
-  Entity e1 = em.create();
-  Entity e2 = em.create();
+  Entity        e1 = em.create();
+  Entity        e2 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<Transform>(e2, VLA::Matrix4x4f::Identity() * 2.0f);
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -95,7 +95,7 @@ TEST_F(FileSerializationTest, ECS_EntityManagerSerialize) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -110,7 +110,7 @@ TEST_F(FileSerializationTest, ECS_EmptyEntityManager) {
   EntityManager em;
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -118,7 +118,7 @@ TEST_F(FileSerializationTest, ECS_EmptyEntityManager) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -127,12 +127,12 @@ TEST_F(FileSerializationTest, ECS_EmptyEntityManager) {
 
 TEST_F(FileSerializationTest, ECS_MultipleComponentsSameEntity) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<DebugName>(e1, "EntityOne");
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -140,7 +140,7 @@ TEST_F(FileSerializationTest, ECS_MultipleComponentsSameEntity) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -153,15 +153,15 @@ TEST_F(FileSerializationTest, ECS_MultipleComponentsSameEntity) {
 
 TEST_F(FileSerializationTest, ECS_VerifyComponentData) {
   EntityManager em;
-  Entity e1 = em.create();
-  Entity e2 = em.create();
+  Entity        e1 = em.create();
+  Entity        e2 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity() * 3.0f);
   em.add_component<Transform>(e2, VLA::Matrix4x4f::Identity() * 5.0f);
   em.add_component<DebugName>(e1, "First");
   em.add_component<DebugName>(e2, "Second");
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -169,7 +169,7 @@ TEST_F(FileSerializationTest, ECS_VerifyComponentData) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -191,14 +191,14 @@ TEST_F(FileSerializationTest, ECS_VerifyComponentData) {
 
 TEST_F(FileSerializationTest, ECS_DestroyedEntityNotSerialized) {
   EntityManager em;
-  Entity e1 = em.create();
-  Entity e2 = em.create();
+  Entity        e1 = em.create();
+  Entity        e2 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<Transform>(e2, VLA::Matrix4x4f::Identity());
   em.destroy(e1);
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -206,7 +206,7 @@ TEST_F(FileSerializationTest, ECS_DestroyedEntityNotSerialized) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -220,13 +220,13 @@ TEST_F(FileSerializationTest, ECS_DestroyedEntityNotSerialized) {
 
 TEST_F(FileSerializationTest, ECS_RemoveComponentSerialized) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<DebugName>(e1, "Test");
   em.try_remove_component<DebugName>(e1);
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -234,7 +234,7 @@ TEST_F(FileSerializationTest, ECS_RemoveComponentSerialized) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -243,8 +243,8 @@ TEST_F(FileSerializationTest, ECS_RemoveComponentSerialized) {
 }
 
 TEST_F(FileSerializationTest, ECS_ManyEntities) {
-  constexpr int ENTITY_COUNT = 100;
-  EntityManager em;
+  constexpr int       ENTITY_COUNT = 100;
+  EntityManager       em;
   std::vector<Entity> entities;
   entities.reserve(ENTITY_COUNT);
 
@@ -256,7 +256,7 @@ TEST_F(FileSerializationTest, ECS_ManyEntities) {
   }
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -264,7 +264,7 @@ TEST_F(FileSerializationTest, ECS_ManyEntities) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -286,16 +286,16 @@ TEST_F(FileSerializationTest, ECS_ManyEntities) {
 
 TEST_F(FileSerializationTest, ECS_DoubleSerializationConsistent) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer1;
-  Serializer ser1(buffer1);
+  Serializer             ser1(buffer1);
   em.serialize(ser1);
 
   std::vector<std::byte> buffer2;
-  Serializer ser2(buffer2);
+  Serializer             ser2(buffer2);
   em.serialize(ser2);
 
   EXPECT_EQ(buffer1.size(), buffer2.size());
@@ -304,15 +304,15 @@ TEST_F(FileSerializationTest, ECS_DoubleSerializationConsistent) {
 
 TEST_F(FileSerializationTest, ECS_DeserializeIntoNonEmpty) {
   EntityManager em;
-  Entity existing = em.create();
+  Entity        existing = em.create();
   em.add_component<Transform>(existing, VLA::Matrix4x4f::Identity() * 10.0f);
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
 
   EntityManager em2;
-  Entity e3 = em2.create();
+  Entity        e3 = em2.create();
   em2.add_component<Transform>(e3, VLA::Matrix4x4f::Identity() * 99.0f);
 
   Serializer deserializer(buffer);
@@ -329,18 +329,18 @@ TEST_F(FileSerializationTest, ECS_DeserializeIntoNonEmpty) {
 
 TEST_F(FileSerializationTest, ECS_GenerationAfterDeserialize) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.destroy(e1);
   Entity e2 = em.create();
   em.add_component<Transform>(e2, VLA::Matrix4x4f::Identity() * 2.0f);
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
 
   EntityManager em2;
-  Serializer deserializer(buffer);
+  Serializer    deserializer(buffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -356,7 +356,7 @@ TEST_F(FileSerializationTest, ECS_GenerationAfterDeserialize) {
 }
 
 TEST_F(FileSerializationTest, ECS_FreeListPreserved) {
-  EntityManager em;
+  EntityManager       em;
   std::vector<Entity> created;
   for (int i = 0; i < 10; ++i) {
     created.push_back(em.create());
@@ -366,11 +366,11 @@ TEST_F(FileSerializationTest, ECS_FreeListPreserved) {
   }
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
 
   EntityManager em2;
-  Serializer deserializer(buffer);
+  Serializer    deserializer(buffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -384,12 +384,12 @@ TEST_F(FileSerializationTest, ECS_FreeListPreserved) {
 
 TEST_F(FileSerializationTest, ECS_EmptyString) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<DebugName>(e1, "");
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
   Filesystem::write_binary("test_ecs.bin", buffer);
 
@@ -397,7 +397,7 @@ TEST_F(FileSerializationTest, ECS_EmptyString) {
   Filesystem::read_binary("test_ecs.bin", readBuffer);
 
   EntityManager em2;
-  Serializer deserializer(readBuffer);
+  Serializer    deserializer(readBuffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -411,15 +411,15 @@ TEST_F(FileSerializationTest, ECS_LongString) {
   longStr += "END";
 
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<DebugName>(e1, longStr);
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
 
   EntityManager em2;
-  Serializer deserializer(buffer);
+  Serializer    deserializer(buffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
@@ -430,28 +430,28 @@ TEST_F(FileSerializationTest, ECS_LongString) {
 
 TEST_F(FileSerializationTest, ECS_DoubleRoundTrip) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer1;
-  Serializer ser1(buffer1);
+  Serializer             ser1(buffer1);
   em.serialize(ser1);
 
   EntityManager em2;
-  Serializer des1(buffer1);
+  Serializer    des1(buffer1);
   des1.reset_offset();
   em2.deserialize(des1);
 
   std::vector<std::byte> buffer2;
-  Serializer ser2(buffer2);
+  Serializer             ser2(buffer2);
   em2.serialize(ser2);
 
   EXPECT_EQ(buffer1.size(), buffer2.size());
   EXPECT_EQ(buffer1, buffer2);
 
   EntityManager em3;
-  Serializer des2(buffer2);
+  Serializer    des2(buffer2);
   des2.reset_offset();
   em3.deserialize(des2);
 
@@ -467,29 +467,29 @@ TEST_F(FileSerializationTest, ECS_DoubleRoundTrip) {
 
 TEST_F(FileSerializationTest, ECS_AllComponentTypes) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<DebugName>(e1, "TestEntity");
 
   Entity e2 = em.create();
   em.add_component<Renderable>(e2);
-  em.get_component<Renderable>(e2).mesh_id = 42;
+  em.get_component<Renderable>(e2).mesh_id     = 42;
   em.get_component<Renderable>(e2).material_id = 99;
-  em.get_component<Renderable>(e2).color[0] = 0.5f;
+  em.get_component<Renderable>(e2).color[0]    = 0.5f;
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
 
   EntityManager em2;
-  Serializer deserializer(buffer);
+  Serializer    deserializer(buffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
   EXPECT_EQ(em2.get_entity_count(), 2u);
 
-  const Transform* t = em2.try_get_component<Transform>(e1);
-  const DebugName* n = em2.try_get_component<DebugName>(e1);
+  const Transform*  t = em2.try_get_component<Transform>(e1);
+  const DebugName*  n = em2.try_get_component<DebugName>(e1);
   const Renderable* r = em2.try_get_component<Renderable>(e2);
 
   ASSERT_NE(t, nullptr);
@@ -505,22 +505,22 @@ TEST_F(FileSerializationTest, ECS_AllComponentTypes) {
 
 TEST_F(FileSerializationTest, ECS_SerializableComponentsOnly) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> buffer;
-  Serializer serializer(buffer);
+  Serializer             serializer(buffer);
   em.serialize(serializer);
 
   EntityManager em2;
-  Serializer deserializer(buffer);
+  Serializer    deserializer(buffer);
   deserializer.reset_offset();
   em2.deserialize(deserializer);
 
   auto* transformPool = em2.get_component_pool<Transform>();
   auto* debugNamePool = em2.get_component_pool<DebugName>();
-  auto* cameraPool = em2.get_component_pool<Camera>();
+  auto* cameraPool    = em2.get_component_pool<Camera>();
 
   EXPECT_NE(transformPool, nullptr);
   EXPECT_NE(debugNamePool, nullptr);
@@ -529,18 +529,18 @@ TEST_F(FileSerializationTest, ECS_SerializableComponentsOnly) {
 
 TEST_F(FileSerializationTest, ECS_IndependentInstances) {
   EntityManager em1;
-  Entity e1 = em1.create();
+  Entity        e1 = em1.create();
   em1.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em1.add_component<DebugName>(e1, "FirstECS");
 
   EntityManager em2;
-  Entity e2 = em2.create();
+  Entity        e2 = em2.create();
   em2.add_component<Transform>(e2, VLA::Matrix4x4f::Identity() * 5.0f);
   em2.add_component<DebugName>(e2, "SecondECS");
 
   std::vector<std::byte> buffer1, buffer2;
-  Serializer ser1(buffer1);
-  Serializer ser2(buffer2);
+  Serializer             ser1(buffer1);
+  Serializer             ser2(buffer2);
   em1.serialize(ser1);
   em2.serialize(ser2);
 
@@ -603,7 +603,7 @@ TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
   std::vector<std::byte> buffer;
   {
     EntityManager em;
-    Entity e = em.create();
+    Entity        e = em.create();
     em.add_component<Transform>(e, VLA::Matrix4x4f::Identity());
 
     Serializer ser(buffer);
@@ -611,7 +611,7 @@ TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
   }
 
   EntityManager em;
-  Serializer des(buffer);
+  Serializer    des(buffer);
   des.reset_offset();
   em.deserialize(des);
 
@@ -634,12 +634,12 @@ TEST_F(FileSerializationTest, ECS_DeserializeFirstThenCreate) {
 
 TEST_F(FileSerializationTest, ECS_IdempotentSerialization) {
   EntityManager em;
-  Entity e1 = em.create();
+  Entity        e1 = em.create();
   em.add_component<Transform>(e1, VLA::Matrix4x4f::Identity());
   em.add_component<DebugName>(e1, "Test");
 
   std::vector<std::byte> b1, b2, b3;
-  Serializer s1(b1), s2(b2), s3(b3);
+  Serializer             s1(b1), s2(b2), s3(b3);
   em.serialize(s1);
   em.serialize(s2);
   em.serialize(s3);

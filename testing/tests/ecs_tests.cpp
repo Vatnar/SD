@@ -1,7 +1,7 @@
 #include <core/ecs/Entity.hpp>
 
-#include "SD/core/ecs/component_registration.hpp"
 #include "SD/core/ecs/EntityManager.hpp"
+#include "SD/core/ecs/component_registration.hpp"
 #include "SD/core/logging.hpp"
 #include "VLA/Matrix.hpp"
 #include "gtest/gtest.h"
@@ -27,7 +27,7 @@ REGISTER_SD_COMPONENT(Health);
 
 TEST(ECSTest, ReplaceComponent) {
   sd::EntityManager entityManager;
-  sd::Entity e = entityManager.create();
+  sd::Entity        e = entityManager.create();
 
   VLA::Matrix4x4f initialMatrix = VLA::Matrix4x4f::Identity();
   entityManager.add_component<sd::Transform>(e, initialMatrix);
@@ -37,8 +37,8 @@ TEST(ECSTest, ReplaceComponent) {
   EXPECT_EQ(transPtrBefore->transform, initialMatrix);
 
   VLA::Matrix4x4f newMatrix = VLA::Matrix4x4f::Identity();
-  newMatrix(0, 3) = 123.0f;
-  newMatrix(1, 3) = 456.0f;
+  newMatrix(0, 3)           = 123.0f;
+  newMatrix(1, 3)           = 456.0f;
   entityManager.add_component<sd::Transform>(e, newMatrix);
 
   sd::Transform* transPtrAfter = entityManager.try_get_component<sd::Transform>(e);
@@ -48,8 +48,8 @@ TEST(ECSTest, ReplaceComponent) {
 
   EXPECT_EQ(transPtrAfter->transform, newMatrix);
 
-  auto components = entityManager.get_all_component_info(e);
-  int transformCount = 0;
+  auto components     = entityManager.get_all_component_info(e);
+  int  transformCount = 0;
   for (const auto& cmp : components) {
     if (cmp.id == sd::ComponentTraits<sd::Transform>::id)
       transformCount++;
@@ -127,7 +127,13 @@ TEST_F(SparseEntitySetTest, Remove_SwapCorrectness) {
 }
 
 TEST_F(SparseEntitySetTest, Remove_MiddleElement_MaintainsIntegrity) {
-  sd::Entity entities[5] = {{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}};
+  sd::Entity entities[5] = {
+      {0, 0},
+      {1, 0},
+      {2, 0},
+      {3, 0},
+      {4, 0}
+  };
 
   for (int i = 0; i < 5; ++i) {
     set.add(entities[i], static_cast<float>(i * 10), 0.0f, 0.0f);
@@ -211,8 +217,8 @@ TEST_F(EntityManagerTest, Destroy_EntityNoLongerAlive) {
 }
 
 TEST_F(EntityManagerTest, Destroy_RecyclesEntityIndex) {
-  sd::Entity e1 = manager.create();
-  uint32_t idx = e1.index;
+  sd::Entity e1  = manager.create();
+  uint32_t   idx = e1.index;
   manager.destroy(e1);
 
   sd::Entity e2 = manager.create();
@@ -221,8 +227,8 @@ TEST_F(EntityManagerTest, Destroy_RecyclesEntityIndex) {
 }
 
 TEST_F(EntityManagerTest, Destroy_IncrementsGeneration) {
-  sd::Entity e1 = manager.create();
-  uint32_t gen = e1.generation;
+  sd::Entity e1  = manager.create();
+  uint32_t   gen = e1.generation;
   manager.destroy(e1);
 
   sd::Entity e2 = manager.create();

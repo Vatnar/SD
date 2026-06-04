@@ -51,8 +51,8 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
       {0.8f, 0.8f}
   };
 
-  float aspect = static_cast<float>(m_view->get_extent().width) /
-                 static_cast<float>(m_view->get_extent().height);
+  float aspect  = static_cast<float>(m_view->get_extent().width) /
+                  static_cast<float>(m_view->get_extent().height);
   float scale_x = (aspect > 1.0f) ? 1.0f / aspect : 1.0f;
   float scale_y = (aspect > 1.0f) ? 1.0f : aspect; // Correcting for FixedWidth if aspect < 1
 

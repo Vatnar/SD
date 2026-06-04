@@ -8,7 +8,7 @@
 template<typename T>
 template<typename... Args>
 void SparseEntitySet<T>::add(Entity entity, Args&&... args) {
-  const usize page = entity.index >> SHIFT;
+  const usize page   = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
   if (page >= sparse.size())
@@ -20,7 +20,7 @@ void SparseEntitySet<T>::add(Entity entity, Args&&... args) {
 
   usize dense_idx = sparse[page][offset];
   if (dense_idx != std::numeric_limits<usize>::max()) {
-    dense_data[dense_idx] = T{std::forward<Args>(args)...};
+    dense_data[dense_idx]     = T{std::forward<Args>(args)...};
     dense_entities[dense_idx] = entity;
   } else {
     sparse[page][offset] = dense_entities.size(); // end
@@ -33,7 +33,7 @@ void SparseEntitySet<T>::add(Entity entity, Args&&... args) {
 }
 template<typename T>
 bool SparseEntitySet<T>::remove(Entity entity) {
-  const usize page = entity.index >> SHIFT;
+  const usize page   = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
@@ -47,15 +47,15 @@ bool SparseEntitySet<T>::remove(Entity entity) {
     return false; // wrong generation
 
   // move, last to removed pos
-  usize last_idx = dense_entities.size() - 1;
+  usize  last_idx    = dense_entities.size() - 1;
   Entity last_entity = dense_entities[last_idx];
 
-  dense_data[dense_idx] = std::move(dense_data[last_idx]);
+  dense_data[dense_idx]     = std::move(dense_data[last_idx]);
   dense_entities[dense_idx] = last_entity;
 
   // update sparse index
-  const usize last_page = last_entity.index >> SHIFT;
-  const usize last_offset = last_entity.index & MASK;
+  const usize last_page          = last_entity.index >> SHIFT;
+  const usize last_offset        = last_entity.index & MASK;
   sparse[last_page][last_offset] = dense_idx;
 
   // free index
@@ -72,7 +72,7 @@ bool SparseEntitySet<T>::remove(Entity entity) {
 }
 template<typename T>
 T* SparseEntitySet<T>::get(Entity entity) {
-  const usize page = entity.index >> SHIFT;
+  const usize page   = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])
@@ -92,7 +92,7 @@ T* SparseEntitySet<T>::get(Entity entity) {
 }
 template<typename T>
 const T* SparseEntitySet<T>::get(const Entity entity) const {
-  const usize page = entity.index >> SHIFT;
+  const usize page   = entity.index >> SHIFT;
   const usize offset = entity.index & MASK;
 
   if (page >= sparse.size() || !sparse[page])

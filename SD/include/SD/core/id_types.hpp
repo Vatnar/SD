@@ -20,7 +20,7 @@ struct ViewId {
   }
 
   constexpr auto operator<=>(const ViewId&) const = default;
-  constexpr bool operator==(const ViewId&) const = default;
+  constexpr bool operator==(const ViewId&) const  = default;
 
   explicit constexpr operator uint32_t() const noexcept { return value; }
 };
@@ -41,7 +41,7 @@ struct WindowId {
   }
 
   constexpr auto operator<=>(const WindowId&) const = default;
-  constexpr bool operator==(const WindowId&) const = default;
+  constexpr bool operator==(const WindowId&) const  = default;
 
   explicit constexpr operator uint32_t() const noexcept { return value; }
 };
