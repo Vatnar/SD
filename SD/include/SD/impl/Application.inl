@@ -4,8 +4,8 @@ template<typename T, typename... Args>
 T& Application::push_view_layer(WindowId id, Args&&... args) {
   auto& windows = window_manager->get_windows();
   if (!windows.contains(id)) {
-    engine_abort(
-        std::format("Attempted to push layer to invalid window ID: {}", static_cast<uint32_t>(id)));
+    log::engine::critical("Attempted to push layer to invalid window ID: {}",
+                          static_cast<uint32_t>(id));
   }
   return windows[id].view_layers.push_layer<T>(std::forward<Args>(args)...);
 }

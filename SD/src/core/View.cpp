@@ -49,7 +49,7 @@ vk::Format sd::View::find_depth_format() {
     }
   }
 
-  engine_abort("Failed to find supported depth format");
+  log::engine::critical("Failed to find supported depth format");
 }
 
 void sd::View::on_gui_render() {

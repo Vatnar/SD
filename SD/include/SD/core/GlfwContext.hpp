@@ -32,7 +32,7 @@ public:
 
 
     if (glfwInit() == false) {
-      engine_abort("Failed to initialise GLFW");
+      log::engine::critical("Failed to initialise GLFW");
     }
   }
 
@@ -55,6 +55,7 @@ public:
     m_error_callback = callback;
   }
 
+  // tODO: remove
   static std::pair<const char**, uint32_t> get_required_instance_extensions() {
     uint32_t     count     = 0;
     const char** glfw_exts = glfwGetRequiredInstanceExtensions(&count);

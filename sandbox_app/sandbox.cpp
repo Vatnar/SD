@@ -36,7 +36,7 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
   sd::Application& app = *to_app(appPtr);
 
   state->version++;
-  printf("GAME VERSION %d LOADED\n", state->version);
+  sd::log::game::info("GAME VERSION {} LOADED", state->version);
 
   state->shared_scene  = from_scene(app.create_scene("MainScene"));
   state->another_scene = from_scene(app.create_scene("AnotherScene"));
@@ -290,7 +290,7 @@ static void game_on_update(SD_Application* app_ptr, GameState* state, float dt) 
 
 static void game_on_unload(SD_Application* app_ptr, GameState* state) {
   (void)app_ptr;
-  printf("GAME VERSION %d UNLOADING\n", state->version);
+  sd::log::game::info("GAME VERSION {} UNLOADING", state->version);
   state->shared_scene  = nullptr;
   state->another_scene = nullptr;
 }

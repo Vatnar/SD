@@ -29,23 +29,4 @@
 #define NO_OP           ((void)0)
 
 
-namespace sd {
-// TODO(docs): Document Abort() overloads
-//   - Explain when to use vs exceptions
-//   - Note about spdlog shutdown behavior
-//   - Thread-safety considerations
-/**
- * Terminates the engine and prints following fatal message
- * @param message
- */
-[[noreturn]] inline void engine_abort(const std::string& message) {
-  log::engine::critical("Fatal error: {}", message);
-  spdlog::shutdown();
-  std::abort();
-}
-[[noreturn]] inline void engine_abort() {
-  spdlog::shutdown();
-  std::abort();
-}
-
-} // namespace sd
+namespace sd {} // namespace sd

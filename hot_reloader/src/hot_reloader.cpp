@@ -186,11 +186,11 @@ int main(int argc, char* argv[]) {
     std::error_code ec;
     if (!std::filesystem::copy_file(source_so, temp_so,
                                     std::filesystem::copy_options::overwrite_existing, ec)) {
-      sd::engine_abort("Failed to copy game code: " + ec.message());
+      sd::log::engine::critical("Failed to copy game code: {}", ec.message());
     }
     std::filesystem::rename(temp_so, live_so, ec);
     if (ec) {
-      sd::engine_abort("Failed to rename game code: " + ec.message());
+      sd::log::engine::critical("Failed to rename game code: {}", ec.message());
     }
 
     g_game_handle = dlopen(live_so.c_str(), RTLD_NOW);

@@ -19,9 +19,9 @@ class ShaderCompiler {
 public:
   ShaderCompiler() {
     if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxc_utils))))
-      engine_abort("Failed to create DXC Utils");
+      log::engine::critical("Failed to create DXC Utils:");
     if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxc_compiler))))
-      engine_abort("Failed to create DXC Compiler");
+      log::engine::critical("Failed to create DXC Compiler");
   }
 
   bool compile_shader(const std::string& source, std::vector<uint32_t>& output,

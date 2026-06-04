@@ -19,7 +19,7 @@ VkShaderModule ShaderLibrary::load(const std::string& hlsl_path, const std::stri
 
   std::vector<u32> spv;
   if (!m_compiler.compile_shader(hlsl_path, spv, profile))
-    engine_abort("Shader compile fail: " + hlsl_path);
+    log::engine::critical("Shader compile fail: {}", hlsl_path);
 
   vk::ShaderModuleCreateInfo create_info{.codeSize = spv.size() * sizeof(uint32_t),
                                          .pCode    = spv.data()};

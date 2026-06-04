@@ -233,20 +233,22 @@ void VulkanWindow::create_swapchain() {
           ? vk::SurfaceTransformFlagBitsKHR::eIdentity
           : caps.currentTransform;
 
-  vk::SwapchainKHR old_swapchain = m_swapchain.get();
+  vk::SwapchainKHR old_swapchain = *m_swapchain;
 
-  m_swapchain_create_info.setSurface(m_surface.get())
-      .setMinImageCount(desired_image_count)
-      .setImageFormat(m_surface_format.format)
-      .setImageColorSpace(m_surface_format.colorSpace)
-      .setImageExtent(m_swapchain_extent)
-      .setImageArrayLayers(1)
-      .setImageUsage(usage)
-      .setPreTransform(pre_transform)
-      .setPresentMode(present_mode)
-      .setClipped(true)
-      .setOldSwapchain(old_swapchain)
-      .setImageSharingMode(vk::SharingMode::eExclusive);
+
+  m_swapchain_create_info =
+      vk::SwapchainCreateInfoKHR{.surface          = *m_surface,
+                                 .minImageCount    = desired_image_count,
+                                 .imageFormat      = m_surface_format.format,
+                                 .imageColorSpace  = m_surface_format.colorSpace,
+                                 .imageExtent      = m_swapchain_extent,
+                                 .imageArrayLayers = 1,
+                                 .imageUsage       = usage,
+                                 .imageSharingMode = vk::SharingMode::eExclusive,
+                                 .preTransform     = pre_transform,
+                                 .presentMode      = present_mode,
+                                 .clipped          = true,
+                                 .oldSwapchain     = old_swapchain};
 
   m_swapchain = check_vulkan_res_val(m_device.createSwapchainKHRUnique(m_swapchain_create_info),
                                      "Failed to create unique swapchain: ");

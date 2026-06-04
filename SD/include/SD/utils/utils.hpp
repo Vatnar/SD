@@ -25,11 +25,11 @@ namespace sd {
 //   - Purpose: Vulkan error checking with abort on failure
 //   - When to use vs CheckVulkanRes
 //   - Example usage
-#define VK_CHECK(x)                      \
-  do {                                   \
-    VkResult res = (x);                  \
-    if (res != VK_SUCCESS)               \
-      engine_abort("Vulkan error: " #x); \
+#define VK_CHECK(x)                               \
+  do {                                            \
+    VkResult res = (x);                           \
+    if (res != VK_SUCCESS)                        \
+      log::engine::critical("Vulkan error: " #x); \
   } while (0)
 
 // TODO(docs): Document SingleTimeCommand function
@@ -212,7 +212,7 @@ inline void transition_image_layout(const vk::CommandBuffer& cmd_buffer, const v
     source_stage      = vk::PipelineStageFlagBits::eTransfer;
     destination_stage = vk::PipelineStageFlagBits::eFragmentShader;
   } else {
-    engine_abort("unsupported layout transition!");
+    log::engine::critical("unsupported layout transition!");
   }
 
   vk::ImageMemoryBarrier barrier{

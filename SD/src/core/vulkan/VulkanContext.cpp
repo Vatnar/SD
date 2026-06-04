@@ -10,6 +10,34 @@
 namespace sd {
 class LayerList;
 
+#ifndef NDEBUG
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+    vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT /*type*/,
+    const vk::DebugUtilsMessengerCallbackDataEXT* callback_data, void* /*user_data*/) {
+  switch (severity) {
+#ifndef SD_SUPPRESS_VULKAN_INFO
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose:
+
+      log::vulkan::trace("{}", callback_data->pMessage);
+      break;
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo:
+      log::vulkan::info("{}", callback_data->pMessage);
+      break;
+#endif
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning:
+      log::vulkan::warn("{}", callback_data->pMessage);
+      break;
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
+      log::vulkan::error("{}", callback_data->pMessage);
+      break;
+    default:
+      break;
+  }
+  return VK_FALSE;
+}
+#endif
+
+
 // NOTE: Take in window, since we need it for some initial values, but not to store
 VulkanContext::VulkanContext(const GlfwContext& glfw_ctx) : m_glfw_ctx(glfw_ctx) {
   static vk::detail::DynamicLoader dl;
@@ -23,6 +51,8 @@ VulkanContext::VulkanContext(const GlfwContext& glfw_ctx) : m_glfw_ctx(glfw_ctx)
 
 void VulkanContext::init(const Window& window) {
   vk::UniqueSurfaceKHR temp_surface = window.create_window_surface(m_instance, nullptr);
+
+  ASSERT(temp_surface.get() != nullptr);
   setup_device_extensions();
   setup_queues(temp_surface.get());
 
@@ -40,27 +70,28 @@ void VulkanContext::init(const Window& window) {
         break;
       }
     }
-  }
 
-  create_vulkan_device();
 
-  m_graphics_queue = m_vulkan_device->getQueue(m_graphics_family_index, 0);
+    create_vulkan_device();
 
-  // Initialize VMA
-  VmaVulkanFunctions vulkan_functions    = {};
-  vulkan_functions.vkGetInstanceProcAddr = m_vk_get_instance_proc_addr;
-  vulkan_functions.vkGetDeviceProcAddr   = m_vk_get_device_proc_addr;
+    m_graphics_queue = m_vulkan_device->getQueue(m_graphics_family_index, 0);
 
-  VmaAllocatorCreateInfo allocator_create_info = {};
-  allocator_create_info.vulkanApiVersion       = VK_API_VERSION_1_3;
-  allocator_create_info.physicalDevice         = m_phys_dev;
-  allocator_create_info.device                 = m_vulkan_device.get();
-  allocator_create_info.instance               = m_instance.get();
-  allocator_create_info.pVulkanFunctions       = &vulkan_functions;
-  allocator_create_info.flags                  = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    // Initialize VMA
+    VmaVulkanFunctions vulkan_functions    = {};
+    vulkan_functions.vkGetInstanceProcAddr = m_vk_get_instance_proc_addr;
+    vulkan_functions.vkGetDeviceProcAddr   = m_vk_get_device_proc_addr;
 
-  if (vmaCreateAllocator(&allocator_create_info, &m_allocator) != VK_SUCCESS) {
-    engine_abort("Failed to create VMA allocator");
+    VmaAllocatorCreateInfo allocator_create_info = {};
+    allocator_create_info.vulkanApiVersion       = VK_API_VERSION_1_3;
+    allocator_create_info.physicalDevice         = m_phys_dev;
+    allocator_create_info.device                 = m_vulkan_device.get();
+    allocator_create_info.instance               = m_instance.get();
+    allocator_create_info.pVulkanFunctions       = &vulkan_functions;
+    allocator_create_info.flags                  = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+    if (vmaCreateAllocator(&allocator_create_info, &m_allocator) != VK_SUCCESS) {
+      log::engine::critical("Failed to create VMA allocator");
+    }
   }
 }
 
@@ -115,16 +146,63 @@ vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
                                .engineVersion      = 1,
                                .apiVersion         = VK_API_VERSION_1_3};
 
-  auto [glfw_exts, ext_count] = GlfwContext::get_required_instance_extensions();
-  std::vector instance_exts(glfw_exts, glfw_exts + ext_count);
+  //~ get instance extensions for glfw and add them to device exts
+  std::vector<const char*> instance_exts;
+  { // get instance extensions from GLFW
+    uint32_t     ext_count{};
+    const char** glfw_exts{glfwGetRequiredInstanceExtensions(&ext_count)};
+    instance_exts.assign(glfw_exts, glfw_exts + ext_count);
+  }
 
-  // TODO: Enable validation layers if in debug mode
-  vk::InstanceCreateInfo inst_info{.pApplicationInfo        = &app_info,
-                                   .ppEnabledExtensionNames = instance_exts.data()};
-  vk::UniqueInstance     instance = check_vulkan_res_val(vk::createInstanceUnique(inst_info),
-                                                         "Failed to create unique Instance: ");
+#ifndef NDEBUG
+  std::vector<const char*> layers;
+  {
+    instance_exts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+    auto available = vk::enumerateInstanceLayerProperties().value;
+    auto it        = std::ranges::find_if(available, [](const auto& lp) {
+      return std::strcmp(lp.layerName, "VK_LAYER_KHRONOS_validation") == 0;
+    });
+    if (it != available.end()) {
+      layers.push_back("VK_LAYER_KHRONOS_validation");
+    } else {
+      log::engine::warn("VK_LAYER_KHRONOS_validation not available");
+    }
+  }
+#endif
+
+
+  vk::InstanceCreateInfo inst_info{
+      .pApplicationInfo = &app_info,
+#ifndef NDEBUG
+      .enabledLayerCount   = static_cast<u32>(layers.size()),
+      .ppEnabledLayerNames = layers.data(),
+#endif
+      .enabledExtensionCount   = static_cast<uint32_t>(instance_exts.size()),
+      .ppEnabledExtensionNames = instance_exts.data()};
+  vk::UniqueInstance instance = check_vulkan_res_val(vk::createInstanceUnique(inst_info),
+                                                     "Failed to create unique Instance: ");
 
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
+
+#ifndef NDEBUG
+  if (!layers.empty()) {
+    vk::DebugUtilsMessengerCreateInfoEXT debug_info{
+        .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+        .messageType     = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                           vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                           vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+        .pfnUserCallback = debug_callback,
+    };
+    m_debug_messenger =
+        check_vulkan_res_val(instance->createDebugUtilsMessengerEXTUnique(debug_info),
+                             "Failed to create debug messenger");
+  }
+#endif
+
 
   m_phys_dev = check_vulkan_res_val(instance->enumeratePhysicalDevices(),
                                     "Failed to enumerate physical devices: ")
@@ -151,24 +229,25 @@ void VulkanContext::setup_queues(vk::SurfaceKHR surface) {
   }
 
   if (graphics_family_index == UINT32_MAX) {
-    engine_abort("No queue family supports both graphics and present capabilities");
+    log::engine::critical("No queue family supports both graphics and present capabilities");
   }
 
   m_graphics_family_index = graphics_family_index;
 }
 void VulkanContext::setup_device_extensions() {
   // Enable features for wireframe rendering (VK_POLYGON_MODE_LINE)
-  m_features2.features.fillModeNonSolid = VK_TRUE;
+  m_features2.features.fillModeNonSolid = true;
 
-  m_features12.timelineSemaphore   = VK_TRUE;
-  m_features12.bufferDeviceAddress = VK_TRUE;
+  m_features12.timelineSemaphore   = true;
+  m_features12.bufferDeviceAddress = true;
   m_features13.setDynamicRendering(true).setSynchronization2(true);
   m_features12.pNext = &m_features13;
   m_features2.setPNext(&m_features12);
 
   auto available = check_vulkan_res_val(m_phys_dev.enumerateDeviceExtensionProperties(),
                                         "Failed to enumerate device extension properties: ");
-  auto supports  = [&](const char* name) {
+
+  auto supports = [&](const char* name) {
     return std::ranges::any_of(available, [&](const vk::ExtensionProperties& e) {
       return std::strcmp(e.extensionName, name) == 0;
     });
@@ -176,7 +255,7 @@ void VulkanContext::setup_device_extensions() {
 
   auto require_ext = [&](const char* name) {
     if (!supports(name))
-      engine_abort("Required device extension missing: " + std::string(name));
+      log::engine::critical("Required device extension missing: {} ", name);
     m_device_exts.push_back(name);
   };
 
@@ -193,6 +272,7 @@ void VulkanContext::create_vulkan_device() {
       .pNext                   = &m_features2,
       .queueCreateInfoCount    = 1,
       .pQueueCreateInfos       = &queue_info,
+      .enabledExtensionCount   = static_cast<u32>(m_device_exts.size()),
       .ppEnabledExtensionNames = m_device_exts.data(),
   };
   dev_info.setPNext(&m_features2);

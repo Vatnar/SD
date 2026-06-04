@@ -1,14 +1,15 @@
 #include "SD/core/logging.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <cstdio>
 #include <mutex>
 #include <vector>
 
 #include "spdlog/async.h"
 #include "spdlog/sinks/base_sink.h"
 #include "spdlog/sinks/basic_file_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
 
 namespace sd::log {
 
@@ -28,6 +29,7 @@ void add_log_entry(LogEntry entry) {
 }
 
 static std::vector<CategoryInfo> g_category_registry;
+static std::mutex                g_registry_mutex;
 
 std::vector<CategoryInfo>& get_category_registry() {
   return g_category_registry;
@@ -86,6 +88,95 @@ static float get_uptime_sec() {
   return elapsed;
 }
 
+static std::string ansi_fg_color(ImVec4 c) {
+  return fmt::format("\033[38;2;{};{};{}m", static_cast<int>(c.x * 255),
+                     static_cast<int>(c.y * 255), static_cast<int>(c.z * 255));
+}
+
+static std::string level_ansi_color(spdlog::level::level_enum level) {
+  static constexpr std::array colors = {
+      ImVec4{0.7f, 0.7f, 0.7f, 1.0f}, // trace
+      ImVec4{0.0f, 0.8f, 1.0f, 1.0f}, // debug
+      ImVec4{0.0f, 1.0f, 0.0f, 1.0f}, // info
+      ImVec4{1.0f, 1.0f, 0.0f, 1.0f}, // warn
+      ImVec4{1.0f, 0.0f, 0.0f, 1.0f}, // err
+      ImVec4{1.0f, 0.0f, 1.0f, 1.0f}, // critical
+  };
+  auto idx = static_cast<size_t>(level);
+  if (idx >= colors.size())
+    return ansi_fg_color(colors.back());
+  return ansi_fg_color(colors[idx]);
+}
+
+static const char* level_str(spdlog::level::level_enum level) {
+  switch (level) {
+    case spdlog::level::trace:
+      return "trace";
+    case spdlog::level::debug:
+      return "debug";
+    case spdlog::level::info:
+      return "info";
+    case spdlog::level::warn:
+      return "warn";
+    case spdlog::level::err:
+      return "error";
+    case spdlog::level::critical:
+      return "critical";
+    default:
+      return "?";
+  }
+}
+
+class CategoryConsoleSink : public spdlog::sinks::base_sink<std::mutex> {
+protected:
+  void sink_it_(const spdlog::details::log_msg& msg) override {
+    spdlog::memory_buf_t formatted;
+    formatter_->format(msg, formatted);
+
+    // Strip trailing newline added by spdlog formatter
+    if (formatted.size() > 0 && formatted.data()[formatted.size() - 1] == '\n')
+      formatted.resize(formatted.size() - 1);
+
+    std::string cat_name(msg.logger_name.data(), msg.logger_name.size());
+    auto        payload = fmt::basic_string_view<char>(msg.payload.data(), msg.payload.size());
+
+    std::string cat_color;
+    {
+      std::lock_guard lock(g_registry_mutex);
+      auto&           reg = get_category_registry();
+      for (auto& cat : reg) {
+        if (is_category_under(cat_name, cat.name)) {
+          cat_color = ansi_fg_color(cat.color);
+          break;
+        }
+      }
+    }
+    auto lev_color = level_ansi_color(msg.level);
+    auto lev_str   = level_str(msg.level);
+
+    std::string out;
+    out.append(formatted.data(), formatted.size());
+    out += '[';
+    if (!cat_color.empty()) {
+      out += cat_color;
+      out += cat_name;
+      out += "\033[0m";
+    } else {
+      out += cat_name;
+    }
+    out += ']';
+    out += " [";
+    out += lev_color;
+    out += lev_str;
+    out += "\033[0m] ";
+    out.append(payload.data(), payload.size());
+    out += '\n';
+    fwrite(out.data(), 1, out.size(), stdout);
+  }
+
+  void flush_() override { fflush(stdout); }
+};
+
 template<typename Mutex>
 class imgui_sink : public spdlog::sinks::base_sink<Mutex> {
 protected:
@@ -130,10 +221,18 @@ static void create_category_logger(const char* name, const LogLevel minLevel) {
 
 void register_category(const char* name, ImVec4 color) {
   // Avoid duplicates
-  auto it = std::find_if(g_category_registry.begin(), g_category_registry.end(),
-                         [name](const CategoryInfo& ci) { return ci.name == name; });
-  if (it == g_category_registry.end()) {
-    g_category_registry.push_back(CategoryInfo{.name = name, .visible = true, .color = color});
+  bool found = false;
+  {
+    std::lock_guard lock(g_registry_mutex);
+    auto            it = std::find_if(g_category_registry.begin(), g_category_registry.end(),
+                                      [name](const CategoryInfo& ci) { return ci.name == name; });
+    if (it == g_category_registry.end()) {
+      g_category_registry.push_back(CategoryInfo{.name = name, .visible = true, .color = color});
+    } else {
+      found = true;
+    }
+  }
+  if (!found) {
     // Create the logger immediately
     create_category_logger(name, LogLevel::TRACE);
   }
@@ -156,17 +255,20 @@ void init() {
   spdlog::init_thread_pool(8192, 1);
 
   // Shared sinks
-  auto console = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  auto console = std::make_shared<CategoryConsoleSink>();
   auto imgui   = std::make_shared<ImguiSinkMt>();
 
   auto engine_file = std::make_shared<spdlog::sinks::basic_file_sink_mt>("engine.log", true);
   auto game_file   = std::make_shared<spdlog::sinks::basic_file_sink_mt>("game.log", true);
 
-  // Console & file: [HH:MM:SS.mmm] [category] [level] message
-  std::string pattern = "%H:%M:%S.%e [%n] [%^%l%$] %v";
-  console->set_pattern(pattern);
-  engine_file->set_pattern(pattern);
-  game_file->set_pattern(pattern);
+  // Console: timestamp only — sink adds category/level colors
+  std::string console_pattern = "%H:%M:%S.%e ";
+  console->set_pattern(console_pattern);
+
+  // File: [HH:MM:SS.mmm] [category] [level] message
+  std::string file_pattern = "%H:%M:%S.%e [%n] [%l] %v";
+  engine_file->set_pattern(file_pattern);
+  game_file->set_pattern(file_pattern);
 
   // ImGui sink: raw message only (timestamp/category/level added by ImGui display code)
   imgui->set_pattern("%v");
@@ -179,6 +281,7 @@ void init() {
   register_category("engine/renderer", ImVec4(0.8f, 0.4f, 1.0f, 1.0f)); // Purple
   register_category("engine/ecs", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));      // Yellow
   register_category("engine/network", ImVec4(0.0f, 1.0f, 0.6f, 1.0f));  // Teal
+  register_category("vulkan", ImVec4(1.0f, 0.4f, 0.0f, 1.0f));
 }
 
 } // namespace sd::log

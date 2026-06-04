@@ -62,6 +62,7 @@ target_link_libraries(SD
 
 target_compile_definitions(SD
         PUBLIC
+        SD_SUPPRESS_VULKAN_INFO
         SPDLOG_COMPILED_LIB
         VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
         VULKAN_HPP_NO_CONSTRUCTORS

@@ -53,7 +53,7 @@ inline FileError read_binary(const std::filesystem::path& path, std::vector<std:
   const auto      file_size = std::filesystem::file_size(path, ec);
   if (ec) {
     // TODO: handle errors
-    engine_abort(ec.category().name());
+    log::engine::critical("Error while reading binary, category: {}", ec.category().name());
     return FileError::ERROR;
   }
   if (file_size == std::numeric_limits<std::uintmax_t>::max()) {

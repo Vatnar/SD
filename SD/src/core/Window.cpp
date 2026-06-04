@@ -15,7 +15,7 @@ sd::Window::Window(int width, int height, const std::string& title) {
     const char* error = nullptr;
     glfwGetError(&error);
     log::engine::error("Failed to create GLFW window with error: {}", error ? error : "unknown");
-    engine_abort("Failed to create GLFW window");
+    log::engine::critical("Failed to create GLFW window");
   }
 
   glfwSetWindowUserPointer(m_handle, this);
@@ -42,7 +42,7 @@ sd::Window::Window(const WindowDesc& desc) {
     const char* error = nullptr;
     glfwGetError(&error);
     log::engine::error("Failed to create GLFW window with error: {}", error ? error : "unknown");
-    engine_abort("Failed to create GLFW window");
+    log::engine::critical("Failed to create GLFW window");
   }
   glfwSetWindowUserPointer(m_handle, this);
 
@@ -135,7 +135,7 @@ sd::Window::create_window_surface(vk::UniqueInstance&          instance,
   auto         res = glfwCreateWindowSurface(*instance, m_handle, allocation_callback, &surface);
   if (res != VK_SUCCESS) {
     // TODO: Maybe give this info to caller
-    engine_abort("Failed to create window surface");
+    log::engine::critical("Failed to create window surface: ");
   }
   return vk::UniqueSurfaceKHR{surface, *instance};
 }

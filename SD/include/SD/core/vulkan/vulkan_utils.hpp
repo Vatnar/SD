@@ -10,9 +10,10 @@ namespace sd {
 inline void check_vulkan_res(vk::Result result, std::string_view message,
                              std::source_location loc = std::source_location::current()) {
   if (result != vk::Result::eSuccess) {
-    auto p =
-        std::format("{}:{} {}: {}", loc.file_name(), loc.line(), message, vk::to_string(result));
-    engine_abort(p);
+    log::engine::critical("{}:{} {}: {}", loc.file_name(), loc.line(), message,
+                          vk::to_string(result));
+    // TODO: why doesnt the vk::to_string(result) work correctly, it shjould return the correct
+    // string
   }
 }
 
@@ -42,7 +43,8 @@ inline u32 find_memory_type(const vk::PhysicalDevice& physical_device, u32 type_
         (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
       return i;
   }
-  engine_abort("Failed to find memory type");
+  log::engine::critical("Failed to find memory type");
+  return {};
 }
 
 } // namespace sd

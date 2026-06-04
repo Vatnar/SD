@@ -57,7 +57,11 @@ private:
   vk::SurfaceFormatKHR m_surface_format;
 
 
-  std::vector<const char*>           m_device_exts;
+  std::vector<const char*> m_device_exts;
+#ifndef NDEBUG
+  vk::UniqueDebugUtilsMessengerEXT m_debug_messenger;
+#endif
+
   PFN_vkGetInstanceProcAddr          m_vk_get_instance_proc_addr = nullptr;
   PFN_vkGetDeviceProcAddr            m_vk_get_device_proc_addr   = nullptr;
   VmaAllocator                       m_allocator                 = VK_NULL_HANDLE;
