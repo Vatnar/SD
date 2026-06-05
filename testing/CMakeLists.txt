@@ -20,6 +20,10 @@ target_link_libraries(SDGTest PRIVATE
         GTest::gtest
 )
 
+target_compile_definitions(SDGTest PRIVATE
+        VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+)
+
 # Tests need exceptions (GoogleTest requirement); override -fno-exceptions inherited from SD
 target_compile_options(SDGTest PRIVATE -fexceptions)
 

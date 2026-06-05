@@ -17,8 +17,6 @@ VulkanWindow::VulkanWindow(Window& window, VulkanContext& vulkan_context) :
   ASSERT(m_command_pool && "Failed to create command pool");
   create_swapchain();
   ASSERT(m_swapchain && "Failed to create swapchain");
-  create_render_pass();
-  ASSERT(m_render_pass && "Failed to create render pass");
   create_swapchain_dependent_resources();
 
   std::generate_n(std::back_inserter(m_frame_syncs), g_max_frames_in_flight, [&] {
@@ -42,7 +40,6 @@ VulkanWindow::~VulkanWindow() {
   // Use raw call to avoid Vulkan-Hpp ASSERTions during shutdown
   (void)m_device.waitIdle();
 
-  m_framebuffers.clear();
   m_swapchain_image_views.clear();
   m_swapchain.reset();
   m_surface.reset();
@@ -69,7 +66,6 @@ void VulkanWindow::recreate_swapchain(LayerList& layers) {
 
   (void)m_device.waitIdle();
 
-  m_framebuffers.clear();
   m_swapchain_image_views.clear();
 
   create_swapchain();
@@ -106,13 +102,6 @@ vk::Extent2D& VulkanWindow::get_swapchain_extent() {
 }
 const std::vector<vk::UniqueImageView>& VulkanWindow::get_swapchain_image_views() const {
   return m_swapchain_image_views;
-}
-
-const std::vector<vk::UniqueFramebuffer>& VulkanWindow::get_framebuffers() const {
-  return m_framebuffers;
-}
-vk::RenderPass VulkanWindow::get_render_pass() const {
-  return *m_render_pass;
 }
 
 std::expected<u32, vk::Result>
@@ -256,52 +245,12 @@ void VulkanWindow::create_swapchain() {
                                             "Failed to get swapchain images");
   ASSERT(!m_swapchain_images.empty() && "Swapchain must have at least one image");
 }
-void VulkanWindow::create_render_pass() {
-  ASSERT(m_device && "Device must be valid");
-  ASSERT(m_surface_format.format != vk::Format::eUndefined && "Surface format must be valid");
 
-  // TODO: Use dynamic rendering (VK_KHR_dynamic_rendering) to simplify render pass management
-  vk::AttachmentDescription color_attachment{};
-  color_attachment.setFormat(m_surface_format.format)
-      .setSamples(vk::SampleCountFlagBits::e1)
-      .setLoadOp(vk::AttachmentLoadOp::eClear)
-      .setStoreOp(vk::AttachmentStoreOp::eStore)
-      .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-      .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-      .setInitialLayout(vk::ImageLayout::eUndefined)
-      .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
-
-  vk::AttachmentReference color_attachment_ref(0, vk::ImageLayout::eColorAttachmentOptimal);
-
-  vk::SubpassDescription subpass{};
-  subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-      .setColorAttachmentCount(1)
-      .setPColorAttachments(&color_attachment_ref);
-
-  vk::SubpassDependency dependency{};
-  dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL)
-      .setDstSubpass(0)
-      .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
-      .setSrcAccessMask(vk::AccessFlagBits::eNone)
-      .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
-      .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-
-  vk::RenderPassCreateInfo render_pass_info{.attachmentCount = 1,
-                                            .pAttachments    = &color_attachment,
-                                            .subpassCount    = 1,
-                                            .pSubpasses      = &subpass,
-                                            .dependencyCount = 1,
-                                            .pDependencies   = &dependency};
-
-  m_render_pass = check_vulkan_res_val(m_device.createRenderPassUnique(render_pass_info),
-                                       "Failed to create unique renderpass");
-}
 void VulkanWindow::create_swapchain_dependent_resources() {
   ASSERT(m_device && "Device must be valid");
   ASSERT(!m_swapchain_images.empty() && "Swapchain images must not be empty");
 
   m_swapchain_image_views.clear();
-  m_framebuffers.clear();
 
   m_swapchain_image_views.reserve(m_swapchain_images.size());
   for (const auto& image : m_swapchain_images) {
@@ -315,33 +264,6 @@ void VulkanWindow::create_swapchain_dependent_resources() {
 
     m_swapchain_image_views.push_back(check_vulkan_res_val(
         m_device.createImageViewUnique(create_info), "Failed to create unique imageview: "));
-  }
-
-  create_framebuffers();
-}
-
-void VulkanWindow::create_framebuffers() {
-  ASSERT(m_device && "Device must be valid");
-  ASSERT(m_render_pass && "Render pass must be valid");
-  ASSERT(!m_swapchain_image_views.empty() && "Image views must not be empty");
-  ASSERT(m_swapchain_extent.width > 0 && m_swapchain_extent.height > 0 &&
-         "Swapchain extent must be valid");
-
-  m_framebuffers.resize(m_swapchain_image_views.size());
-
-  for (usize i = 0; i < m_swapchain_image_views.size(); i++) {
-    vk::ImageView attachments[] = {*m_swapchain_image_views[i]};
-
-    vk::FramebufferCreateInfo framebuffer_info{};
-    framebuffer_info.setRenderPass(*m_render_pass)
-        .setAttachmentCount(1)
-        .setPAttachments(attachments)
-        .setWidth(m_swapchain_extent.width)
-        .setHeight(m_swapchain_extent.height)
-        .setLayers(1);
-
-    m_framebuffers[i] = check_vulkan_res_val(m_device.createFramebufferUnique(framebuffer_info),
-                                             "Failed to create unique framebuffer: ");
   }
 }
 

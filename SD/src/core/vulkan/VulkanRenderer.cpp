@@ -12,9 +12,8 @@ VulkanRenderer::VulkanRenderer(VulkanContext& ctx, FrameTimer& timer) :
 
 void VulkanRenderer::init() {
   ASSERT(ctx.is_initialized() && "VulkanContext must be initialized before VulkanRenderer::init()");
-  m_device    = ctx.get_vulkan_device().get();
-  m_shaders   = std::make_unique<ShaderLibrary>(m_device);
-  m_pipelines = std::make_unique<PipelineFactory>(m_device, *m_shaders);
+  m_device  = ctx.get_vulkan_device().get();
+  m_shaders = std::make_unique<ShaderLibrary>(m_device);
 }
 
 vk::CommandBuffer VulkanRenderer::begin_command_buffer(VulkanWindow& vw) {
@@ -48,31 +47,52 @@ vk::CommandBuffer VulkanRenderer::begin_command_buffer(VulkanWindow& vw) {
 
 void VulkanRenderer::begin_render_pass(VulkanWindow& vw) {
   ASSERT(vw.get_swapchain() && "Swapchain must be valid");
-  ASSERT(vw.get_render_pass() && "Render pass must be valid");
-  ASSERT(!vw.get_framebuffers().empty() && "Framebuffers must not be empty");
-  ASSERT(vw.current_image_index < vw.get_framebuffers().size() && "Image index out of bounds");
+  ASSERT(vw.current_image_index < vw.get_swapchain_image_views().size() &&
+         "Image index out of bounds");
 
-  auto cmd = vw.get_current_command_buffer();
+  auto cmd    = vw.get_current_command_buffer();
+  auto extent = vw.get_swapchain_extent();
 
-  std::array<vk::ClearValue, 1> clear_values{};
-  clear_values[0].color = vk::ClearColorValue{m_clear_color};
+  // Transition swapchain image: UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL
+  auto                   swapchain_image = vw.get_swapchain_images()[vw.current_image_index];
+  vk::ImageMemoryBarrier to_att{
+      .srcAccessMask       = vk::AccessFlagBits::eNone,
+      .dstAccessMask       = vk::AccessFlagBits::eColorAttachmentWrite,
+      .oldLayout           = vk::ImageLayout::eUndefined,
+      .newLayout           = vk::ImageLayout::eColorAttachmentOptimal,
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .image               = swapchain_image,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eColor,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1},
+  };
+  cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+                      vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, {}, {}, to_att);
 
-
-  vk::RenderPassBeginInfo render_pass_begin{
-      .renderPass      = vw.get_render_pass(),
-      .framebuffer     = *vw.get_framebuffers()[vw.current_image_index],
-      .renderArea      = vk::Rect2D{.offset = {0, 0}, .extent = vw.get_swapchain_extent()},
-      .clearValueCount = clear_values.size(),
-      .pClearValues    = clear_values.data()
+  vk::RenderingAttachmentInfo color_att{
+      .imageView   = *vw.get_swapchain_image_views()[vw.current_image_index],
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp      = vk::AttachmentLoadOp::eClear,
+      .storeOp     = vk::AttachmentStoreOp::eStore,
+      .clearValue  = vk::ClearValue{.color = vk::ClearColorValue{m_clear_color}},
+  };
+  vk::RenderingInfo rendering_info{
+      .renderArea           = {.offset = {0, 0}, .extent = extent},
+      .layerCount           = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments    = &color_att,
   };
 
-  cmd.beginRenderPass(render_pass_begin, vk::SubpassContents::eInline);
+  cmd.beginRendering(rendering_info);
 
-  vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(vw.get_swapchain_extent().width),
-                        static_cast<float>(vw.get_swapchain_extent().height), 0.0f, 1.0f);
+  vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(extent.width),
+                        static_cast<float>(extent.height), 0.0f, 1.0f);
   cmd.setViewport(0, 1, &viewport);
 
-  vk::Rect2D scissor({0, 0}, vw.get_swapchain_extent());
+  vk::Rect2D scissor({0, 0}, extent);
   cmd.setScissor(0, 1, &scissor);
 }
 
@@ -88,7 +108,27 @@ vk::Result VulkanRenderer::end_frame(VulkanWindow& vw) {
 
   auto cmd = vw.get_current_command_buffer();
 
-  cmd.endRenderPass();
+  cmd.endRendering();
+
+  // Transition swapchain image: COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR
+  auto                   swapchain_image = vw.get_swapchain_images()[vw.current_image_index];
+  vk::ImageMemoryBarrier to_present{
+      .srcAccessMask       = vk::AccessFlagBits::eColorAttachmentWrite,
+      .dstAccessMask       = vk::AccessFlagBits::eNone,
+      .oldLayout           = vk::ImageLayout::eColorAttachmentOptimal,
+      .newLayout           = vk::ImageLayout::ePresentSrcKHR,
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .image               = swapchain_image,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eColor,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1},
+  };
+  cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                      vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, to_present);
+
   (void)cmd.end();
 
   vk::SubmitInfo submit_info{};
@@ -127,10 +167,6 @@ vk::Result VulkanRenderer::end_frame(VulkanWindow& vw) {
 void VulkanRenderer::reload_shaders() {
   (void)ctx.get_vulkan_device()->waitIdle();
   m_shaders->clear_cache();
-  auto failures = m_pipelines->recreate_all_pipelines();
-  if (!failures.empty()) {
-    log::engine::warn("{} pipeline(s) failed to recreate during hot reload", failures.size());
-  }
 }
 
 } // namespace sd

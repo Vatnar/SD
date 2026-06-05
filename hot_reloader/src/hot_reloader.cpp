@@ -8,7 +8,7 @@
 #include "ConfigLoader.hpp"
 #include "SD/Application.hpp"
 #include "SD/core/logging.hpp"
-#include "SD/game.h"
+#include "SD/game_api.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -166,7 +166,7 @@ int main(int argc, char* argv[]) {
   hr::ConfigLoader config(argc, argv);
   const auto&      cfg = config.get_config();
 
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   sd::log::engine::warn("Running in debug mode");
 #endif
   sd::log::engine::info("HotReloadApp starting");

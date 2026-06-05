@@ -104,11 +104,15 @@ endif ()
 ######################
 add_executable(SandboxAppStandalone
         main.cpp
-        $<TARGET_OBJECTS:SandboxGameObjects>
+        sandbox.cpp
 )
 
 target_link_libraries(SandboxAppStandalone PRIVATE
         SD
+)
+
+target_compile_definitions(SandboxAppStandalone PRIVATE
+        VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 )
 
 set_target_properties(SandboxAppStandalone PROPERTIES

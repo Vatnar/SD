@@ -1,12 +1,11 @@
 // TODO(docs): Add file-level Doxygen header
 //   - @file VulkanRenderer.hpp
 //   - @brief Frame rendering orchestration
-//   - Relationship to VulkanContext, VulkanWindow, PipelineFactory, ShaderLibrary
+//   - Relationship to VulkanContext, VulkanWindow, ShaderLibrary
 #pragma once
 
 #include "SD/core/FrameTimer.hpp"
 #include "SD/core/base.hpp"
-#include "SD/core/vulkan/PipelineFactory.hpp"
 #include "SD/core/vulkan/ShaderLibrary.hpp"
 #include "VulkanContext.hpp"
 #include "VulkanWindow.hpp"
@@ -17,7 +16,7 @@ namespace sd {
 //   - Purpose: Orchestrates frame rendering (BeginFrame, BeginRenderPass, EndFrame)
 //   - Command buffer management
 //   - Clear color and render state
-//   - Subsystems (ShaderLibrary, PipelineFactory)
+//   - Subsystem: ShaderLibrary
 //   - Example rendering loop
 class VulkanRenderer {
 public:
@@ -34,8 +33,7 @@ public:
   void reload_shaders();
 
   //~ Subsystems
-  ShaderLibrary&   get_shader_library() { return *m_shaders; }
-  PipelineFactory& get_pipeline_factory() { return *m_pipelines; }
+  ShaderLibrary& get_shader_library() { return *m_shaders; }
 
 private:
   VulkanContext& ctx;
@@ -44,7 +42,6 @@ private:
 
   std::array<float, 4> m_clear_color{0.1f, 0.1f, 0.1f, 1.0f};
 
-  std::unique_ptr<ShaderLibrary>   m_shaders;
-  std::unique_ptr<PipelineFactory> m_pipelines;
+  std::unique_ptr<ShaderLibrary> m_shaders;
 };
 } // namespace sd

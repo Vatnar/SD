@@ -139,9 +139,13 @@ void WindowManager::draw_window(WindowId id, WindowData& data, ViewManager& view
     vw.reset_framebuffer_resized();
   }
 
+  // Wait for previous frame before acquiring (avoids semaphore-pending error)
+  auto& device     = m_vulkan_ctx.get_vulkan_device();
+  auto& frame_sync = vw.get_frame_sync();
+  (void)device->waitForFences(1, &*frame_sync.in_flight, true, UINT64_MAX);
+
   // Acquire Image
-  auto& frame_sync  = vw.get_frame_sync();
-  auto  acquire_res = vw.get_vulkan_images(frame_sync.image_acquired);
+  auto acquire_res = vw.get_vulkan_images(frame_sync.image_acquired);
 
   if (!acquire_res) {
     if (acquire_res.error() == vk::Result::eErrorOutOfDateKHR) {

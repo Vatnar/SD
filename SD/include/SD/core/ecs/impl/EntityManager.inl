@@ -198,7 +198,7 @@ inline Entity EntityManager::create() {
   Entity e = {idx, m_generations[idx]};
 
   m_entity_masks.add(e, ComponentMask{});
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   ValidateInvariants();
 #endif
   return e;
@@ -221,7 +221,7 @@ inline void EntityManager::destroy(const Entity e) {
   mask->reset();
   m_generations[e.index]++;
   m_free_list.push_back(e.index);
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   ValidateInvariants();
 #endif
 }

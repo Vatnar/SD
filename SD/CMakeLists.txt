@@ -15,7 +15,6 @@ set(SD_ENGINE_SOURCES
         src/core/layers/EngineDebugLayer.cpp
         src/core/vulkan/VulkanContext.cpp
         src/core/vulkan/VulkanRenderer.cpp
-        src/core/vulkan/PipelineFactory.cpp
         src/core/vulkan/VulkanWindow.cpp
         src/core/vulkan/VulkanFramebuffer.cpp
         src/core/vulkan/ShaderLibrary.cpp
@@ -63,6 +62,8 @@ target_link_libraries(SD
 target_compile_definitions(SD
         PUBLIC
         SD_SUPPRESS_VULKAN_INFO
+        SD_FAIL_ON_VULKAN_VALIDATION_ERROR
+
         SPDLOG_COMPILED_LIB
         VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
         VULKAN_HPP_NO_CONSTRUCTORS
@@ -70,10 +71,14 @@ target_compile_definitions(SD
         VULKAN_HPP_USE_STD_EXPECTED=1
         VULKAN_HPP_NO_EXCEPTIONS=1
         SPDLOG_NO_EXCEPTIONS
-        $<$<CONFIG:Debug>:ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_TRACE>
-        $<$<NOT:$<CONFIG:Debug>>:ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_INFO>
         PRIVATE
 )
+
+if(SD_DEBUG_ENABLED)
+  target_compile_definitions(SD PUBLIC SD_DEBUG SD_BUILD_DEBUG=1 ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_TRACE)
+else()
+  target_compile_definitions(SD PUBLIC ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_INFO)
+endif()
 
 #~ pch
 target_precompile_headers(SD PRIVATE

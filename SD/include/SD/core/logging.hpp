@@ -41,7 +41,8 @@ enum class LogLevel {
   WARN     = ENGINE_LOG_LEVEL_WARN,
   ERROR    = ENGINE_LOG_LEVEL_ERROR,
   CRITICAL = ENGINE_LOG_LEVEL_CRITICAL,
-  OFF      = ENGINE_LOG_LEVEL_OFF
+  OFF      = ENGINE_LOG_LEVEL_OFF,
+  GENERAL  = 7
 };
 
 struct LogEntry {
@@ -59,6 +60,9 @@ struct CategoryInfo {
 
 SD_EXPORT std::deque<LogEntry> get_log_history();
 SD_EXPORT void                 add_log_entry(LogEntry entry);
+SD_EXPORT void                 clear_history();
+SD_EXPORT size_t               get_total_entry_count();
+SD_EXPORT std::vector<LogEntry> get_entries(size_t offset, size_t count);
 
 SD_EXPORT std::vector<CategoryInfo>& get_category_registry();
 SD_EXPORT void                       register_category(const char* name, ImVec4 color);
@@ -74,6 +78,8 @@ spdlog::level::level_enum to_spdlog_level(LogLevel level);
 
 LogLevel from_spdlog_level(spdlog::level::level_enum level);
 
+constexpr auto LOG_LEVEL_GENERAL = spdlog::level::level_enum(7);
+
 inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char* categoryPath) {
   if (auto logger = spdlog::get(categoryPath)) {
     return logger;
@@ -86,65 +92,81 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
 } // namespace sd::log
 namespace sd {} // namespace sd
 
-#define SD_LOG_CATEGORY_IMPL(CategoryPath, Level)                                           \
-  constexpr auto        cMinLevel     = static_cast<::sd::log::LogLevel>(Level);            \
-  constexpr const char* cCategoryPath = CategoryPath;                                       \
-                                                                                            \
-  template<typename... Args>                                                                \
-  inline void trace(spdlog::format_string_t<Args...> fmt, Args&&... args) {                 \
-    if constexpr (cMinLevel <= ::sd::log::LogLevel::TRACE) {                                \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {           \
-        logger->trace(fmt, std::forward<Args>(args)...);                                    \
-      }                                                                                     \
-    }                                                                                       \
-  }                                                                                         \
-                                                                                            \
-  template<typename... Args>                                                                \
-  inline void debug(spdlog::format_string_t<Args...> fmt, Args&&... args) {                 \
-    if constexpr (cMinLevel <= ::sd::log::LogLevel::DEBUG) {                                \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {           \
-        logger->debug(fmt, std::forward<Args>(args)...);                                    \
-      }                                                                                     \
-    }                                                                                       \
-  }                                                                                         \
-                                                                                            \
-  template<typename... Args>                                                                \
-  inline void info(spdlog::format_string_t<Args...> fmt, Args&&... args) {                  \
-    if constexpr (cMinLevel <= ::sd::log::LogLevel::INFO) {                                 \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {           \
-        logger->info(fmt, std::forward<Args>(args)...);                                     \
-      }                                                                                     \
-    }                                                                                       \
-  }                                                                                         \
-                                                                                            \
-  template<typename... Args>                                                                \
-  inline void warn(spdlog::format_string_t<Args...> fmt, Args&&... args) {                  \
-    if constexpr (cMinLevel <= ::sd::log::LogLevel::WARN) {                                 \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {           \
-        logger->warn(fmt, std::forward<Args>(args)...);                                     \
-      }                                                                                     \
-    }                                                                                       \
-  }                                                                                         \
-                                                                                            \
-  template<typename... Args>                                                                \
-  inline void error(spdlog::format_string_t<Args...> fmt, Args&&... args) {                 \
-    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
-      logger->error(fmt, std::forward<Args>(args)...);                                      \
-    }                                                                                       \
-  }                                                                                         \
-                                                                                            \
-  template<typename... Args>                                                                \
-  [[noreturn]] inline void critical(spdlog::format_string_t<Args...> fmt, Args&&... args) { \
-    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
-      logger->critical(fmt, std::forward<Args>(args)...);                                   \
-    }                                                                                       \
-    spdlog::shutdown();                                                                     \
-    std::abort();                                                                           \
+#define SD_LOG_CATEGORY_IMPL(CategoryPath, Level)                                             \
+  constexpr auto        cMinLevel     = static_cast<::sd::log::LogLevel>(Level);              \
+  constexpr const char* cCategoryPath = CategoryPath;                                         \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  inline void trace(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::TRACE) {                                  \
+      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+        logger->trace(fmt, std::forward<Args>(args)...);                                      \
+      }                                                                                       \
+    }                                                                                         \
+  }                                                                                           \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  inline void debug(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::DEBUG) {                                  \
+      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+        logger->debug(fmt, std::forward<Args>(args)...);                                      \
+      }                                                                                       \
+    }                                                                                         \
+  }                                                                                           \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  inline void info(spdlog::format_string_t<Args...> fmt, Args&&... args) {                    \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::INFO) {                                   \
+      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+        logger->info(fmt, std::forward<Args>(args)...);                                       \
+      }                                                                                       \
+    }                                                                                         \
+  }                                                                                           \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  inline void warn(spdlog::format_string_t<Args...> fmt, Args&&... args) {                    \
+    if constexpr (cMinLevel <= ::sd::log::LogLevel::WARN) {                                   \
+      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+        logger->warn(fmt, std::forward<Args>(args)...);                                       \
+      }                                                                                       \
+    }                                                                                         \
+  }                                                                                           \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  inline void error(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
+    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+      logger->error(fmt, std::forward<Args>(args)...);                                        \
+    }                                                                                         \
+  }                                                                                           \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  [[noreturn]] inline void critical(spdlog::format_string_t<Args...> fmt, Args&&... args) {   \
+    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+      logger->critical(fmt, std::forward<Args>(args)...);                                     \
+    }                                                                                         \
+    spdlog::shutdown();                                                                       \
+    std::abort();                                                                             \
+  }                                                                                           \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  inline void general(spdlog::format_string_t<Args...> fmt, Args&&... args) {                 \
+    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+      logger->log(::sd::log::LOG_LEVEL_GENERAL, fmt, std::forward<Args>(args)...);            \
+    }                                                                                         \
+  }                                                                                           \
+                                                                                              \
+  template<typename... Args>                                                                  \
+  inline void tagged(std::string_view subcategory, spdlog::format_string_t<Args...> fmt,      \
+                     Args&&... args) {                                                        \
+    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+      auto msg =                                                                              \
+          fmt::format("[{}] {}", subcategory, fmt::format(fmt, std::forward<Args>(args)...)); \
+      logger->log(::sd::log::LOG_LEVEL_GENERAL, "{}", msg);                                   \
+    }                                                                                         \
   }
 
 
-namespace sd {
-namespace log {
+namespace sd::log {
 namespace engine {
 SD_LOG_CATEGORY_IMPL("engine", ENGINE_LOG_LEVEL_ENGINE)
 
@@ -163,5 +185,7 @@ SD_LOG_CATEGORY_IMPL("engine/network", ENGINE_LOG_LEVEL_ENGINE)
 namespace vulkan {
 SD_LOG_CATEGORY_IMPL("vulkan", ENGINE_LOG_LEVEL_ENGINE)
 }
-} // namespace log
-} // namespace sd
+namespace debug_layer {
+SD_LOG_CATEGORY_IMPL("debug_layer", ENGINE_LOG_LEVEL_ENGINE)
+}
+} // namespace sd::log

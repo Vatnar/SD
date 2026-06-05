@@ -53,10 +53,6 @@ public:
   vk::Extent2D&                                         get_swapchain_extent();
   [[nodiscard]] const std::vector<vk::UniqueImageView>& get_swapchain_image_views() const;
 
-  [[nodiscard]] const std::vector<vk::UniqueFramebuffer>& get_framebuffers() const;
-
-  [[nodiscard]] vk::RenderPass get_render_pass() const;
-
   std::expected<uint32_t, vk::Result> get_vulkan_images(vk::UniqueSemaphore& image_acquired);
   vk::Result                          present_image(uint32_t image_index);
 
@@ -75,12 +71,8 @@ public:
 
 private:
   void create_swapchain();
-  void create_render_pass(); // can be shared, but yeah...
-
   void create_command_pool();
-
   void create_swapchain_dependent_resources();
-  void create_framebuffers();
 
   VulkanContext& m_vulkan_ctx;
   vk::Device&    m_device;
@@ -99,12 +91,8 @@ private:
   vk::SurfaceFormatKHR             m_surface_format;
   vk::SurfaceCapabilitiesKHR       m_surface_capabilities;
 
-  vk::UniqueRenderPass m_render_pass;
-
   vk::UniqueCommandPool                m_command_pool;
   std::vector<vk::UniqueCommandBuffer> m_command_buffers;
-
-  std::vector<vk::UniqueFramebuffer> m_framebuffers;
 
   std::vector<FrameSync>     m_frame_syncs;
   std::vector<SwapchainSync> m_swapchain_syncs;

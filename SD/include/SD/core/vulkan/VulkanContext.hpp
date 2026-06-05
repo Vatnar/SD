@@ -58,7 +58,7 @@ private:
 
 
   std::vector<const char*> m_device_exts;
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   vk::UniqueDebugUtilsMessengerEXT m_debug_messenger;
 #endif
 

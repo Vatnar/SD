@@ -13,7 +13,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP": "OFF",
+        "SD_DEBUG_ENABLED": "ON",
         "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
       }
     },
@@ -23,6 +23,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "SD_DEBUG_ENABLED": "OFF",
         "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
       }
     },
@@ -32,6 +33,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "SD_DEBUG_ENABLED": "OFF",
         "CMAKE_UNITY_BUILD": "ON",
         "CMAKE_UNITY_BUILD_BATCH_SIZE": "8",
         "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
@@ -43,8 +45,8 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "SD_DEBUG_ENABLED": "ON",
         "SD_ENABLE_ASAN": "ON",
-        "CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP": "OFF",
         "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
       }
     }

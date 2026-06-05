@@ -95,8 +95,14 @@ public:
 
   // Log viewer filters
   char m_log_search_buffer[128]{};
-  int  m_log_level_filter       = 0;
-  bool m_log_filter_initialized = false;
+  bool m_log_show_trace      = true;
+  bool m_log_show_debug      = true;
+  bool m_log_show_info       = true;
+  bool m_log_show_warn       = true;
+  bool m_log_show_error      = true;
+  bool m_log_show_critical   = true;
+  bool m_log_show_general    = true;
+  bool m_log_show_timestamps = true;
 
   // Category tree for log filtering
   struct CategoryNode {
@@ -110,8 +116,10 @@ public:
 
   void build_category_tree();
   void render_category_node(CategoryNode& node);
+  void render_category_menu(CategoryNode& node);
   bool is_log_visible(const std::string& category);
   void set_category_visible(CategoryNode& node, bool visible);
+  bool is_log_entry_visible(const log::LogEntry& entry);
 
   float m_timer              = 0.0f;
   int   m_update_count       = 0;
@@ -125,10 +133,6 @@ public:
   // Entity lifecycle tracking (for m_log_entity_lifecycle)
   Scene* m_prev_scene_for_entity_count = nullptr;
   int    m_prev_entity_count           = -1;
-
-  // Debug shortcut state
-  bool  m_debug_mode_active = false;
-  float m_debug_mode_timer  = 0.0f;
 };
 
 } // namespace sd

@@ -18,7 +18,6 @@ namespace sd {
 //   - Purpose: Compiles HLSL to SPIR-V and caches VkShaderModules
 //   - Load() method usage and profile parameter
 //   - Hot reload: CheckForChanges() + ClearCache() pattern
-//   - Integration with PipelineFactory
 //   - Example: Loading and using shaders
 /// Compiles HLSL → SPIR-V and caches VkShaderModules.
 class ShaderLibrary {

@@ -49,7 +49,7 @@ class SparseEntitySet : public SparseEntitySetBase {
   // 2. sparse[page][offset] is either valid dense index OR sentinel (max usize)
   // 3. For each i in [0, dense_entities.size()): sparse[dense_entities[i]] points back to i
 
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   void ValidateInvariants() const {
     assert(dense_entities.size() == dense_data.size());
     for (size_t i = 0; i < dense_entities.size(); ++i) {
@@ -138,7 +138,7 @@ public:
       }
       sparse[page][offset] = i;
     }
-#ifndef NDEBUG
+#ifdef SD_DEBUG
     ValidateInvariants();
 #endif
   }

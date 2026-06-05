@@ -170,7 +170,7 @@ private:
   // 3. m_entity_masks has entry for every index in m_generations
   // 4. Component mask bit is set iff component exists in corresponding pool
 
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   void ValidateInvariants() const {
     assert(m_entity_masks.size() == m_generations.size());
     for (u32 idx : m_free_list) {

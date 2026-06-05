@@ -19,7 +19,7 @@
     }                                                                         \
   } while (0)
 
-#ifndef NDEBUG
+#ifdef SD_DEBUG
 #define ASSERT(x) ASSERT_ALWAYS(x)
 #else
 #define ASSERT(x) (void)(x)

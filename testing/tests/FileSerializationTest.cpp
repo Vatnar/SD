@@ -4,8 +4,8 @@
 #include "SD/core/ecs/EntityManager.hpp"
 #include "SD/core/ecs/commands.hpp"
 #include "SD/core/ecs/components.hpp"
-#include "utils/file_utils.hpp"
-#include "utils/serialization.hpp"
+#include "SD/utils/file_utils.hpp"
+#include "SD/utils/serialization.hpp"
 
 namespace sd {
 

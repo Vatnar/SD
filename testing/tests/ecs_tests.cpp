@@ -1,5 +1,4 @@
-#include <core/ecs/Entity.hpp>
-
+#include "SD/core/ecs/Entity.hpp"
 #include "SD/core/ecs/EntityManager.hpp"
 #include "SD/core/ecs/component_registration.hpp"
 #include "SD/core/logging.hpp"

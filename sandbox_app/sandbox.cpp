@@ -5,24 +5,9 @@
 #include <SD/core/ecs/components.hpp>
 #include <SD/core/layers/EngineDebugLayer.hpp>
 #include <SD/core/vulkan/VulkanRenderer.hpp>
-#include <SD/game.h>
+#include <SD/game_api.hpp>
 
-#include "GameRenderLayer.hpp"
 #include "logging.hpp"
-
-// Wrap sd types for C interface
-static sd::Application* to_app(SD_Application* app) {
-  return reinterpret_cast<sd::Application*>(app);
-}
-static sd::Scene* to_scene(SD_Scene* scene) {
-  return reinterpret_cast<sd::Scene*>(scene);
-}
-[[maybe_unused]] static SD_Application* from_app(sd::Application* app) {
-  return reinterpret_cast<SD_Application*>(app);
-}
-static SD_Scene* from_scene(sd::Scene* scene) {
-  return reinterpret_cast<SD_Scene*>(scene);
-}
 
 static void register_game_categories() {
   sd::log::register_category("game", ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
@@ -31,23 +16,22 @@ static void register_game_categories() {
   sd::log::register_category("game/audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
 }
 
-static void game_on_load(SD_Application* appPtr, GameState* state) {
+namespace game {
+
+void on_load(sd::Application& app, State& state) {
   register_game_categories();
-  sd::Application& app = *to_app(appPtr);
 
-  state->version++;
-  sd::log::game::info("GAME VERSION {} LOADED", state->version);
+  state.version++;
+  sd::log::game::info("GAME VERSION {} LOADED", state.version);
 
-  state->shared_scene  = from_scene(app.create_scene("MainScene"));
-  state->another_scene = from_scene(app.create_scene("AnotherScene"));
+  state.shared_scene  = app.create_scene("MainScene");
+  state.another_scene = app.create_scene("AnotherScene");
 
   sd::WindowId main_win{0};
-  auto&        ctrl =
-      app.push_view_layer<sd::Panel>(main_win, "Sandbox Controls", to_scene(state->another_scene));
-  ctrl.set_scene(to_scene(state->shared_scene));
+  auto& ctrl = app.push_view_layer<sd::Panel>(main_win, "Sandbox Controls", state.another_scene);
+  ctrl.set_scene(state.shared_scene);
 
-  auto& game_view = app.create_view<sd::View>("Game", app.services());
-  // auto& renderer       = app.services().renderer;
+  auto& game_view      = app.create_view<sd::View>("Game", app.services());
   auto& vulkan_context = app.services().vulkan;
   game_view.setup_layered_render(3);
 
@@ -57,7 +41,6 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
       VLA::Matrix4x4f mvp{};
       float           color[4]{};
     };
-    //  check that push is smaller than max size
     auto                         physical_device = vulkan_context.get_physical_device();
     vk::PhysicalDeviceProperties props           = physical_device.getProperties();
     u32                          max_push_size   = props.limits.maxPushConstantsSize;
@@ -79,7 +62,6 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
           .pushConstantRangeCount = 1,
           .pPushConstantRanges    = &push_constant_range};
 
-
       auto res =
           vulkan_context.get_vulkan_device().get().createPipelineLayoutUnique(pipeline_layout_info);
       if (res.result != vk::Result::eSuccess) {
@@ -89,18 +71,14 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
       pipeline_layout = std::move(res.value);
     }
 
-
     const char* vert_path{"assets/engine/shaders/world.vert"};
     const char* frag_path{"assets/engine/shaders/world.frag"};
 
-
-    // TODO: prolly shouldnt be null
     vk::RenderPass  render_pass{VK_NULL_HANDLE};
     u32             subpass{0};
     vk::PolygonMode polygon_mode{VK_POLYGON_MODE_FILL};
 
     vk::UniquePipeline pipeline;
-
 
     //~ Compile vert and frag modules
     sd::ShaderCompiler shader_compiler;
@@ -119,7 +97,6 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
       auto vulkan_device = vulkan_context.get_vulkan_device().get();
       auto res           = vulkan_device.createShaderModuleUnique(create_info);
 
-      // TODO: this is very recoverable
       if (res.result != vk::Result::eSuccess) {
         sd::log::engine::critical("Shader comp failed");
         return;
@@ -149,14 +126,11 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
       frag_module = std::move(res.value);
     }
 
-    //~ Define shader stages
-
     vk::PipelineShaderStageCreateInfo vert_stage{
         .stage  = vk::ShaderStageFlagBits::eVertex,
         .module = *vert_module,
         .pName  = "main",
     };
-
 
     vk::PipelineShaderStageCreateInfo frag_stage{
         .stage  = vk::ShaderStageFlagBits::eFragment,
@@ -170,7 +144,6 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
 
     vk::PipelineInputAssemblyStateCreateInfo input_assembly{
         .topology = vk::PrimitiveTopology::eTriangleList,
-
     };
 
     vk::PipelineViewportStateCreateInfo viewport_state{
@@ -211,7 +184,15 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
         .pDynamicStates    = dynamic_states.data(),
     };
 
+    auto                            surface_format = vulkan_context.get_surface_format().format;
+    auto                            depth_format   = game_view.find_depth_format();
+    vk::PipelineRenderingCreateInfo rendering_info{.colorAttachmentCount    = 1,
+                                                   .pColorAttachmentFormats = &surface_format,
+                                                   .depthAttachmentFormat   = depth_format,
+                                                   .stencilAttachmentFormat = {}};
+
     vk::GraphicsPipelineCreateInfo pipeline_info{
+        .pNext               = &rendering_info,
         .stageCount          = 2,
         .pStages             = shader_stages.data(),
         .pVertexInputState   = &vertex_input_info,
@@ -229,7 +210,6 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
         .basePipelineHandle  = {},
         .basePipelineIndex   = {},
     };
-
 
     //~ pipeline cache
     vk::UniquePipelineCache     pipeline_cache{};
@@ -251,58 +231,74 @@ static void game_on_load(SD_Application* appPtr, GameState* state) {
       pipeline = std::move(res.value.front());
     }
 
-    // TODO: then same for wire
-
-
-    // sd::PipelineFactory::PipelineDesc wire_desc = world_desc;
-    // wire_desc.polygon_mode = VK_POLYGON_MODE_LINE;
-    // auto wire_pipe_handle = pipelines.create_graphics_pipeline(wire_desc, push_layout);
-
-    sd::log::game::info("Pushing GameRenderLayer");
-    // game_view.push_layer<GameRenderLayer>(1, "GameRender", to_scene(state->shared_scene),
-    // world_pipe_handle, wire_pipe_handle, push_layout,
-    // &pipelines);
+    sd::log::game::info("Pipeline created");
   }
 
-  app.push_global_layer<sd::EngineDebugLayer>(app.runtime(), app.services(),
-                                              to_scene(state->shared_scene));
+  app.push_global_layer<sd::EngineDebugLayer>(app.runtime(), app.services(), state.shared_scene);
 
-  auto scene = to_scene(state->shared_scene);
-  auto ent   = scene->em.create();
-  scene->em.add_component<sd::DebugName>(ent, "Triangle");
-  scene->em.add_component<sd::Transform>(ent, VLA::Matrix4x4f::Identity());
-  scene->em.add_component<sd::Renderable>(ent, sd::Renderable{0, 0, 1, 1});
+  auto ent = state.shared_scene->em.create();
+  state.shared_scene->em.add_component<sd::DebugName>(ent, "Triangle");
+  state.shared_scene->em.add_component<sd::Transform>(ent, VLA::Matrix4x4f::Identity());
+  state.shared_scene->em.add_component<sd::Renderable>(ent, sd::Renderable{0, 0, 1, 1});
 
+  auto ent2 = state.shared_scene->em.create();
+  state.shared_scene->em.add_component<sd::DebugName>(ent2, "Better triangle");
+  state.shared_scene->em.add_component<sd::Transform>(ent2, VLA::Matrix4x4f::Identity());
+  state.shared_scene->em.add_component<sd::Renderable>(ent2, sd::Renderable{0, 0, 1, 1});
 
-  auto ent2 = scene->em.create();
-  scene->em.add_component<sd::DebugName>(ent2, "Better triangle");
-  scene->em.add_component<sd::Transform>(ent2, VLA::Matrix4x4f::Identity());
-  scene->em.add_component<sd::Renderable>(ent2, sd::Renderable{0, 0, 1, 1});
-
-  sd::log::game::info("Game loaded, version {}", state->version);
+  sd::log::game::info("Game loaded, version {}", state.version);
 }
 
-static void game_on_update(SD_Application* app_ptr, GameState* state, float dt) {
-  (void)app_ptr;
+void on_update(sd::Application& app, State& state, float dt) {
+  (void)app;
   (void)state;
   (void)dt;
 }
 
-static void game_on_unload(SD_Application* app_ptr, GameState* state) {
-  (void)app_ptr;
-  sd::log::game::info("GAME VERSION {} UNLOADING", state->version);
-  state->shared_scene  = nullptr;
-  state->another_scene = nullptr;
+void on_unload(sd::Application& app, State& state) {
+  (void)app;
+  sd::log::game::info("GAME VERSION {} UNLOADING", state.version);
+  state.shared_scene  = nullptr;
+  state.another_scene = nullptr;
 }
 
-// The single exported function
+} // namespace game
+
+// C-linkage wrappers for the hot-reloader (dlopen path)
+
+static void c_on_load(SD_Application* app, GameState* state) {
+  game::State s;
+  s.shared_scene  = reinterpret_cast<sd::Scene*>(state->shared_scene);
+  s.another_scene = reinterpret_cast<sd::Scene*>(state->another_scene);
+  s.version       = state->version;
+  game::on_load(*reinterpret_cast<sd::Application*>(app), s);
+  state->shared_scene  = reinterpret_cast<SD_Scene*>(s.shared_scene);
+  state->another_scene = reinterpret_cast<SD_Scene*>(s.another_scene);
+  state->version       = s.version;
+}
+
+static void c_on_update(SD_Application* app, GameState* state, float dt) {
+  game::State s;
+  s.shared_scene  = reinterpret_cast<sd::Scene*>(state->shared_scene);
+  s.another_scene = reinterpret_cast<sd::Scene*>(state->another_scene);
+  s.version       = state->version;
+  game::on_update(*reinterpret_cast<sd::Application*>(app), s, dt);
+}
+
+static void c_on_unload(SD_Application* app, GameState* state) {
+  game::State s;
+  s.shared_scene  = reinterpret_cast<sd::Scene*>(state->shared_scene);
+  s.another_scene = reinterpret_cast<sd::Scene*>(state->another_scene);
+  s.version       = state->version;
+  game::on_unload(*reinterpret_cast<sd::Application*>(app), s);
+}
 
 extern "C" GameAPI get_game_api(void) {
-  GameAPI api     = {};
+  GameAPI api{};
   api.api_version = GAME_API_VERSION;
   api.struct_size = sizeof(GameAPI);
-  api.on_load     = game_on_load;
-  api.on_update   = game_on_update;
-  api.on_unload   = game_on_unload;
+  api.on_load     = c_on_load;
+  api.on_update   = c_on_update;
+  api.on_unload   = c_on_unload;
   return api;
 }

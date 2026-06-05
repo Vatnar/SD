@@ -7,21 +7,14 @@
 #include <SD/utils/utils.hpp>
 #include <VLA/Matrix.hpp>
 
-GameRenderLayer::GameRenderLayer(const std::string& name, sd::Scene* scene,
-                                 sd::PipelineFactory::Handle pipeline_handle,
-                                 sd::PipelineFactory::Handle wireframe_handle,
-                                 VkPipelineLayout layout, sd::PipelineFactory* pipeline_factory) :
-  RenderStage(name, scene), m_pipeline_handle(pipeline_handle),
-  m_wireframe_handle(wireframe_handle), m_layout(layout), m_pipeline_factory(pipeline_factory) {
+GameRenderLayer::GameRenderLayer(const std::string& name, sd::Scene* scene, VkPipeline pipeline,
+                                 VkPipeline wireframe, VkPipelineLayout layout) :
+  RenderStage(name, scene), m_pipeline(pipeline), m_wireframe(wireframe), m_layout(layout) {
 }
 
 void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
-  ASSERT(m_pipeline_factory && "PipelineFactory must be valid");
-
-  // Resolve handles to actual pipelines (stable across hot-reloads)
-  VkPipeline active_pipe = (m_view->get_render_mode() == sd::RenderMode::WIREFRAME)
-                               ? m_pipeline_factory->get_pipeline(m_wireframe_handle)
-                               : m_pipeline_factory->get_pipeline(m_pipeline_handle);
+  VkPipeline active_pipe =
+      (m_view->get_render_mode() == sd::RenderMode::WIREFRAME) ? m_wireframe : m_pipeline;
 
   ASSERT(cmd != VK_NULL_HANDLE && "Invalid cmd buffer");
   ASSERT(active_pipe != VK_NULL_HANDLE && "Invalid pipeline - was it destroyed or recreated?");

@@ -13,8 +13,65 @@
 
 namespace sd::log {
 
+static constexpr const char* HISTORY_FILE    = "debug_history.log";
+static constexpr size_t      MAX_MEM_ENTRIES = 500;
+
 static std::deque<LogEntry> g_log_history;
+static size_t               g_file_entry_count = 0;
 static std::mutex           g_log_mutex;
+
+static void write_entry_to_file(const LogEntry& entry) {
+  FILE* f = fopen(HISTORY_FILE, "a");
+  if (!f)
+    return;
+  fprintf(f, "%.6f|%d|%s|%s\n", entry.uptime_sec, static_cast<int>(entry.level),
+          entry.category.c_str(), entry.message.c_str());
+  fclose(f);
+}
+
+static std::vector<LogEntry> read_entries_from_file(size_t offset, size_t count) {
+  std::vector<LogEntry> result;
+  FILE*                 f = fopen(HISTORY_FILE, "r");
+  if (!f)
+    return result;
+
+  char   line[4096];
+  size_t idx = 0;
+  while (fgets(line, sizeof(line), f) && result.size() < count) {
+    if (idx++ < offset)
+      continue;
+
+    char* p1 = strchr(line, '|');
+    if (!p1)
+      continue;
+    *p1++ = '\0';
+
+    char* p2 = strchr(p1, '|');
+    if (!p2)
+      continue;
+    *p2++ = '\0';
+
+    char* p3 = strchr(p2, '|');
+    if (!p3)
+      continue;
+    *p3++ = '\0';
+
+    // Strip trailing newline from message
+    size_t mlen = strlen(p3);
+    while (mlen > 0 && (p3[mlen - 1] == '\n' || p3[mlen - 1] == '\r'))
+      p3[--mlen] = '\0';
+
+    LogEntry entry;
+    entry.uptime_sec = std::stof(line);
+    entry.level      = static_cast<LogLevel>(std::stoi(p1));
+    entry.category   = p2;
+    entry.message    = p3;
+    result.push_back(std::move(entry));
+  }
+
+  fclose(f);
+  return result;
+}
 
 std::deque<LogEntry> get_log_history() {
   std::lock_guard lock(g_log_mutex);
@@ -23,9 +80,48 @@ std::deque<LogEntry> get_log_history() {
 
 void add_log_entry(LogEntry entry) {
   std::lock_guard lock(g_log_mutex);
-  if (g_log_history.size() > 500)
-    g_log_history.erase(g_log_history.begin());
+  if (g_log_history.size() >= MAX_MEM_ENTRIES) {
+    write_entry_to_file(g_log_history.front());
+    g_log_history.pop_front();
+    g_file_entry_count++;
+  }
   g_log_history.push_back(std::move(entry));
+}
+
+void clear_history() {
+  std::lock_guard lock(g_log_mutex);
+  g_log_history.clear();
+  g_file_entry_count = 0;
+  FILE* f            = fopen(HISTORY_FILE, "w");
+  if (f)
+    fclose(f);
+}
+
+size_t get_total_entry_count() {
+  std::lock_guard lock(g_log_mutex);
+  return g_file_entry_count + g_log_history.size();
+}
+
+std::vector<LogEntry> get_entries(size_t offset, size_t count) {
+  std::lock_guard       lock(g_log_mutex);
+  std::vector<LogEntry> result;
+
+  // File portion
+  if (offset < g_file_entry_count) {
+    size_t from_file = std::min(count, g_file_entry_count - offset);
+    auto   fe        = read_entries_from_file(offset, from_file);
+    result           = std::move(fe);
+  }
+
+  // Memory portion
+  size_t mem_offset = offset > g_file_entry_count ? offset - g_file_entry_count : 0;
+  if (mem_offset < g_log_history.size() && result.size() < count) {
+    size_t from_mem = std::min(count - result.size(), g_log_history.size() - mem_offset);
+    auto   begin    = g_log_history.begin() + static_cast<std::ptrdiff_t>(mem_offset);
+    result.insert(result.end(), begin, begin + static_cast<std::ptrdiff_t>(from_mem));
+  }
+
+  return result;
 }
 
 static std::vector<CategoryInfo> g_category_registry;
@@ -55,6 +151,8 @@ spdlog::level::level_enum to_spdlog_level(const LogLevel level) {
       return spdlog::level::critical;
     case LogLevel::OFF:
       return spdlog::level::off;
+    case LogLevel::GENERAL:
+      return LOG_LEVEL_GENERAL;
   }
   return spdlog::level::info;
 }
@@ -76,7 +174,7 @@ LogLevel from_spdlog_level(spdlog::level::level_enum level) {
     case spdlog::level::off:
       return LogLevel::OFF;
     default:
-      return LogLevel::INFO;
+      return LogLevel::GENERAL;
   }
 }
 
@@ -156,20 +254,40 @@ protected:
 
     std::string out;
     out.append(formatted.data(), formatted.size());
-    out += '[';
     if (!cat_color.empty()) {
       out += cat_color;
+      out += '[';
       out += cat_name;
+      out += ']';
       out += "\033[0m";
     } else {
+      out += '[';
       out += cat_name;
+      out += ']';
     }
-    out += ']';
-    out += " [";
-    out += lev_color;
-    out += lev_str;
-    out += "\033[0m] ";
-    out.append(payload.data(), payload.size());
+    if (msg.level != LOG_LEVEL_GENERAL) {
+      out += " [";
+      out += lev_color;
+      out += lev_str;
+      out += "\033[0m] ";
+    } else {
+      out += ' ';
+    }
+
+    if (msg.level == LOG_LEVEL_GENERAL && payload.size() > 0 && payload[0] == '[') {
+      std::string_view payload_sv(payload.data(), payload.size());
+      auto             close = payload_sv.find(']');
+      if (close != std::string_view::npos && !cat_color.empty()) {
+        out += cat_color;
+        out.append(payload.data(), close + 1);
+        out += "\033[0m";
+        out.append(payload.data() + close + 1, payload.size() - close - 1);
+      } else {
+        out.append(payload.data(), payload.size());
+      }
+    } else {
+      out.append(payload.data(), payload.size());
+    }
     out += '\n';
     fwrite(out.data(), 1, out.size(), stdout);
   }
@@ -254,6 +372,9 @@ void init() {
 
   spdlog::init_thread_pool(8192, 1);
 
+  // Rotate overflow history file
+  std::rename(HISTORY_FILE, "debug_history.log.old");
+
   // Shared sinks
   auto console = std::make_shared<CategoryConsoleSink>();
   auto imgui   = std::make_shared<ImguiSinkMt>();
@@ -282,6 +403,7 @@ void init() {
   register_category("engine/ecs", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));      // Yellow
   register_category("engine/network", ImVec4(0.0f, 1.0f, 0.6f, 1.0f));  // Teal
   register_category("vulkan", ImVec4(1.0f, 0.4f, 0.0f, 1.0f));
+  register_category("debug_layer", ImVec4(1.0f, 0.5f, 0.8f, 1.0f));
 }
 
 } // namespace sd::log

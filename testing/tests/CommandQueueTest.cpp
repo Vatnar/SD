@@ -1,8 +1,9 @@
-#include <core/ecs/CommandQueue.hpp>
-#include <core/ecs/EntityManager.hpp>
-#include <core/ecs/commands.hpp>
-#include <core/ecs/components.hpp>
 #include <gtest/gtest.h>
+
+#include "SD/core/ecs/CommandQueue.hpp"
+#include "SD/core/ecs/EntityManager.hpp"
+#include "SD/core/ecs/commands.hpp"
+#include "SD/core/ecs/components.hpp">
 
 namespace sd {
 

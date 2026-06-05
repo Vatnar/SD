@@ -1,18 +1,14 @@
 #pragma once
 #include <SD/core/Layer.hpp>
-#include <SD/core/vulkan/PipelineFactory.hpp>
 
 class GameRenderLayer : public sd::RenderStage {
-  sd::PipelineFactory::Handle m_pipeline_handle;
-  sd::PipelineFactory::Handle m_wireframe_handle;
-  VkPipelineLayout            m_layout;
-  sd::PipelineFactory*        m_pipeline_factory;
+  VkPipeline       m_pipeline;
+  VkPipeline       m_wireframe;
+  VkPipelineLayout m_layout;
 
 public:
-  GameRenderLayer(const std::string& name, sd::Scene* scene,
-                  sd::PipelineFactory::Handle pipeline_handle,
-                  sd::PipelineFactory::Handle wireframe_handle, VkPipelineLayout layout,
-                  sd::PipelineFactory* pipeline_factory);
+  GameRenderLayer(const std::string& name, sd::Scene* scene, VkPipeline pipeline,
+                  VkPipeline wireframe, VkPipelineLayout layout);
   void on_render(vk::CommandBuffer cmd) override;
   void on_detach() override;
 };

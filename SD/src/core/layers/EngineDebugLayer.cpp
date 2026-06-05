@@ -37,8 +37,8 @@ void EngineDebugLayer::on_update(float dt) {
 
   m_views.for_each([&](View& view) {
     if (m_log_view_resizes && view.consume_extent_changed()) {
-      log::engine::debug("View '{}' resized to {}x{}", view.get_name(), view.get_extent().width,
-                         view.get_extent().height);
+      log::debug_layer::tagged("view", "View '{}' resized to {}x{}", view.get_name(),
+                               view.get_extent().width, view.get_extent().height);
     }
   });
 
@@ -51,9 +51,11 @@ void EngineDebugLayer::on_update(float dt) {
       int alive = m_selected_scene->em.get_alive_entity_count();
       if (alive != m_prev_entity_count) {
         if (alive > m_prev_entity_count)
-          log::engine::debug("Entity created (count: {} -> {})", m_prev_entity_count, alive);
+          log::debug_layer::tagged("entity", "Entity created (count: {} -> {})",
+                                   m_prev_entity_count, alive);
         else
-          log::engine::debug("Entity destroyed (count: {} -> {})", m_prev_entity_count, alive);
+          log::debug_layer::tagged("entity", "Entity destroyed (count: {} -> {})",
+                                   m_prev_entity_count, alive);
         m_prev_entity_count = alive;
       }
     }
@@ -109,7 +111,7 @@ void EngineDebugLayer::on_event(Event& e) {
         detail = "Generic Event";
         break;
     }
-    log::engine::trace("Event: {} [{}]", e.get_name(), detail);
+    log::debug_layer::tagged("event", "{} [{}]", e.get_name(), detail);
   }
 }
 
@@ -127,9 +129,51 @@ void EngineDebugLayer::on_im_gui_menu_bar() {
     display_layout_menu();
 
     ImGui::Separator();
-    if (ImGui::MenuItem("Reload Shaders", "Ctrl+Shift+D, R")) {
+    if (ImGui::MenuItem("Reload Shaders")) {
       m_renderer.reload_shaders();
     }
+
+    ImGui::EndMenu();
+  }
+
+  if (ImGui::BeginMenu("Log")) {
+    if (ImGui::BeginMenu("Categories")) {
+      if (!m_category_tree_built)
+        build_category_tree();
+      for (auto& child : m_category_root.children) {
+        render_category_menu(child);
+      }
+      ImGui::EndMenu();
+    }
+
+    if (ImGui::MenuItem("Clear Log")) {
+      log::clear_history();
+    }
+    if (ImGui::MenuItem("Copy Log")) {
+      auto        history = log::get_log_history();
+      std::string clip;
+      for (auto& entry : history) {
+        if (!is_log_entry_visible(entry))
+          continue;
+        clip +=
+            fmt::format("[+{:.3f}s] [{}] {}\n", entry.uptime_sec, entry.category, entry.message);
+      }
+      if (!clip.empty())
+        ImGui::SetClipboardText(clip.c_str());
+    }
+
+    if (ImGui::BeginMenu("Levels")) {
+      ImGui::MenuItem("Trace", nullptr, &m_log_show_trace);
+      ImGui::MenuItem("Debug", nullptr, &m_log_show_debug);
+      ImGui::MenuItem("Info", nullptr, &m_log_show_info);
+      ImGui::MenuItem("Warn", nullptr, &m_log_show_warn);
+      ImGui::MenuItem("Error", nullptr, &m_log_show_error);
+      ImGui::MenuItem("Critical", nullptr, &m_log_show_critical);
+      ImGui::MenuItem("General", nullptr, &m_log_show_general);
+      ImGui::EndMenu();
+    }
+
+    ImGui::MenuItem("Show Timestamps", nullptr, &m_log_show_timestamps);
 
     ImGui::EndMenu();
   }
@@ -357,7 +401,7 @@ void EngineDebugLayer::display_ecs_inspector() {
             if (ImGui::DragFloat4(("row " + std::to_string(i)).c_str(),
                                   &transform_ptr->world_matrix(i, 0), 0.01f)) {
               if (m_log_scene_changes) {
-                log::engine::debug("Entity {} transform changed", entity.index);
+                log::debug_layer::tagged("transform", "Entity {} transform changed", entity.index);
               }
             }
           }
@@ -368,13 +412,13 @@ void EngineDebugLayer::display_ecs_inspector() {
         if (ImGui::TreeNode("Renderable")) {
           if (ImGui::ColorEdit4("Color", renderable->color)) {
             if (m_log_scene_changes) {
-              log::engine::debug("Entity {} color changed", entity.index);
+              log::debug_layer::tagged("color", "Entity {} color changed", entity.index);
             }
           }
           if (ImGui::DragInt("Stage", (int*)&renderable->render_stage, 1, 0, 10)) {
             if (m_log_scene_changes) {
-              log::engine::debug("Entity {} render stage changed to {}", entity.index,
-                                 renderable->render_stage);
+              log::debug_layer::tagged("render", "Entity {} render stage changed to {}",
+                                       entity.index, renderable->render_stage);
             }
           }
           ImGui::TreePop();
@@ -475,6 +519,27 @@ bool EngineDebugLayer::is_log_visible(const std::string& category) {
   return node->visible;
 }
 
+void EngineDebugLayer::render_category_menu(CategoryNode& node) {
+  if (node.children.empty()) {
+    bool vis = node.visible;
+    if (ImGui::MenuItem(node.name.c_str(), nullptr, &vis)) {
+      set_category_visible(node, vis);
+    }
+  } else {
+    if (ImGui::BeginMenu(node.name.c_str())) {
+      bool vis = node.visible;
+      if (ImGui::MenuItem(node.name.c_str(), nullptr, &vis)) {
+        set_category_visible(node, vis);
+      }
+      ImGui::Separator();
+      for (auto& child : node.children) {
+        render_category_menu(child);
+      }
+      ImGui::EndMenu();
+    }
+  }
+}
+
 void EngineDebugLayer::set_category_visible(CategoryNode& node, bool visible) {
   node.visible = visible;
   for (auto& child : node.children) {
@@ -489,142 +554,144 @@ void EngineDebugLayer::set_category_visible(CategoryNode& node, bool visible) {
   }
 }
 
-void EngineDebugLayer::display_event_log() {
-  const auto& history    = log::get_log_history();
-  auto&       categories = log::get_category_registry();
-
-  // Initialize filters once
-  if (!m_log_filter_initialized) {
-    m_log_search_buffer[0]   = '\0';
-    m_log_filter_initialized = true;
+bool EngineDebugLayer::is_log_entry_visible(const log::LogEntry& entry) {
+  switch (entry.level) {
+    case log::LogLevel::TRACE:
+      return m_log_show_trace;
+    case log::LogLevel::DEBUG:
+      return m_log_show_debug;
+    case log::LogLevel::INFO:
+      return m_log_show_info;
+    case log::LogLevel::WARN:
+      return m_log_show_warn;
+    case log::LogLevel::ERROR:
+      return m_log_show_error;
+    case log::LogLevel::CRITICAL:
+      return m_log_show_critical;
+    case log::LogLevel::GENERAL:
+      return m_log_show_general;
+    default:
+      return false;
   }
+}
+
+void EngineDebugLayer::display_event_log() {
+  size_t total_entries = log::get_total_entry_count();
+  auto&  categories    = log::get_category_registry();
+
+  // Ensure category tree is built before is_log_visible() is called below
+  if (!m_category_tree_built || categories.size() != m_category_root.children.size())
+    build_category_tree();
 
   // Search bar
   ImGui::InputText("Search", m_log_search_buffer, sizeof(m_log_search_buffer));
-  ImGui::SameLine();
-
-  // Level filter
-  const char* level_items[] = {"All", "Debug+", "Info+", "Warn+", "Error+"};
-  ImGui::Combo("Level", &m_log_level_filter, level_items, IM_ARRAYSIZE(level_items));
-
-  // Category tree filters
-  if (!m_category_tree_built || categories.size() != m_category_root.children.size()) {
-    build_category_tree();
-  }
-  if (ImGui::TreeNode("Categories")) {
-    for (auto& child : m_category_root.children) {
-      render_category_node(child);
-    }
-    ImGui::TreePop();
-  }
 
   ImGui::Separator();
-
-  // Determine minimum level to show
-  log::LogLevel min_level = log::LogLevel::TRACE;
-  switch (m_log_level_filter) {
-    case 1:
-      min_level = log::LogLevel::DEBUG;
-      break;
-    case 2:
-      min_level = log::LogLevel::INFO;
-      break;
-    case 3:
-      min_level = log::LogLevel::WARN;
-      break;
-    case 4:
-      min_level = log::LogLevel::ERROR;
-      break;
-    default:
-      break;
-  }
 
   std::string search = m_log_search_buffer;
   std::ranges::transform(search, search.begin(), tolower);
 
-  for (const auto& log : history) {
-    // Level filter
-    if (static_cast<int>(log.level) < static_cast<int>(min_level))
-      continue;
+  ImGuiListClipper clipper;
+  clipper.Begin(static_cast<int>(total_entries));
+  while (clipper.Step()) {
+    int  display_count = clipper.DisplayEnd - clipper.DisplayStart;
+    auto batch         = log::get_entries(clipper.DisplayStart, display_count);
 
-    // Category filter (using tree visibility)
-    if (!is_log_visible(log.category))
-      continue;
-
-    // Search filter
-    if (!search.empty()) {
-      std::string msg_lower = log.message;
-      std::ranges::transform(msg_lower, msg_lower.begin(), tolower);
-      if (msg_lower.find(search) == std::string::npos)
+    for (auto& log : batch) {
+      if (!is_log_entry_visible(log) || !is_log_visible(log.category))
         continue;
-    }
 
-    // Category color
-    ImVec4 cat_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-    for (auto& cat : categories) {
-      if (cat.name == log.category) {
-        cat_color = cat.color;
-        break;
+      if (!search.empty()) {
+        std::string msg_lower = log.message;
+        std::ranges::transform(msg_lower, msg_lower.begin(), tolower);
+        if (msg_lower.find(search) == std::string::npos)
+          continue;
+      }
+
+      // Category color
+      ImVec4 cat_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+      for (auto& cat : categories) {
+        if (cat.name == log.category) {
+          cat_color = cat.color;
+          break;
+        }
+      }
+
+      // Level color for the tag
+      ImVec4 level_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+      switch (log.level) {
+        case log::LogLevel::TRACE:
+          level_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+          break;
+        case log::LogLevel::DEBUG:
+          level_color = ImVec4(0.0f, 0.8f, 1.0f, 1.0f);
+          break;
+        case log::LogLevel::INFO:
+          level_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+          break;
+        case log::LogLevel::WARN:
+          level_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+          break;
+        case log::LogLevel::ERROR:
+          level_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+          break;
+        case log::LogLevel::CRITICAL:
+          level_color = ImVec4(1.0f, 0.0f, 1.0f, 1.0f);
+          break;
+        default:
+          break;
+      }
+
+      // Format: [+sec] [Category] [level] message
+      if (m_log_show_timestamps) {
+        ImGui::Text("[+%.3fs] ", log.uptime_sec);
+        ImGui::SameLine();
+      }
+      ImGui::TextColored(cat_color, "[%s]", log.category.c_str());
+
+      if (log.level != log::LogLevel::GENERAL) {
+        ImGui::SameLine();
+
+        const char* level_str = "?";
+        switch (log.level) {
+          case log::LogLevel::TRACE:
+            level_str = "trace";
+            break;
+          case log::LogLevel::DEBUG:
+            level_str = "debug";
+            break;
+          case log::LogLevel::INFO:
+            level_str = "info";
+            break;
+          case log::LogLevel::WARN:
+            level_str = "warn";
+            break;
+          case log::LogLevel::ERROR:
+            level_str = "error";
+            break;
+          case log::LogLevel::CRITICAL:
+            level_str = "critical";
+            break;
+          default:
+            break;
+        }
+        ImGui::TextColored(level_color, "[%s]", level_str);
+      }
+
+      ImGui::SameLine();
+      if (log.level == log::LogLevel::GENERAL && !log.message.empty() && log.message[0] == '[') {
+        auto close = log.message.find(']');
+        if (close != std::string::npos) {
+          ImGui::TextColored(cat_color, "%.*s", static_cast<int>(close + 1), log.message.c_str());
+          ImGui::SameLine();
+          ImGui::Text("%s", log.message.c_str() + close + 1);
+        } else {
+          ImGui::Text("%s", log.message.c_str());
+        }
+      } else {
+        ImGui::Text("%s", log.message.c_str());
       }
     }
-
-    // Level color for the tag
-    ImVec4 level_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-    switch (log.level) {
-      case log::LogLevel::TRACE:
-        level_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-        break;
-      case log::LogLevel::DEBUG:
-        level_color = ImVec4(0.0f, 0.8f, 1.0f, 1.0f);
-        break;
-      case log::LogLevel::INFO:
-        level_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
-        break;
-      case log::LogLevel::WARN:
-        level_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
-        break;
-      case log::LogLevel::ERROR:
-        level_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-        break;
-      case log::LogLevel::CRITICAL:
-        level_color = ImVec4(1.0f, 0.0f, 1.0f, 1.0f);
-        break;
-      default:
-        break;
-    }
-
-    // Format: [+sec] [Category] [level] message
-    ImGui::Text("[+%.3fs] ", log.uptime_sec);
-    ImGui::SameLine();
-    ImGui::TextColored(cat_color, "[%s]", log.category.c_str());
-    ImGui::SameLine();
-
-    const char* level_str = "?";
-    switch (log.level) {
-      case log::LogLevel::TRACE:
-        level_str = "trace";
-        break;
-      case log::LogLevel::DEBUG:
-        level_str = "debug";
-        break;
-      case log::LogLevel::INFO:
-        level_str = "info";
-        break;
-      case log::LogLevel::WARN:
-        level_str = "warn";
-        break;
-      case log::LogLevel::ERROR:
-        level_str = "error";
-        break;
-      case log::LogLevel::CRITICAL:
-        level_str = "critical";
-        break;
-      default:
-        break;
-    }
-    ImGui::TextColored(level_color, "[%s]", level_str);
-    ImGui::SameLine();
-    ImGui::Text("%s", log.message.c_str());
   }
 
   if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
@@ -825,36 +892,10 @@ void EngineDebugLayer::handle_layout_shortcuts() {
 }
 
 void EngineDebugLayer::handle_debug_shortcuts() {
-  // Ctrl+Shift+D prefix for debug shortcuts
-  // Uses member variables mDebugModeActive and mDebugModeTimer (not static, for thread safety)
-
   ImGuiIO& io = ImGui::GetIO();
 
-  // Check for Ctrl+Shift+D
-  if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D)) {
-    m_debug_mode_active = true;
-    m_debug_mode_timer  = 0.5f; // 500ms timeout
-  }
-
-  if (m_debug_mode_active) {
-    // Decrement timer
-    m_debug_mode_timer -= io.DeltaTime;
-
-    // Check for second key
-    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-      m_renderer.reload_shaders();
-      m_debug_mode_active = false;
-    } else if (ImGui::IsKeyPressed(ImGuiKey_H)) {
-      m_hot_reload_enabled = !m_hot_reload_enabled;
-      m_debug_mode_active  = false;
-    } else if (ImGui::IsKeyPressed(ImGuiKey_L)) {
-      m_show_context_overlay = !m_show_context_overlay;
-      m_debug_mode_active    = false;
-    } else if (m_debug_mode_timer <= 0.0f) {
-      // Timer expired - open debug wheel (placeholder)
-      log::engine::info("Debug wheel placeholder - coming soon!");
-      m_debug_mode_active = false;
-    }
+  if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_P)) {
+    log::debug_layer::tagged("debug", "Command palette placeholder - coming soon!");
   }
 }
 

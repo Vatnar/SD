@@ -126,10 +126,9 @@ public:
   ImVec2 get_content_region_extent() const { return m_content_region_extent; }
 
   // --- Rendering setup ---
-  vk::Extent2D                 get_im_gui_extent();
-  vk::Format                   find_depth_format();
-  [[nodiscard]] vk::RenderPass get_layered_render_pass() const { return m_layered_rp.get(); }
-  Layer*                       get_layer_by_stage(u32 stage);
+  vk::Extent2D get_im_gui_extent();
+  vk::Format   find_depth_format();
+  Layer*       get_layer_by_stage(u32 stage);
 
   void setup_layered_render(u32 maxStages, VkExtent2D initialExtent = {1280, 720});
   void cleanup_layered_render();
@@ -149,8 +148,6 @@ private:
   ImVec2 m_content_region_extent{0, 0};
 
   // Vulkan rendering resources
-  vk::UniqueRenderPass m_layered_rp;
-
   vk::Image           m_color_image      = VK_NULL_HANDLE;
   VmaAllocation       m_color_allocation = VK_NULL_HANDLE;
   vk::UniqueImageView m_color_view;
@@ -160,8 +157,6 @@ private:
   vk::UniqueImageView m_depth_view;
 
   VkDescriptorSet m_display_tex_ds = VK_NULL_HANDLE; // imgui::image
-
-  vk::UniqueFramebuffer m_layered_framebuffer;
 
   std::vector<std::unique_ptr<Layer>> m_layers_by_stage;
   VLA::Matrix4x4f                     m_camera_view_projection;

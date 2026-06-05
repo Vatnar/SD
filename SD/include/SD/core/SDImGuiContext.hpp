@@ -57,7 +57,6 @@ public:
 
 private:
   void create_descriptor_pool(VulkanContext& ctx);
-  void create_compatible_render_pass(VulkanContext& ctx, vk::Format format);
 
 private:
   ImGuiContext* m_context = nullptr;
@@ -65,7 +64,6 @@ private:
   SDImGuiCallbacks m_callbacks;
 
   vk::UniqueDescriptorPool m_descriptor_pool;
-  vk::UniqueRenderPass     m_render_pass;
   vk::UniqueSampler        m_default_sampler;
   bool                     m_is_vulkan_initialized = false;
 };

@@ -10,7 +10,7 @@
 namespace sd {
 class LayerList;
 
-#ifndef NDEBUG
+#ifdef SD_DEBUG
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT /*type*/,
     const vk::DebugUtilsMessengerCallbackDataEXT* callback_data, void* /*user_data*/) {
@@ -26,9 +26,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 #endif
     case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning:
       log::vulkan::warn("{}", callback_data->pMessage);
+#ifdef SD_FAIL_ON_VULKAN_VALIDATION_ERROR
+      log::engine::critical("Got validation error, shutting down");
+#endif
       break;
     case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
       log::vulkan::error("{}", callback_data->pMessage);
+#ifdef SD_FAIL_ON_VULKAN_VALIDATION_ERROR
+      log::engine::critical("Got validation error, shutting down");
+#endif
       break;
     default:
       break;
@@ -154,7 +160,7 @@ vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
     instance_exts.assign(glfw_exts, glfw_exts + ext_count);
   }
 
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   std::vector<const char*> layers;
   {
     instance_exts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -174,7 +180,7 @@ vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
 
   vk::InstanceCreateInfo inst_info{
       .pApplicationInfo = &app_info,
-#ifndef NDEBUG
+#ifdef SD_DEBUG
       .enabledLayerCount   = static_cast<u32>(layers.size()),
       .ppEnabledLayerNames = layers.data(),
 #endif
@@ -185,7 +191,7 @@ vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
 
   VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance);
 
-#ifndef NDEBUG
+#ifdef SD_DEBUG
   if (!layers.empty()) {
     vk::DebugUtilsMessengerCreateInfoEXT debug_info{
         .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |

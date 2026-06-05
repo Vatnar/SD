@@ -37,22 +37,24 @@ void SDImGuiContext::init(Window& window, VulkanWindow& vw) {
   // 2. Init GLFW
   ImGui_ImplGlfw_InitForVulkan(window.get_native_handle(), true);
 
-  create_compatible_render_pass(ctx, vw.get_surface_format().format);
+  // 3. Renderer Init (Vulkan) — Dynamic Rendering
+  auto                               surface_format = vw.get_surface_format().format;
+  vk::PipelineRenderingCreateInfoKHR rendering_info{
+      .colorAttachmentCount    = 1,
+      .pColorAttachmentFormats = &surface_format,
+  };
 
-  // 3. Renderer Init (Vulkan)
   ImGui_ImplVulkan_InitInfo init_info{};
-  init_info.Instance       = *ctx.get_instance();
-  init_info.PhysicalDevice = ctx.get_physical_device();
-  init_info.Device         = *ctx.get_vulkan_device();
-  init_info.QueueFamily    = ctx.get_graphics_family_index();
-  init_info.Queue          = ctx.get_graphics_queue();
-  init_info.DescriptorPool = *m_descriptor_pool;
-  init_info.MinImageCount  = 2;
-  init_info.ImageCount     = g_max_frames_in_flight;
-
-  init_info.PipelineInfoMain.RenderPass  = *m_render_pass;
-  init_info.PipelineInfoMain.Subpass     = 0;
-  init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+  init_info.Instance                                     = *ctx.get_instance();
+  init_info.PhysicalDevice                               = ctx.get_physical_device();
+  init_info.Device                                       = *ctx.get_vulkan_device();
+  init_info.QueueFamily                                  = ctx.get_graphics_family_index();
+  init_info.Queue                                        = ctx.get_graphics_queue();
+  init_info.DescriptorPool                               = *m_descriptor_pool;
+  init_info.MinImageCount                                = 2;
+  init_info.ImageCount                                   = g_max_frames_in_flight;
+  init_info.UseDynamicRendering                          = true;
+  init_info.PipelineInfoMain.PipelineRenderingCreateInfo = rendering_info;
 
   ImGui_ImplVulkan_Init(&init_info);
 
@@ -90,7 +92,6 @@ void SDImGuiContext::shutdown() {
     m_context = nullptr;
   }
 
-  m_render_pass.reset();
   m_descriptor_pool.reset();
 }
 
@@ -212,43 +213,6 @@ void SDImGuiContext::create_descriptor_pool(VulkanContext& ctx) {
   m_descriptor_pool =
       check_vulkan_res_val(ctx.get_vulkan_device()->createDescriptorPoolUnique(pool_info),
                            "Failed to create ImGui descriptor pool");
-}
-
-void SDImGuiContext::create_compatible_render_pass(VulkanContext& ctx, vk::Format format) {
-  vk::AttachmentDescription attachment{};
-  attachment.setFormat(format)
-      .setSamples(vk::SampleCountFlagBits::e1)
-      .setLoadOp(vk::AttachmentLoadOp::eLoad) // Load existing content (Overlay)
-      .setStoreOp(vk::AttachmentStoreOp::eStore)
-      .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-      .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-      .setInitialLayout(vk::ImageLayout::eColorAttachmentOptimal) // Already drawn to by Scene
-      .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);           // Ready for swap
-
-  vk::AttachmentReference color_ref(0, vk::ImageLayout::eColorAttachmentOptimal);
-
-  vk::SubpassDescription subpass{};
-  subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
-      .setColorAttachmentCount(1)
-      .setPColorAttachments(&color_ref);
-
-  vk::SubpassDependency dependency{};
-  dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL)
-      .setDstSubpass(0)
-      .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
-      .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
-      .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
-      .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
-
-  vk::RenderPassCreateInfo info{.attachmentCount = 1,
-                                .pAttachments    = &attachment,
-                                .subpassCount    = 1,
-                                .pSubpasses      = &subpass,
-                                .dependencyCount = 1,
-                                .pDependencies   = &dependency};
-
-  m_render_pass = check_vulkan_res_val(ctx.get_vulkan_device()->createRenderPassUnique(info),
-                                       "Failed to create ImGui RenderPass");
 }
 
 VkDescriptorSet SDImGuiContext::create_texture_from_view(VkImageView view, VkImageLayout layout) {

@@ -179,96 +179,50 @@ void sd::View::create_vulkan_resources() {
                            "Failed to create depth view: ");
   ASSERT(m_depth_view && "Depth view must be created");
 
-  //  RenderPass attachments
-  vk::AttachmentDescription color_attach(
-      {}, vk::Format::eR8G8B8A8Unorm, vk::SampleCountFlagBits::e1, vk::AttachmentLoadOp::eClear,
-      vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
-      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eShaderReadOnlyOptimal);
-  vk::AttachmentDescription depth_attach(
-      {}, static_cast<vk::Format>(depth_format), vk::SampleCountFlagBits::e1,
-      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
-      vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-  std::array attachments = {color_attach, depth_attach};
-
-  // Subpass references
-  vk::AttachmentReference color_ref(0, vk::ImageLayout::eColorAttachmentOptimal);
-  vk::AttachmentReference depth_ref(1, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-  vk::SubpassDescription subpass_bg({}, vk::PipelineBindPoint::eGraphics, {}, nullptr, 1,
-                                    &color_ref, nullptr, &depth_ref);
-  vk::SubpassDescription subpass_world = subpass_bg; // Identical for now
-  vk::SubpassDescription subpass_ui({}, vk::PipelineBindPoint::eGraphics, {}, nullptr, 1,
-                                    &color_ref, nullptr, nullptr);
-  std::array             subpasses = {subpass_bg, subpass_world, subpass_ui};
-
-  // Subpass dependencies (proper progression)
-  std::array dependencies = {
-      vk::SubpassDependency{.srcSubpass      = VK_SUBPASS_EXTERNAL,
-                            .dstSubpass      = 0,
-                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            .dstStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            .srcAccessMask   = vk::AccessFlagBits::eNone,
-                            .dstAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
-                            .dependencyFlags = vk::DependencyFlagBits::eByRegion},
-      vk::SubpassDependency{.srcSubpass      = VK_SUBPASS_EXTERNAL,
-                            .dstSubpass      = 1,
-                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            .dstStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            .srcAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
-                            .dstAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
-                            .dependencyFlags = vk::DependencyFlagBits::eByRegion},
-      vk::SubpassDependency{                  .srcSubpass      = 1,
-                            .dstSubpass      = 2,
-                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            .dstStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            .srcAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
-                            .dstAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
-                            .dependencyFlags = vk::DependencyFlagBits::eByRegion},
-      vk::SubpassDependency{                  .srcSubpass      = 2,
-                            .dstSubpass      = VK_SUBPASS_EXTERNAL,
-                            .srcStageMask    = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            .dstStageMask    = vk::PipelineStageFlagBits::eBottomOfPipe,
-                            .srcAccessMask   = vk::AccessFlagBits::eColorAttachmentWrite,
-                            .dstAccessMask   = vk::AccessFlagBits::eNone,
-                            .dependencyFlags = vk::DependencyFlagBits::eByRegion}
-  };
-
-  if (!m_layered_rp) {
-    vk::RenderPassCreateInfo rp_info{.attachmentCount = attachments.size(),
-                                     .pAttachments    = attachments.data(),
-                                     .subpassCount    = subpasses.size(),
-                                     .pSubpasses      = subpasses.data(),
-                                     .dependencyCount = dependencies.size(),
-                                     .pDependencies   = dependencies.data()};
-    m_layered_rp =
-        check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createRenderPassUnique(rp_info),
-                             "Failed to create render pass: ");
-    ASSERT(m_layered_rp && "Render pass must be created");
+  // Initial transition: UNDEFINED -> SHADER_READ_ONLY_OPTIMAL (for ImGui descriptor)
+  {
+    auto&                 device = m_vulkan_ctx.get_vulkan_device();
+    vk::UniqueCommandPool tmp_pool =
+        check_vulkan_res_val(device->createCommandPoolUnique(vk::CommandPoolCreateInfo{
+                                 .queueFamilyIndex = m_vulkan_ctx.get_graphics_family_index()}),
+                             "Failed to create temp command pool");
+    auto tmp_cmds =
+        check_vulkan_res_val(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo{
+                                 .commandPool        = *tmp_pool,
+                                 .level              = vk::CommandBufferLevel::ePrimary,
+                                 .commandBufferCount = 1}),
+                             "Failed to allocate temp cmd buffer");
+    auto tmp_cmd = std::move(tmp_cmds.front());
+    (void)tmp_cmd->begin(
+        vk::CommandBufferBeginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    vk::ImageMemoryBarrier init_barrier{
+        .srcAccessMask       = vk::AccessFlagBits::eNone,
+        .dstAccessMask       = vk::AccessFlagBits::eShaderRead,
+        .oldLayout           = vk::ImageLayout::eUndefined,
+        .newLayout           = vk::ImageLayout::eShaderReadOnlyOptimal,
+        .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .image               = m_color_image,
+        .subresourceRange = vk::ImageSubresourceRange{.aspectMask = vk::ImageAspectFlagBits::eColor,
+                                                      .baseMipLevel   = 0,
+                                                      .levelCount     = 1,
+                                                      .baseArrayLayer = 0,
+                                                      .layerCount     = 1},
+    };
+    tmp_cmd->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+                             vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, init_barrier);
+    (void)tmp_cmd->end();
+    vk::SubmitInfo submit{.commandBufferCount = 1, .pCommandBuffers = &*tmp_cmd};
+    (void)m_vulkan_ctx.get_graphics_queue().submit(submit);
+    (void)device->waitIdle();
   }
-
-  // Framebuffer (now with valid renderPass)
-  std::array views = {m_color_view.get(), m_depth_view.get()};
-
-  vk::FramebufferCreateInfo fb_info{.renderPass      = *m_layered_rp,
-                                    .attachmentCount = views.size(),
-                                    .pAttachments    = views.data(),
-                                    .width           = extent.width,
-                                    .height          = extent.height,
-                                    .layers          = 1};
-  m_layered_framebuffer =
-      check_vulkan_res_val(m_vulkan_ctx.get_vulkan_device()->createFramebufferUnique(fb_info),
-                           "Failed to create framebuffer: ");
-  ASSERT(m_layered_framebuffer && "Framebuffer must be created");
 
   m_display_tex_ds = m_imgui_ctx.create_texture_from_view(m_color_view.get());
 }
 
 void sd::View::on_render(vk::CommandBuffer cmd) {
-  ASSERT(m_layered_rp && "Render pass must be valid");
-  ASSERT(m_layered_framebuffer && "Framebuffer must be valid");
+  ASSERT(m_color_view && "Color view must be valid");
+  ASSERT(m_depth_view && "Depth view must be valid");
   ASSERT(m_extent.width > 0 && m_extent.height > 0 && "Extent must be valid");
 
   auto* game_layer = get_layer_by_stage(1);
@@ -281,17 +235,66 @@ void sd::View::on_render(vk::CommandBuffer cmd) {
       vk::ClearValue{.depthStencil = vk::ClearDepthStencilValue{1.0f, 0}},
   };
 
-  vk::RenderPassBeginInfo begin_info{
-      .renderPass      = *m_layered_rp,
-      .framebuffer     = *m_layered_framebuffer,
-      .renderArea      = vk::Rect2D{.offset = {0, 0}, .extent = m_extent},
-      .clearValueCount = 2,
-      .pClearValues    = clears.data(),
+  // Transition color: UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL
+  vk::ImageMemoryBarrier color_to_att{
+      .srcAccessMask       = vk::AccessFlagBits::eNone,
+      .dstAccessMask       = vk::AccessFlagBits::eColorAttachmentWrite,
+      .oldLayout           = vk::ImageLayout::eUndefined,
+      .newLayout           = vk::ImageLayout::eColorAttachmentOptimal,
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .image               = m_color_image,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eColor,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1},
+  };
+  cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+                      vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, {}, {}, color_to_att);
+
+  // Transition depth: UNDEFINED -> DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+  vk::ImageMemoryBarrier depth_to_att{
+      .srcAccessMask       = vk::AccessFlagBits::eNone,
+      .dstAccessMask       = vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+      .oldLayout           = vk::ImageLayout::eUndefined,
+      .newLayout           = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .image               = m_depth_image,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eDepth,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1},
+  };
+  cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+                      vk::PipelineStageFlagBits::eEarlyFragmentTests, {}, {}, {}, depth_to_att);
+
+  vk::RenderingAttachmentInfo color_att{
+      .imageView   = *m_color_view,
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp      = vk::AttachmentLoadOp::eClear,
+      .storeOp     = vk::AttachmentStoreOp::eStore,
+      .clearValue  = clears[0],
+  };
+  vk::RenderingAttachmentInfo depth_att{
+      .imageView   = *m_depth_view,
+      .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+      .loadOp      = vk::AttachmentLoadOp::eClear,
+      .storeOp     = vk::AttachmentStoreOp::eDontCare,
+      .clearValue  = clears[1],
+  };
+  vk::RenderingInfo rendering_info{
+      .renderArea           = {.offset = {0, 0}, .extent = m_extent},
+      .layerCount           = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments    = &color_att,
+      .pDepthAttachment     = &depth_att,
   };
 
-  cmd.beginRenderPass(begin_info, vk::SubpassContents::eInline);
+  cmd.beginRendering(rendering_info);
 
-  // Viewport/scissor once
   vk::Viewport viewport{
       0, 0, static_cast<float>(m_extent.width), static_cast<float>(m_extent.height), 0, 1};
   cmd.setViewport(0, viewport);
@@ -301,11 +304,27 @@ void sd::View::on_render(vk::CommandBuffer cmd) {
   };
   cmd.setScissor(0, scissor);
 
-  // Subpass 1: Game layer only (for now)
-  cmd.nextSubpass(vk::SubpassContents::eInline);
   game_layer->on_render(cmd);
 
-  cmd.endRenderPass();
+  cmd.endRendering();
+
+  // Transition color: COLOR_ATTACHMENT_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
+  vk::ImageMemoryBarrier color_to_read{
+      .srcAccessMask       = vk::AccessFlagBits::eColorAttachmentWrite,
+      .dstAccessMask       = vk::AccessFlagBits::eShaderRead,
+      .oldLayout           = vk::ImageLayout::eColorAttachmentOptimal,
+      .newLayout           = vk::ImageLayout::eShaderReadOnlyOptimal,
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .image               = m_color_image,
+      .subresourceRange = vk::ImageSubresourceRange{.aspectMask   = vk::ImageAspectFlagBits::eColor,
+                                                    .baseMipLevel = 0,
+                                                    .levelCount   = 1,
+                                                    .baseArrayLayer = 0,
+                                                    .layerCount     = 1},
+  };
+  cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                      vk::PipelineStageFlagBits::eFragmentShader, {}, {}, {}, color_to_read);
 }
 
 void sd::View::cleanup_layered_render() {
@@ -317,10 +336,8 @@ void sd::View::cleanup_layered_render() {
     m_depth_image      = VK_NULL_HANDLE;
     m_depth_allocation = VK_NULL_HANDLE;
     m_display_tex_ds   = VK_NULL_HANDLE;
-    m_layered_framebuffer.reset();
     m_color_view.reset();
     m_depth_view.reset();
-    m_layered_rp.reset();
     return;
   }
 
@@ -352,11 +369,9 @@ void sd::View::cleanup_layered_render() {
     m_depth_allocation = VK_NULL_HANDLE;
   }
 
-  // vk::Unique handles (Views, RP, FB) clean themselves up
-  m_layered_framebuffer.reset();
+  // vk::Unique handles clean themselves up
   m_color_view.reset();
   m_depth_view.reset();
-  m_layered_rp.reset();
 }
 
 void sd::View::resize(VkExtent2D extent) {
