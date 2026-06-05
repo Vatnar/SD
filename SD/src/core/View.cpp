@@ -50,6 +50,7 @@ vk::Format sd::View::find_depth_format() {
   }
 
   log::engine::critical("Failed to find supported depth format");
+  return vk::Format::eUndefined;
 }
 
 void sd::View::on_gui_render() {
@@ -72,10 +73,6 @@ void sd::View::on_gui_render() {
   }
   ImGui::End();
 }
-
-// SD::View::~View() {
-//   CleanupLayeredRender();
-// }
 
 void sd::View::setup_layered_render(u32 maxStages, VkExtent2D initialExtent) {
   ASSERT(initialExtent.width > 0 && initialExtent.height > 0 && "Initial extent must be valid");

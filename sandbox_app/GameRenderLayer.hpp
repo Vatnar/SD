@@ -10,5 +10,4 @@ public:
   GameRenderLayer(const std::string& name, sd::Scene* scene, VkPipeline pipeline,
                   VkPipeline wireframe, VkPipelineLayout layout);
   void on_render(vk::CommandBuffer cmd) override;
-  void on_detach() override;
 };

@@ -405,13 +405,4 @@ void init() {
   register_category("vulkan", ImVec4(1.0f, 0.4f, 0.0f, 1.0f));
   register_category("debug_layer", ImVec4(1.0f, 0.5f, 0.8f, 1.0f));
 }
-
 } // namespace sd::log
-
-namespace sd::log::game {
-SD_LOG_CATEGORY_IMPL("game", ENGINE_LOG_LEVEL_GAME)
-
-namespace combat {
-SD_LOG_CATEGORY_IMPL("game/combat", ENGINE_LOG_LEVEL_GAME)
-}
-} // namespace sd::log::game

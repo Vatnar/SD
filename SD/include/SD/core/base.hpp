@@ -27,6 +27,3 @@
 #define INVALID_PATH    ASSERT(!"Invalid Path!")
 #define NOT_IMPLEMENTED ASSERT(!"Not Implemented!")
 #define NO_OP           ((void)0)
-
-
-namespace sd {} // namespace sd

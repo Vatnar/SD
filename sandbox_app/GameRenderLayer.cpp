@@ -92,6 +92,3 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
     vkCmdDraw(cmd, 3, 1, 0, 0);
   }
 }
-void GameRenderLayer::on_detach() {
-  RenderStage::on_detach();
-}

@@ -1,10 +1,6 @@
-#include <cstdio>
-
 #include <SD/Application.hpp>
-#include <SD/core/SceneView.hpp>
 #include <SD/core/ecs/components.hpp>
 #include <SD/core/layers/EngineDebugLayer.hpp>
-#include <SD/core/vulkan/VulkanRenderer.hpp>
 #include <SD/game_api.hpp>
 
 #include "logging.hpp"

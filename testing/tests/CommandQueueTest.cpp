@@ -3,7 +3,7 @@
 #include "SD/core/ecs/CommandQueue.hpp"
 #include "SD/core/ecs/EntityManager.hpp"
 #include "SD/core/ecs/commands.hpp"
-#include "SD/core/ecs/components.hpp">
+#include "SD/core/ecs/components.hpp"
 
 namespace sd {
 

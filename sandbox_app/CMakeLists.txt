@@ -48,14 +48,6 @@ if (UNIX AND NOT APPLE)
             $<TARGET_OBJECTS:SandboxGameObjects>
     )
 
-    target_compile_definitions(SandboxApp PRIVATE
-            VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
-            VULKAN_HPP_NO_CONSTRUCTORS
-            VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
-            VULKAN_HPP_USE_STD_EXPECTED=1
-            VULKAN_HPP_NO_EXCEPTIONS=1
-    )
-
     target_link_libraries(SandboxApp PRIVATE
             SD
     )

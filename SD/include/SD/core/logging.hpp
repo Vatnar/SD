@@ -90,8 +90,6 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
 }
 
 } // namespace sd::log
-namespace sd {} // namespace sd
-
 #define SD_LOG_CATEGORY_IMPL(CategoryPath, Level)                                             \
   constexpr auto        cMinLevel     = static_cast<::sd::log::LogLevel>(Level);              \
   constexpr const char* cCategoryPath = CategoryPath;                                         \

@@ -71,7 +71,6 @@ target_compile_definitions(SD
         VULKAN_HPP_USE_STD_EXPECTED=1
         VULKAN_HPP_NO_EXCEPTIONS=1
         SPDLOG_NO_EXCEPTIONS
-        PRIVATE
 )
 
 if(SD_DEBUG_ENABLED)
@@ -179,14 +178,6 @@ if (SD_ENABLE_IWYU)
         file(APPEND "${CMAKE_SOURCE_DIR}/iwyu-apply.sh" " -DCMAKE_CXX_INCLUDE_WHAT_YOU_USE=\"${IWYU_TOOL};-p;\$BUILD_DIR;-Xiwyu;--mapping_file=${CMAKE_SOURCE_DIR}/iwyu.imp\"\n")
         file(APPEND "${CMAKE_SOURCE_DIR}/iwyu-apply.sh" "cmake --build \"\$BUILD_DIR\" --target SD 2>&1 | tee iwyu-output.log\n")
         execute_process(COMMAND chmod +x "${CMAKE_SOURCE_DIR}/iwyu-apply.sh")
-
-        add_custom_target(iwyu-test
-                COMMAND ${CMAKE_COMMAND} -E echo "Testing IWYU on src/core/IWYU_Test.cpp"
-                COMMAND ${IWYU_TOOL} -p ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src/core/IWYU_Test.cpp
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                COMMENT "Running IWYU test"
-                VERBATIM
-        )
     else ()
         message(STATUS "IWYU not found. Install with: sudo apt install iwyu")
     endif ()
