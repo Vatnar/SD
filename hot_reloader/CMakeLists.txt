@@ -26,7 +26,7 @@ if (UNIX AND NOT APPLE)
             TOML_EXCEPTIONS=0
     )
 
-    # INSTALL
+    #~ INSTALL
     install(TARGETS HotReloadApp
             RUNTIME DESTINATION bin
     )

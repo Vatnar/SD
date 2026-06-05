@@ -1,6 +1,4 @@
-###############
-# Game module #
-###############
+#~ Game module
 
 add_library(SandboxGameObjects OBJECT
         GameRenderLayer.cpp
@@ -39,9 +37,7 @@ if (SD_ENABLE_ASAN AND NOT MSVC)
     )
 endif ()
 
-#####################################
-# Hot-reload plugin (Linux only)    #
-#####################################
+#~ Hot-reload plugin (Linux only)
 if (UNIX AND NOT APPLE)
     add_library(SandboxApp SHARED
             sandbox.cpp
@@ -91,9 +87,7 @@ if (UNIX AND NOT APPLE)
     )
 endif ()
 
-######################
-# Standalone         #
-######################
+#~ Standalone
 add_executable(SandboxAppStandalone
         main.cpp
         sandbox.cpp
