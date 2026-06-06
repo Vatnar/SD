@@ -7,7 +7,10 @@ class GameRenderLayer : public sd::RenderStage {
   VkPipelineLayout m_layout;
 
 public:
-  GameRenderLayer(const std::string& name, sd::Scene* scene, VkPipeline pipeline,
-                  VkPipeline wireframe, VkPipelineLayout layout);
+  GameRenderLayer(const std::string& name,
+                  sd::Scene*         scene,
+                  vk::Pipeline       pipeline,
+                  vk::Pipeline       wireframe,
+                  vk::PipelineLayout layout);
   void on_render(vk::CommandBuffer cmd) override;
 };

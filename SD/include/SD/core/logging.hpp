@@ -154,7 +154,8 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void tagged(std::string_view subcategory, spdlog::format_string_t<Args...> fmt,      \
+  inline void tagged(std::string_view                 subcategory,                            \
+                     spdlog::format_string_t<Args...> fmt,                                    \
                      Args&&... args) {                                                        \
     if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
       auto msg =                                                                              \
@@ -168,6 +169,9 @@ namespace sd::log {
 namespace engine {
 SD_LOG_CATEGORY_IMPL("engine", ENGINE_LOG_LEVEL_ENGINE)
 
+namespace shader {
+SD_LOG_CATEGORY_IMPL("engine/shader", ENGINE_LOG_LEVEL_ENGINE)
+}
 namespace renderer {
 SD_LOG_CATEGORY_IMPL("engine/renderer", ENGINE_LOG_LEVEL_ENGINE)
 } // namespace renderer

@@ -105,7 +105,14 @@ public:
   template<typename T>
   bool try_remove_component(Entity e);
 
-  void                                          destroy(Entity e);
+  void destroy(Entity e);
+  void clear() {
+    m_generations.clear();
+    m_free_list.clear();
+    m_component_pools.clear();
+    m_entity_masks.clear();
+  }
+
   [[nodiscard]] std::vector<ComponentDebugInfo> get_all_component_info(Entity e) const;
 
   [[nodiscard]] bool is_alive(Entity e) const;

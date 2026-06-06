@@ -27,7 +27,6 @@
 
 namespace sd {
 class Event;
-class GameContext;
 class Layer;
 class LayoutManager;
 class RuntimeStateManager;
@@ -80,8 +79,10 @@ public:
   // Layer management
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
-  T& push_global_layer(Args&&... args) {
-    return global_layers.push_layer<T>(std::forward<Args>(args)...);
+  T& push_layer(Args&&... args) {
+    auto& layer = global_layers.push_layer<T>(std::forward<Args>(args)...);
+    layer.m_app = this;
+    return layer;
   }
 
   // Window management
@@ -97,12 +98,14 @@ public:
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
-  T& push_view_layer(WindowId id, Args&&... args);
+  T& push_window_layer(WindowId id, Args&&... args);
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<View, T>
   T& create_view(std::string name, Args&&... args) {
-    return view_manager->create<T>(std::move(name), std::forward<Args>(args)...);
+    auto& view = view_manager->create<T>(std::move(name), std::forward<Args>(args)...);
+    view.m_app = this;
+    return view;
   }
 
 
@@ -133,9 +136,16 @@ public:
   [[nodiscard]] Scene* get_scene(const std::string& name) const { return scene_manager.get(name); }
 
   void clear_game_layers();
-  void reload_game();
 
-  void reload_shaders() const;
+  void request_restart() { m_restart_requested.store(true, std::memory_order_release); }
+  [[nodiscard]] bool consume_restart_request() {
+    return m_restart_requested.exchange(false, std::memory_order_acq_rel);
+  }
+
+  void request_shader_reload() { m_shader_reload_requested.store(true, std::memory_order_release); }
+  [[nodiscard]] bool consume_shader_reload_request() {
+    return m_shader_reload_requested.exchange(false, std::memory_order_acq_rel);
+  }
 
   [[nodiscard]] EngineServices services() const {
     return EngineServices{
@@ -159,9 +169,9 @@ public:
   }
 
 public:
-  bool  is_running         = true;
-  bool  hot_reload_enabled = true;
-  float hot_reload_timer   = 0.0f;
+  bool is_running              = true;
+  bool hot_reload_enabled      = true;
+  bool game_code_reload_paused = false;
 
 
   ApplicationSpecification app_spec;
@@ -177,18 +187,18 @@ public:
 
   LayerList    global_layers;
   EventManager app_event_manager;
-  GameContext* game_context = nullptr;
 
   RuntimeStateManager* state_manager;
   FrameTimer           timer;
 
 private:
+  std::atomic<bool> m_restart_requested{false};
+  std::atomic<bool> m_shader_reload_requested{false};
+
   std::unique_ptr<GlfwContext>    m_glfw_ctx;
   std::unique_ptr<VulkanContext>  m_vulkan_ctx;
   std::unique_ptr<VulkanRenderer> m_renderer;
   std::unique_ptr<SDImGuiContext> m_imgui_ctx;
-
-  void* m_game_handle = nullptr;
 };
 
 

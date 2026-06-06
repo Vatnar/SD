@@ -1,13 +1,15 @@
 namespace sd {
 template<typename T, typename... Args>
   requires std::is_base_of_v<Layer, T>
-T& Application::push_view_layer(WindowId id, Args&&... args) {
+T& Application::push_window_layer(WindowId id, Args&&... args) {
   auto& windows = window_manager->get_windows();
   if (!windows.contains(id)) {
     log::engine::critical("Attempted to push layer to invalid window ID: {}",
                           static_cast<uint32_t>(id));
   }
-  return windows[id].view_layers.push_layer<T>(std::forward<Args>(args)...);
+  auto& layer = windows[id].view_layers.push_layer<T>(std::forward<Args>(args)...);
+  layer.m_app = this;
+  return layer;
 }
 template<typename T, typename... Args>
   requires std::is_base_of_v<Layer, T>

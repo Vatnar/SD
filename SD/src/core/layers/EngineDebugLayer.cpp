@@ -3,6 +3,7 @@
 #include <array>
 #include <imgui.h>
 
+#include "SD/Application.hpp"
 #include "SD/core/LayoutManager.hpp"
 #include "SD/core/SceneManager.hpp"
 #include "SD/core/View.hpp"
@@ -15,8 +16,9 @@
 
 namespace sd {
 
-EngineDebugLayer::EngineDebugLayer(ApplicationRuntime runtime, EngineServices services,
-                                   Scene* scene) :
+EngineDebugLayer::EngineDebugLayer(ApplicationRuntime runtime,
+                                   EngineServices     services,
+                                   Scene*             scene) :
   Panel("EngineDebug", scene), m_views(runtime.views), m_scenes(runtime.scenes),
   m_layout(runtime.layout), m_events(runtime.events), m_frame_timer(runtime.timer),
   m_hot_reload_enabled(runtime.hot_reload_enabled), m_global_layers(runtime.global_layers),
@@ -37,8 +39,11 @@ void EngineDebugLayer::on_update(float dt) {
 
   m_views.for_each([&](View& view) {
     if (m_log_view_resizes && view.consume_extent_changed()) {
-      log::debug_layer::tagged("view", "View '{}' resized to {}x{}", view.get_name(),
-                               view.get_extent().width, view.get_extent().height);
+      log::debug_layer::tagged("view",
+                               "View '{}' resized to {}x{}",
+                               view.get_name(),
+                               view.get_extent().width,
+                               view.get_extent().height);
     }
   });
 
@@ -51,11 +56,15 @@ void EngineDebugLayer::on_update(float dt) {
       int alive = m_selected_scene->em.get_alive_entity_count();
       if (alive != m_prev_entity_count) {
         if (alive > m_prev_entity_count)
-          log::debug_layer::tagged("entity", "Entity created (count: {} -> {})",
-                                   m_prev_entity_count, alive);
+          log::debug_layer::tagged("entity",
+                                   "Entity created (count: {} -> {})",
+                                   m_prev_entity_count,
+                                   alive);
         else
-          log::debug_layer::tagged("entity", "Entity destroyed (count: {} -> {})",
-                                   m_prev_entity_count, alive);
+          log::debug_layer::tagged("entity",
+                                   "Entity destroyed (count: {} -> {})",
+                                   m_prev_entity_count,
+                                   alive);
         m_prev_entity_count = alive;
       }
     }
@@ -130,7 +139,12 @@ void EngineDebugLayer::on_im_gui_menu_bar() {
 
     ImGui::Separator();
     if (ImGui::MenuItem("Reload Shaders")) {
-      m_renderer.reload_shaders();
+      m_app->request_shader_reload();
+    }
+
+    ImGui::Separator();
+    if (ImGui::MenuItem("Restart Game")) {
+      m_app->request_restart();
     }
 
     ImGui::EndMenu();
@@ -229,7 +243,8 @@ void EngineDebugLayer::on_gui_render() {
       ImGui::Text("App Performance: %.1f FPS", ImGui::GetIO().Framerate);
       ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
       ImGui::Separator();
-      if (ImGui::BeginTable("Timings", 2,
+      if (ImGui::BeginTable("Timings",
+                            2,
                             ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
         ImGui::TableSetupColumn("Metric", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -253,11 +268,11 @@ void EngineDebugLayer::on_gui_render() {
       }
 
       ImGui::Separator();
-      if (ImGui::Checkbox("Auto-Reload Shaders", &m_hot_reload_enabled)) {
-        m_hot_reload_enabled = !m_hot_reload_enabled;
+      if (ImGui::Checkbox("Pause Hot-Reload", &m_app->game_code_reload_paused)) {
+        m_app->game_code_reload_paused = !m_app->game_code_reload_paused;
       }
       if (ImGui::Button("Force Reload Shaders")) {
-        m_renderer.reload_shaders();
+        m_app->request_shader_reload();
       }
     }
     ImGui::End();
@@ -271,7 +286,8 @@ void EngineDebugLayer::on_gui_render() {
       if (mouse_pos.x >= region_pos.x && mouse_pos.x <= region_pos.x + region_extent.x &&
           mouse_pos.y >= region_pos.y && mouse_pos.y <= region_pos.y + region_extent.y) {
         ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 15, mouse_pos.y + 15));
-        if (ImGui::Begin("##ContextOverlay", nullptr,
+        if (ImGui::Begin("##ContextOverlay",
+                         nullptr,
                          ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar |
                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_AlwaysAutoResize |
@@ -307,8 +323,10 @@ void EngineDebugLayer::display_view_info(View* selected_view) {
     ImGui::TreePop();
   }
   ImGui::Separator();
-  ImGui::Text("ID: %u | Extent: %ux%u", static_cast<uint32_t>(selected_view->get_view_id()),
-              selected_view->get_extent().width, selected_view->get_extent().height);
+  ImGui::Text("ID: %u | Extent: %ux%u",
+              static_cast<uint32_t>(selected_view->get_view_id()),
+              selected_view->get_extent().width,
+              selected_view->get_extent().height);
 
   AspectMode current_mode = selected_view->get_aspect_mode();
   int        modeInt      = static_cast<int>(current_mode);
@@ -399,7 +417,8 @@ void EngineDebugLayer::display_ecs_inspector() {
         if (ImGui::TreeNode("Transform")) {
           for (int i = 0; i < 4; i++) {
             if (ImGui::DragFloat4(("row " + std::to_string(i)).c_str(),
-                                  &transform_ptr->world_matrix(i, 0), 0.01f)) {
+                                  &transform_ptr->world_matrix(i, 0),
+                                  0.01f)) {
               if (m_log_scene_changes) {
                 log::debug_layer::tagged("transform", "Entity {} transform changed", entity.index);
               }
@@ -417,8 +436,10 @@ void EngineDebugLayer::display_ecs_inspector() {
           }
           if (ImGui::DragInt("Stage", (int*)&renderable->render_stage, 1, 0, 10)) {
             if (m_log_scene_changes) {
-              log::debug_layer::tagged("render", "Entity {} render stage changed to {}",
-                                       entity.index, renderable->render_stage);
+              log::debug_layer::tagged("render",
+                                       "Entity {} render stage changed to {}",
+                                       entity.index,
+                                       renderable->render_stage);
             }
           }
           ImGui::TreePop();
@@ -899,7 +920,8 @@ void EngineDebugLayer::handle_debug_shortcuts() {
   }
 }
 
-void EngineDebugLayer::apply_preset_configuration(bool inspectors_visible, bool log_visible,
+void EngineDebugLayer::apply_preset_configuration(bool inspectors_visible,
+                                                  bool log_visible,
                                                   bool renderer_visible) {
   m_show_view_inspector  = inspectors_visible;
   m_show_scene_inspector = inspectors_visible;

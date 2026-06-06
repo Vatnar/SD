@@ -12,8 +12,7 @@ VulkanRenderer::VulkanRenderer(VulkanContext& ctx, FrameTimer& timer) :
 
 void VulkanRenderer::init() {
   ASSERT(ctx.is_initialized() && "VulkanContext must be initialized before VulkanRenderer::init()");
-  m_device  = ctx.get_vulkan_device().get();
-  m_shaders = std::make_unique<ShaderLibrary>(m_device);
+  m_device = ctx.get_vulkan_device().get();
 }
 
 vk::CommandBuffer VulkanRenderer::begin_command_buffer(VulkanWindow& vw) {
@@ -70,7 +69,11 @@ void VulkanRenderer::begin_render_pass(VulkanWindow& vw) {
                                                     .layerCount     = 1},
   };
   cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                      vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, {}, {}, to_att);
+                      vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                      {},
+                      {},
+                      {},
+                      to_att);
 
   vk::RenderingAttachmentInfo color_att{
       .imageView   = *vw.get_swapchain_image_views()[vw.current_image_index],
@@ -88,8 +91,12 @@ void VulkanRenderer::begin_render_pass(VulkanWindow& vw) {
 
   cmd.beginRendering(rendering_info);
 
-  vk::Viewport viewport(0.0f, 0.0f, static_cast<float>(extent.width),
-                        static_cast<float>(extent.height), 0.0f, 1.0f);
+  vk::Viewport viewport(0.0f,
+                        0.0f,
+                        static_cast<float>(extent.width),
+                        static_cast<float>(extent.height),
+                        0.0f,
+                        1.0f);
   cmd.setViewport(0, 1, &viewport);
 
   vk::Rect2D scissor({0, 0}, extent);
@@ -127,7 +134,11 @@ vk::Result VulkanRenderer::end_frame(VulkanWindow& vw) {
                                                     .layerCount     = 1},
   };
   cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                      vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, to_present);
+                      vk::PipelineStageFlagBits::eBottomOfPipe,
+                      {},
+                      {},
+                      {},
+                      to_present);
 
   (void)cmd.end();
 
@@ -162,11 +173,6 @@ vk::Result VulkanRenderer::end_frame(VulkanWindow& vw) {
   vw.current_frame = (vw.current_frame + 1) % g_max_frames_in_flight;
 
   return res;
-}
-
-void VulkanRenderer::reload_shaders() {
-  (void)ctx.get_vulkan_device()->waitIdle();
-  m_shaders->clear_cache();
 }
 
 } // namespace sd

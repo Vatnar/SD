@@ -17,9 +17,9 @@ set(SD_ENGINE_SOURCES
         src/core/vulkan/VulkanRenderer.cpp
         src/core/vulkan/VulkanWindow.cpp
         src/core/vulkan/VulkanFramebuffer.cpp
-        src/core/vulkan/ShaderLibrary.cpp
         src/core/ecs/CommandQueue.cpp
         src/core/ecs/ComponentFactory.cpp
+        src/core/ShaderCompiler.cpp
 )
 add_library(SD SHARED ${SD_ENGINE_SOURCES})
 

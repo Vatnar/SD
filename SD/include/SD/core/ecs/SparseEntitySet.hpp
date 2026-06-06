@@ -91,6 +91,12 @@ public:
 
   [[nodiscard]] usize size() const { return dense_entities.size(); }
 
+  void clear() {
+    sparse.clear();
+    dense_data.clear();
+    dense_entities.clear();
+  }
+
   void serialize_to(std::vector<char>& out) const {
     // Header: size_t entity_count, size_t sizeof(T).
     size_t entity_count = dense_entities.size();

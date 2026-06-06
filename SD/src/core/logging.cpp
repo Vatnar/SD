@@ -24,8 +24,12 @@ static void write_entry_to_file(const LogEntry& entry) {
   FILE* f = fopen(HISTORY_FILE, "a");
   if (!f)
     return;
-  fprintf(f, "%.6f|%d|%s|%s\n", entry.uptime_sec, static_cast<int>(entry.level),
-          entry.category.c_str(), entry.message.c_str());
+  fprintf(f,
+          "%.6f|%d|%s|%s\n",
+          entry.uptime_sec,
+          static_cast<int>(entry.level),
+          entry.category.c_str(),
+          entry.message.c_str());
   fclose(f);
 }
 
@@ -187,8 +191,10 @@ static float get_uptime_sec() {
 }
 
 static std::string ansi_fg_color(ImVec4 c) {
-  return fmt::format("\033[38;2;{};{};{}m", static_cast<int>(c.x * 255),
-                     static_cast<int>(c.y * 255), static_cast<int>(c.z * 255));
+  return fmt::format("\033[38;2;{};{};{}m",
+                     static_cast<int>(c.x * 255),
+                     static_cast<int>(c.y * 255),
+                     static_cast<int>(c.z * 255));
 }
 
 static std::string level_ansi_color(spdlog::level::level_enum level) {
@@ -317,6 +323,10 @@ static void create_category_logger(const char* name, const LogLevel minLevel) {
   if (g_shared_sinks.empty())
     return; // Init() not called yet
 
+  // Safe guard: spdlog already has a logger with this name (e.g. after hot-reload)
+  if (spdlog::get(name))
+    return;
+
   std::vector<spdlog::sink_ptr> catSinks = g_shared_sinks; // console + imgui
 
   // Route to the correct file sink based on category prefix
@@ -328,7 +338,9 @@ static void create_category_logger(const char* name, const LogLevel minLevel) {
     catSinks.push_back(g_engine_file_sink);
   }
 
-  auto logger = std::make_shared<spdlog::async_logger>(name, catSinks.begin(), catSinks.end(),
+  auto logger = std::make_shared<spdlog::async_logger>(name,
+                                                       catSinks.begin(),
+                                                       catSinks.end(),
                                                        spdlog::thread_pool(),
                                                        spdlog::async_overflow_policy::block);
 
@@ -342,7 +354,8 @@ void register_category(const char* name, ImVec4 color) {
   bool found = false;
   {
     std::lock_guard lock(g_registry_mutex);
-    auto            it = std::find_if(g_category_registry.begin(), g_category_registry.end(),
+    auto            it = std::find_if(g_category_registry.begin(),
+                                      g_category_registry.end(),
                                       [name](const CategoryInfo& ci) { return ci.name == name; });
     if (it == g_category_registry.end()) {
       g_category_registry.push_back(CategoryInfo{.name = name, .visible = true, .color = color});

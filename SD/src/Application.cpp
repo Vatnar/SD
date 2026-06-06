@@ -1,9 +1,7 @@
 #include "SD/Application.hpp"
 
-#include <dlfcn.h>
 #include <filesystem>
 
-#include "SD/GameContext.hpp"
 #include "SD/RuntimeStateManager.hpp"
 #include "SD/core/LayoutManager.hpp"
 #include "SD/core/SDImGuiContext.hpp"
@@ -71,15 +69,16 @@ Application::Application(const ApplicationSpecification& spec, RuntimeStateManag
   is_running(true), hot_reload_enabled(spec.enableHotReload), app_spec(spec),
   window_manager(nullptr), view_manager(std::make_unique<ViewManager>()),
   layout_manager(std::make_unique<LayoutManager>()), scene_manager(), global_layers(),
-  app_event_manager(), game_context(nullptr), state_manager(state_manager), timer(),
+  app_event_manager(), state_manager(state_manager), timer(),
   m_glfw_ctx(std::make_unique<GlfwContext>()),
   m_vulkan_ctx(std::make_unique<VulkanContext>(*m_glfw_ctx)),
   m_renderer(std::make_unique<VulkanRenderer>(*m_vulkan_ctx, timer)),
-  m_imgui_ctx(std::make_unique<SDImGuiContext>(SDImGuiCallbacks{.close_app = [this] { close(); }})),
-  m_game_handle(nullptr) {
+  m_imgui_ctx(
+      std::make_unique<SDImGuiContext>(SDImGuiCallbacks{.close_app = [this] { close(); }})) {
   window_manager = std::make_unique<WindowManager>(
-      services(), WindowManagerCallbacks{.close_app    = [this] { close(); },
-                                         .on_app_event = [this](Event& e) { on_app_event(e); }});
+      services(),
+      WindowManagerCallbacks{.close_app    = [this] { close(); },
+                             .on_app_event = [this](Event& e) { on_app_event(e); }});
 
   WindowProps props(spec.name, spec.width, spec.height);
   WindowId    main_id = window_manager->create(props);
@@ -183,17 +182,6 @@ void Application::frame() {
   m_imgui_ctx->end_dock_space();
   m_imgui_ctx->end_frame();
 
-  if (hot_reload_enabled) {
-    hot_reload_timer += dt;
-    if (hot_reload_timer >= 0.5f) {
-      hot_reload_timer = 0.0f;
-      auto changed     = m_renderer->get_shader_library().check_for_changes();
-      if (!changed.empty()) {
-        log::engine::info("Shader changes detected: {}. Reloading...", changed.size());
-        reload_shaders();
-      }
-    }
-  }
   window_manager->draw_windows(*view_manager);
 
   timer.end_work();
@@ -213,61 +201,13 @@ void Application::on_app_event(Event& e) {
   global_layers.on_event(e);
 }
 
-void Application::reload_shaders() const {
-  m_renderer->reload_shaders();
-}
-
 void Application::clear_game_layers() {
   global_layers.clear();
   if (view_manager) {
     view_manager->clear();
   }
-  scene_manager.clear();
-}
-
-void Application::reload_game() {
-  log::engine::info("Starting game reload...");
-
-  if (game_context) {
-    game_context->on_unload();
-    delete game_context;
-    game_context = nullptr;
-  }
-
-  clear_game_layers();
-
-  if (m_game_handle) {
-    dlclose(m_game_handle);
-    m_game_handle = nullptr;
-  }
-
-  void* handle = dlopen(app_spec.gameSoPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  if (!handle) {
-    log::engine::error("Failed to reload game DLL: {}", dlerror());
-    return;
-  }
-  m_game_handle = handle;
-
-  using CreateGameFn = GameContext* (*)(RuntimeStateManager*);
-  auto* create       = reinterpret_cast<CreateGameFn>(dlsym(handle, "CreateGame"));
-  if (!create) {
-    log::engine::error("Failed to find CreateGame: {}", dlerror());
-    dlclose(handle);
-    return;
-  }
-
-  game_context = create(state_manager);
-  if (!game_context) {
-    log::engine::error("Game DLL returned null from CreateGame");
-    dlclose(handle);
-    m_game_handle = nullptr;
-    return;
-  }
-  game_context->on_load(*this);
-
-  state_manager->restore(this);
-
-  log::engine::info("Game reloaded successfully");
+  // Scenes survive reload — the game's on_load reuses them
+  // and re-pushes layers/views with the new code.
 }
 
 } // namespace sd

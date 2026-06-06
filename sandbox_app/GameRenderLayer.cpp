@@ -7,8 +7,11 @@
 #include <SD/utils/utils.hpp>
 #include <VLA/Matrix.hpp>
 
-GameRenderLayer::GameRenderLayer(const std::string& name, sd::Scene* scene, VkPipeline pipeline,
-                                 VkPipeline wireframe, VkPipelineLayout layout) :
+GameRenderLayer::GameRenderLayer(const std::string& name,
+                                 sd::Scene*         scene,
+                                 vk::Pipeline       pipeline,
+                                 vk::Pipeline       wireframe,
+                                 vk::PipelineLayout layout) :
   RenderStage(name, scene), m_pipeline(pipeline), m_wireframe(wireframe), m_layout(layout) {
 }
 

@@ -60,6 +60,7 @@ struct ComponentIdGenerator {
   ComponentIdGenerator& operator=(const ComponentIdGenerator&) = delete;
 
   static usize next() { return m_counter++; }
+  static void  reset() { m_counter = 0; }
 
 private:
   static inline usize m_counter = 0;

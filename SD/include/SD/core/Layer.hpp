@@ -14,6 +14,7 @@
 #include "events/Event.hpp"
 
 namespace sd {
+class Application;
 class View;
 class Layer;
 template<typename T> concept IsLayer = std::is_base_of_v<Layer, T>;
@@ -55,14 +56,16 @@ public:
   [[nodiscard]] bool is_active() const noexcept { return m_is_active; }
 
 protected:
-  bool        m_is_active = true;
-  std::string m_debug_name;
-  Scene*      m_scene = nullptr;
-  int         m_stage_id;
-  ViewId      m_view_id;
-  View*       m_view = nullptr;
+  bool         m_is_active = true;
+  std::string  m_debug_name;
+  Scene*       m_scene = nullptr;
+  Application* m_app   = nullptr;
+  int          m_stage_id;
+  ViewId       m_view_id;
+  View*        m_view = nullptr;
 
   friend class View;
+  friend class Application;
 };
 
 // ---------------------------------------------------------------------------
@@ -77,39 +80,33 @@ public:
   // --- Available for override ---
   // OnEvent, OnUpdate, OnFixedUpdate, OnAttach, OnDetach
 
-  // --- Sealed (not for Systems) ---
-  void on_render(vk::CommandBuffer) final {}
-  void on_gui_render() final {}
-  void on_im_gui_menu_bar() final {}
-  void on_swapchain_recreated() final {}
+  // --- Default no-ops (override if needed) ---
+  void on_render(vk::CommandBuffer) override {}
+  void on_gui_render() override {}
+  void on_im_gui_menu_bar() override {}
+  void on_swapchain_recreated() override {}
 };
 
-/// GPU command recording layer: bound to a View + render stage. No logic or UI.
+/// GPU command recording layer: bound to a View + render stage.
 class SD_EXPORT RenderStage : public Layer {
 public:
   using Layer::Layer;
 
-  // --- Available for override ---
-  // OnRender, OnSwapchainRecreated, OnAttach, OnDetach
-
-  // --- Sealed (not for RenderStages) ---
-  void on_update(float) final {}
-  void on_fixed_update(double) final {}
-  void on_gui_render() final {}
-  void on_im_gui_menu_bar() final {}
+  // --- Default no-ops (override if needed) ---
+  void on_update(float) override {}
+  void on_fixed_update(double) override {}
+  void on_gui_render() override {}
+  void on_im_gui_menu_bar() override {}
 };
 
-/// ImGui UI layer: panels, inspectors, debug tools. No GPU rendering.
+/// ImGui UI layer: panels, inspectors, debug tools.
 class SD_EXPORT Panel : public Layer {
 public:
   using Layer::Layer;
 
-  // --- Available for override ---
-  // OnGuiRender, OnImGuiMenuBar, OnUpdate, OnEvent, OnAttach, OnDetach
-
-  // --- Sealed (not for Panels) ---
-  void on_render(vk::CommandBuffer) final {}
-  void on_swapchain_recreated() final {}
+  // --- Default no-ops (override if needed) ---
+  void on_render(vk::CommandBuffer) override {}
+  void on_swapchain_recreated() override {}
 };
 
 } // namespace sd

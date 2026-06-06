@@ -18,6 +18,13 @@ public:
   static std::unique_ptr<SparseEntitySetBase> create(u32 component_id);
   static bool                                 is_registered(u32 component_id);
 
+  // Clears all registrations and resets the ID counter.
+  // register_default_pools() re-registers the engine's built-in components
+  // (Transform, Camera, Renderable, DebugName). Used on full game restart
+  // to prevent stale lambdas from a previously dlclosed .so.
+  static void clear();
+  static void register_default_pools();
+
 private:
   static inline std::vector<PoolCreatorFn> m_creators;
 };

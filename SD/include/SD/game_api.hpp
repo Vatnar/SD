@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-//~ C API (for dlopen / shared library boundary)
+// ── C API (for dlopen / shared library boundary) ──────────────────────────
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,17 +12,11 @@ extern "C" {
 #define GAME_API_VERSION 1
 
 typedef struct SD_Application SD_Application;
-typedef struct SD_Scene       SD_Scene;
 
-typedef struct GameState {
-  SD_Scene* shared_scene;
-  SD_Scene* another_scene;
-  int       version;
-} GameState;
-
-typedef void (*Game_OnLoadFn)(SD_Application* app, GameState* state);
-typedef void (*Game_OnUpdateFn)(SD_Application* app, GameState* state, float dt);
-typedef void (*Game_OnUnloadFn)(SD_Application* app, GameState* state);
+typedef void (*Game_OnLoadFn)(SD_Application* app, void* state);
+typedef void (*Game_OnUpdateFn)(SD_Application* app, void* state, float dt);
+typedef void (*Game_OnUnloadFn)(SD_Application* app, void* state);
+typedef void (*Game_OnReloadFn)(SD_Application* app, void* state);
 
 typedef struct GameAPI {
   uint32_t        api_version;
@@ -30,6 +24,7 @@ typedef struct GameAPI {
   Game_OnLoadFn   on_load;
   Game_OnUpdateFn on_update;
   Game_OnUnloadFn on_unload;
+  Game_OnReloadFn on_reload;
 } GameAPI;
 
 typedef GameAPI (*GetGameAPIFn)();
@@ -57,6 +52,7 @@ struct State {
 void on_load(sd::Application& app, State& state);
 void on_update(sd::Application& app, State& state, float dt);
 void on_unload(sd::Application& app, State& state);
+void on_reload(sd::Application& app, State& state);
 
 } // namespace game
 
