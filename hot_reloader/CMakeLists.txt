@@ -25,6 +25,9 @@ if (UNIX AND NOT APPLE)
             VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
             TOML_EXCEPTIONS=0
     )
+    target_compile_options(HotReloadApp PRIVATE
+            -freflection
+    )
 
     #~ INSTALL
     install(TARGETS HotReloadApp

@@ -1,6 +1,7 @@
 #include "SD/Application.hpp"
 
 #include <filesystem>
+#include <meta>
 
 #include "SD/RuntimeStateManager.hpp"
 #include "SD/core/LayoutManager.hpp"
@@ -9,10 +10,13 @@
 #include "SD/core/layers/PerformanceLayer.hpp"
 #include "SD/core/vulkan/VulkanRenderer.hpp"
 
+
 namespace sd {
+
 
 ImVec4 apply_theme() {
   ImGui::StyleColorsDark();
+
   ImGuiStyle& style  = ImGui::GetStyle();
   ImVec4*     colors = style.Colors;
 

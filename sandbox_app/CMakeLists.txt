@@ -24,6 +24,7 @@ else ()
             $<$<CONFIG:RelWithDebInfo>:-O2 -g>
             -fno-exceptions
             -Wall
+            -freflection
             -Wextra
             -Wpedantic
             $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
@@ -65,6 +66,7 @@ if (UNIX AND NOT APPLE)
                 $<$<CONFIG:RelWithDebInfo>:-O2 -g>
                 -fno-exceptions
                 -Wall
+                -freflection
                 -Wextra
                 -Wpedantic
                 $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
@@ -120,18 +122,19 @@ if (MSVC)
             /permissive-
             $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:/WX>
     )
-else ()
-    target_compile_options(SandboxAppStandalone PRIVATE
-            $<$<CONFIG:Debug>:-g -O0>
-            $<$<CONFIG:Release>:-O3>
-            $<$<CONFIG:RelWithDebInfo>:-O2 -g>
-            -fno-exceptions
-            -Wall
-            -Wextra
-            -Wpedantic
-            $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
-    )
-endif ()
+    else ()
+        target_compile_options(SandboxAppStandalone PRIVATE
+                $<$<CONFIG:Debug>:-g -O0>
+                $<$<CONFIG:Release>:-O3>
+                $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+                -fno-exceptions
+                -Wall
+                -freflection
+                -Wextra
+                -Wpedantic
+                $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
+        )
+    endif ()
 
 if (SD_ENABLE_ASAN AND NOT MSVC)
     target_compile_options(SandboxAppStandalone PRIVATE

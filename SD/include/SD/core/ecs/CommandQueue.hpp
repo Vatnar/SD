@@ -1,7 +1,8 @@
 #pragma once
+#include <mutex>
+
 #include "Command.hpp"
 #include "Entity.hpp"
-
 namespace sd {
 
 class CommandQueue {

@@ -106,6 +106,7 @@ if (MSVC)
             $<$<CONFIG:RelWithDebInfo>:/O2 /Zi /EHsc->
             /W4
             /permissive-
+
             $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:/WX>
     )
 else ()
@@ -116,6 +117,7 @@ else ()
             -fno-exceptions
             -Wall
             -Wextra
+            -freflection
             -Wpedantic
             $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
     )
