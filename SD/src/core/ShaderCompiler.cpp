@@ -1,55 +1,81 @@
 #include "SD/core/ShaderCompiler.hpp"
 
 // DXC
+#include <algorithm>
+#include <cctype>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include <dxc/dxcapi.h>
 
 #include "SD/core/logging.hpp"
-
+#include "SD/utils/FixedString.hpp"
 #ifdef _WIN32
 #include <wrl/client.h>
 using Microsoft::WRL::ComPtr;
 #else
 #include <dxc/WinAdapter.h>
+
+// NOLINTBEGIN(readability-identifier-naming)
+namespace Microsoft::WRL {
+template<typename T>
+using ComPtr = CComPtr<T>;
+}
+using Microsoft::WRL::ComPtr;
+// NOLINTEND(readability-identifier-naming)
 #endif
 
-namespace {
-constexpr const char* k_shader_model = "6_9";
 
-const std::unordered_map<std::string, std::string> k_ext_to_profile = {
-    { "vert",  "vs"},
-    {   "vs",  "vs"},
-    { "frag",  "fs"},
-    {   "ps",  "fs"},
-    {   "fs",  "fs"},
-    { "comp",  "cs"},
-    {   "cs",  "cs"},
-    { "geom",  "gs"},
-    {   "gs",  "gs"},
-    { "tesc",  "hs"},
-    {   "hs",  "hs"},
-    { "tese",  "ds"},
-    {   "ds",  "ds"},
-    { "mesh",  "ms"},
-    {   "ms",  "ms"},
-    { "task",  "as"},
-    {   "as",  "as"},
-    { "rgen", "lib"},
-    {"rmiss", "lib"},
-    {"rchit", "lib"},
-    {"rahit", "lib"},
-    {"rcall", "lib"},
-    {  "lib", "lib"},
+namespace {
+constexpr const char* k_shader_model = "6_0";
+
+
+struct ExtMapping {
+  std::string_view ext;
+  std::string_view profile;
 };
 
-CComPtr<IDxcUtils> init_dxc_utils() {
-  CComPtr<IDxcUtils> utils;
+// sorted lexicographically after 'ext' for binary serach
+constexpr std::array<ExtMapping, 29> k_ext_to_profile = {
+    {{"ahit", "lib"},   {"amp", "as"},   {"anyhit", "lib"}, {"as", "as"},     {"comp", "cs"},
+     {"compute", "cs"}, {"cs", "cs"},    {"ds", "ds"},      {"frag", "fs"},   {"fs", "fs"},
+     {"geom", "gs"},    {"gs", "gs"},    {"hs", "hs"},      {"lib", "lib"},   {"mesh", "ms"},
+     {"ms", "ms"},      {"pixel", "fs"}, {"ps", "fs"},      {"rahit", "lib"}, {"rcall", "lib"},
+     {"rchit", "lib"},  {"rgen", "lib"}, {"rint", "lib"},   {"rmiss", "lib"}, {"task", "as"},
+     {"tesc", "hs"},    {"tese", "ds"},  {"vert", "vs"},    {"vs", "vs"}}
+};
+
+// TODO: compute max length
+using ExtString = FixedString<20>; // slightly overkill, but doesnt matter
+template<usize N>
+consteval std::array<ExtString, N> concatenate_mappings(std::array<ExtMapping, N> mappings) {
+  std::array<ExtString, N> result;
+
+  for (usize i = 0; i < mappings.size(); ++i) {
+    result[i] = ExtString{mappings[i].ext} + ExtString{':'} + ExtString{mappings[i].profile};
+  }
+
+  return result;
+}
+
+constexpr std::array<ExtString, k_ext_to_profile.size()> k_valid_exts =
+    concatenate_mappings(k_ext_to_profile);
+
+// Only supports ASCII
+std::wstring to_wstring(const std::string& str) {
+  return {str.begin(), str.end()};
+}
+
+ComPtr<IDxcUtils> init_dxc_utils() {
+  ComPtr<IDxcUtils> utils;
   if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils))))
     sd::log::engine::critical("Failed to create DXC utils instance");
   return utils;
 }
 
-CComPtr<IDxcCompiler3> init_dxc_compiler() {
-  CComPtr<IDxcCompiler3> compiler;
+ComPtr<IDxcCompiler3> init_dxc_compiler() {
+  ComPtr<IDxcCompiler3> compiler;
   if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler))))
     sd::log::engine::critical("Failed to create DXC Compiler instance");
   return compiler;
@@ -59,47 +85,60 @@ std::string deduce_profile(const std::string& filename) {
   auto dot = filename.rfind('.');
   if (dot == std::string::npos) {
     sd::log::engine::shader::warn("No extension in '{}', falling back to lib_6_9", filename);
-    return std::string{"lib_6_9"};
+    return std::string{"lib_"} + k_shader_model;
   }
 
   std::string ext = filename.substr(dot + 1);
-  // Normalise to lowercase
   for (auto& c : ext)
     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
-  auto it = k_ext_to_profile.find(ext);
-  if (it == k_ext_to_profile.end()) {
-    sd::log::engine::shader::warn("Unknown extension '{}' in '{}', falling back to lib_6_9",
-                                  ext,
-                                  filename);
-    return std::string{"lib_6_9"};
+  // bin search small array is way faster than std::unordered_map
+  auto it = std::lower_bound(
+      k_ext_to_profile.begin(),
+      k_ext_to_profile.end(),
+      ext,
+      [](const ExtMapping& mapping, const std::string& key) { return mapping.ext < key; });
+  if (it != k_ext_to_profile.end() && it->ext == ext) {
+    return std::string(it->profile) + '_' + k_shader_model;
   }
+  std::string fallback_profile = std::string{"lib_"} + k_shader_model;
+  sd::log::engine::shader::error("Unknown file extension {} for HLSL shader, falling back to {}",
+                                 ext,
+                                 fallback_profile);
 
-  return it->second + '_' + k_shader_model;
+
+  sd::log::engine::shader::general("The are the supported extensions are:");
+  for (auto& valid_ext : k_valid_exts) {
+    sd::log::engine::shader::general("{}", valid_ext);
+  }
+  return std::string{"lib_"} + k_shader_model;
 }
 } // namespace
 
 namespace sd {
 std::optional<std::vector<u32>> compile_shader(const std::string& filename,
                                                const std::string& profile) {
-  local_persist CComPtr<IDxcUtils> s_utils        = init_dxc_utils();
-  local_persist CComPtr<IDxcCompiler3> s_compiler = init_dxc_compiler();
+  static ComPtr<IDxcUtils>     s_utils    = init_dxc_utils();
+  static ComPtr<IDxcCompiler3> s_compiler = init_dxc_compiler();
 
-  CComPtr<IDxcBlobEncoding> source_blob;
-  HRESULT                   hres = s_utils->LoadFile(CA2W(filename.c_str()), nullptr, &source_blob);
+  ComPtr<IDxcBlobEncoding> source_blob;
+  std::wstring             w_filename = to_wstring(filename);
+
+  HRESULT hres = s_utils->LoadFile(w_filename.c_str(), nullptr, &source_blob);
   if (FAILED(hres)) {
     log::engine::shader::error("Failed to load file {}", filename);
     return {};
   }
 
-  std::string target_profile = profile.empty() ? deduce_profile(filename) : profile;
+  std::string  target_profile   = profile.empty() ? deduce_profile(filename) : profile;
+  std::wstring w_target_profile = to_wstring(target_profile);
 
-  std::vector<LPCWSTR> arguments = {
-      CA2W(filename.c_str()),
+  std::vector arguments = {
+      // w_filename.c_str(),
       L"-E",
       L"main",
       L"-T",
-      CA2W(target_profile.c_str()),
+      w_target_profile.c_str(),
       L"-spirv",
   };
 #if SD_DEBUG
@@ -112,7 +151,7 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
                    .Size     = source_blob->GetBufferSize(),
                    .Encoding = DXC_CP_ACP};
 
-  CComPtr<IDxcResult> result;
+  ComPtr<IDxcResult> result;
   hres = s_compiler->Compile(&buffer,
                              arguments.data(),
                              static_cast<u32>(arguments.size()),
@@ -122,7 +161,7 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
     result->GetStatus(&hres);
 
   if (FAILED(hres) && result) {
-    CComPtr<IDxcBlobEncoding> error_blob;
+    ComPtr<IDxcBlobEncoding> error_blob;
     if (SUCCEEDED(result->GetErrorBuffer(&error_blob)) && error_blob) {
       log::engine::shader::error("Shader compilation failed:\n{}",
                                  static_cast<const char*>(error_blob->GetBufferPointer()));
@@ -130,7 +169,7 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
     return {};
   }
 
-  CComPtr<IDxcBlob> code;
+  ComPtr<IDxcBlob> code;
   result->GetResult(&code);
 
   auto* ptr   = static_cast<const u32*>(code->GetBufferPointer());
