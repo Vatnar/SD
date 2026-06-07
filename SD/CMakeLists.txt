@@ -73,11 +73,11 @@ target_compile_definitions(SD
         SPDLOG_NO_EXCEPTIONS
 )
 
-if(SD_DEBUG_ENABLED)
-  target_compile_definitions(SD PUBLIC SD_DEBUG SD_BUILD_DEBUG=1 ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_TRACE)
-else()
-  target_compile_definitions(SD PUBLIC ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_INFO)
-endif()
+if (SD_DEBUG_ENABLED)
+    target_compile_definitions(SD PUBLIC SD_DEBUG SD_BUILD_DEBUG=1 ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_TRACE)
+else ()
+    target_compile_definitions(SD PUBLIC ENGINE_LOG_LEVEL=ENGINE_LOG_LEVEL_INFO)
+endif ()
 
 #~ pch
 target_precompile_headers(SD PRIVATE

@@ -7,25 +7,23 @@ Components are pure data structs with no behaviour. Registration is done via a m
 
 ```cpp
 struct Transform {
-    Vec3 position;
-    Quat rotation;
-    Vec3 scale;
+    VLA::Matrix4x4f world_matrix;
 };
 REGISTER_SD_COMPONENT(Transform);
 ```
 
 The macro specialises `ComponentTraits<T>` with:
-- `IsRegistered = true` — required for compile-time checks
-- `Name` — human-readable name for debugging and serialization
-- `Id` — a monotonically increasing unique ID assigned by `ComponentIdGenerator`
+- `s_is_registered = true` — required for compile-time checks
+- `name` — human-readable name for debugging and serialization
+- `id` — a monotonically increasing unique ID assigned by `ComponentIdGenerator`
 
 ```cpp
 #define REGISTER_SD_COMPONENT(Type)                                          \
   template<>                                                                 \
   struct ComponentTraits<Type> {                                             \
-    static constexpr bool IsRegistered = true;                               \
-    static constexpr const char* Name = "SD_" #Type;                         \
-    static inline const usize Id = SD::detail::ComponentIdGenerator::Next(); \
+    static constexpr bool        s_is_registered = true;                     \
+    static constexpr const char* name            = "SD_" #Type;              \
+    static inline const usize    id              = detail::ComponentIdGenerator::next(); \
   };
 ```
 
@@ -39,14 +37,10 @@ The macro specialises `ComponentTraits<T>` with:
 template<>
 struct ComponentSerializer<Transform> {
     static void serialize(const Transform& c, Serializer& s) {
-        s.write(c.position);
-        s.write(c.rotation);
-        s.write(c.scale);
+        s.write(c.world_matrix.A);
     }
     static void deserialize(Transform& c, Serializer& s) {
-        c.position = s.Read<Vec3>();
-        c.rotation = s.Read<Quat>();
-        c.scale = s.Read<Vec3>();
+        s.read(c.world_matrix.A);
     }
 };
 ```

@@ -9,8 +9,8 @@ echo "Starting Doxygen Watcher..."
 echo "Initial generation..."
 doxygen $DOXYFILE
 
-echo "Watching for changes in /code/SDEngine..."
-while inotifywait -r -e modify,create,delete /code/SDEngine; do
+echo "Watching for changes in /code..."
+while inotifywait -r -e modify,create,delete /code; do
     echo "Change detected. Regenerating..."
     doxygen $DOXYFILE
 done

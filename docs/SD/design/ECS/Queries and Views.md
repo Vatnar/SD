@@ -11,7 +11,7 @@ template<typename... Components>
 std::tuple<Components&...> get_component_group(Entity e);
 
 bool Iterator::is_valid() const {
-  return (manager.HasComponent<Components>(currentEntity) && ...);
+  return (manager.has_component<Components>(currentEntity) && ...);
 }
 ```
 

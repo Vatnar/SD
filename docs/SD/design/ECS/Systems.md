@@ -4,9 +4,9 @@ date: 2026-04-07
 Systems query the ECS to get all entities with a specific set of components and iterate over them sequentially.
 
 ```cpp
-auto view = em.View<Transform, Velocity>();
+auto view = em.view<Transform, Velocity>();
 for (auto [entity, transform, velocity] : view) {
-    transform.position += velocity.velocity * dt;
+    transform.world_matrix += velocity.velocity * dt;
 }
 ```
 
@@ -15,10 +15,10 @@ Views are lightweight, no allocations, no heap storage. The iterator dereference
 **Example: Physics system applying gravity**
 ```cpp
 void PhysicsSystem::update(float dt) {
-    auto view = entity_manager.View<Transform, RigidBody>();
+    auto view = entity_manager.view<Transform, RigidBody>();
     for (auto [entity, transform, body] : view) {
-        body.velocity += Vec3{0, -9.81f, 0} * dt;
-        transform.position += body.velocity * dt;
+        body.velocity += VLA::Vector3{0, -9.81f, 0} * dt;
+        transform.world_matrix += body.velocity * dt;
     }
 }
 ```
