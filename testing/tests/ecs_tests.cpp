@@ -35,9 +35,7 @@ TEST(ECSTest, ReplaceComponent) {
   ASSERT_NE(transPtrBefore, nullptr);
   EXPECT_EQ(transPtrBefore->transform, initialMatrix);
 
-  VLA::Matrix4x4f newMatrix = VLA::Matrix4x4f::Identity();
-  newMatrix(0, 3)           = 123.0f;
-  newMatrix(1, 3)           = 456.0f;
+  VLA::Matrix4x4f newMatrix = VLA::Matrix4x4f::Translation({123.0f, 456.0f, 0.0f});
   entityManager.add_component<sd::Transform>(e, newMatrix);
 
   sd::Transform* transPtrAfter = entityManager.try_get_component<sd::Transform>(e);

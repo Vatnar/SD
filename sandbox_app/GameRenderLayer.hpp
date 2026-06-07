@@ -2,15 +2,14 @@
 #include <SD/core/Layer.hpp>
 
 class GameRenderLayer : public sd::RenderStage {
-  VkPipeline       m_pipeline;
-  VkPipeline       m_wireframe;
-  VkPipelineLayout m_layout;
+  vk::UniquePipeline       m_pipeline;
+  vk::UniquePipeline       m_wireframe;
+  vk::UniquePipelineLayout m_layout;
 
 public:
-  GameRenderLayer(const std::string& name,
-                  sd::Scene*         scene,
-                  vk::Pipeline       pipeline,
-                  vk::Pipeline       wireframe,
-                  vk::PipelineLayout layout);
+  GameRenderLayer(const std::string&       name,
+                  sd::Scene*               scene,
+                  vk::UniquePipeline       pipeline,
+                  vk::UniquePipelineLayout layout);
   void on_render(vk::CommandBuffer cmd) override;
 };

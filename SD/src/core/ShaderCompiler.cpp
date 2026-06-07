@@ -173,12 +173,6 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
       L"-fvk-use-dx-layout",
   };
 
-  // -fvk-invert-y is only valid for vertex/domain/geometry/mesh/library stages
-  if (target_profile.size() >= 2) {
-    auto prefix = target_profile.substr(0, 2);
-    if (prefix == "vs" || prefix == "ds" || prefix == "gs" || prefix == "ms" || prefix == "li")
-      arguments.push_back(L"-fvk-invert-y");
-  }
 #if SD_DEBUG
   arguments.push_back(L"-D_DEBUG");
   arguments.push_back(L"-Zi");

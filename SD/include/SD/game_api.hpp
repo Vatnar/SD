@@ -47,6 +47,7 @@ struct State {
   sd::Scene* shared_scene  = nullptr;
   sd::Scene* another_scene = nullptr;
   int        version       = 0;
+  u32        view_bit      = 1;
 };
 
 void on_load(sd::Application& app, State& state);

@@ -7,23 +7,62 @@
 #include <SD/utils/utils.hpp>
 #include <VLA/Matrix.hpp>
 
-GameRenderLayer::GameRenderLayer(const std::string& name,
-                                 sd::Scene*         scene,
-                                 vk::Pipeline       pipeline,
-                                 vk::Pipeline       wireframe,
-                                 vk::PipelineLayout layout) :
-  RenderStage(name, scene), m_pipeline(pipeline), m_wireframe(wireframe), m_layout(layout) {
+GameRenderLayer::GameRenderLayer(const std::string&       name,
+                                 sd::Scene*               scene,
+                                 vk::UniquePipeline       pipeline,
+                                 vk::UniquePipelineLayout layout) :
+  RenderStage(name, scene), m_pipeline(std::move(pipeline)), m_layout(std::move(layout)) {
 }
 
 void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
-  VkPipeline active_pipe =
-      (m_view->get_render_mode() == sd::RenderMode::WIREFRAME) ? m_wireframe : m_pipeline;
-
   ASSERT(cmd != VK_NULL_HANDLE && "Invalid cmd buffer");
-  ASSERT(active_pipe != VK_NULL_HANDLE && "Invalid pipeline - was it destroyed or recreated?");
-  ASSERT(m_layout != VK_NULL_HANDLE && "Invalid layout");
+  ASSERT(m_pipeline && "Invalid pipeline - was it destroyed or recreated?");
+  ASSERT(m_layout && "Invalid layout");
 
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, active_pipe);
+  auto         raw_extent = m_view->get_extent();
+  vk::Extent2D extent{raw_extent.width, raw_extent.height};
+
+  vk::RenderingAttachmentInfo color_attachment{
+      .imageView   = m_view->get_color_view(),
+      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+      .loadOp      = vk::AttachmentLoadOp::eClear,
+      .storeOp     = vk::AttachmentStoreOp::eStore,
+      .clearValue =
+          vk::ClearValue{.color = vk::ClearColorValue{std::array{0.1f, 0.1f, 0.1f, 1.0f}}},
+  };
+
+  vk::RenderingAttachmentInfo depth_attachment{
+      .imageView   = m_view->get_depth_view(),
+      .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+      .loadOp      = vk::AttachmentLoadOp::eClear,
+      .storeOp     = vk::AttachmentStoreOp::eDontCare,
+      .clearValue  = vk::ClearValue{.depthStencil = vk::ClearDepthStencilValue{1.0f, 0}},
+  };
+
+  vk::RenderingInfo rendering_info{
+      .renderArea           = vk::Rect2D{.offset = {0, 0}, .extent = extent},
+      .layerCount           = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments    = &color_attachment,
+      .pDepthAttachment     = &depth_attachment,
+  };
+
+  cmd.beginRendering(rendering_info);
+
+  vk::Viewport viewport{.x        = 0,
+                        .y        = 0,
+                        .width    = static_cast<float>(raw_extent.width),
+                        .height   = static_cast<float>(raw_extent.height),
+                        .minDepth = 0,
+                        .maxDepth = 1};
+  cmd.setViewport(0, viewport);
+  cmd.setScissor(0,
+                 vk::Rect2D{
+                     {0, 0},
+                     extent
+  });
+
+  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
 
   struct Push {
     VLA::Matrix4x4f mvp;
@@ -73,6 +112,7 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
   const float d2 = cross(p - n1, n2 - n1);
   const float d3 = cross(p - n2, n0 - n2);
 
+  // Just checks for equilateral triangle
   const bool inside = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 
   for (auto [entity, transform, renderable] : m_scene->em.view<sd::Transform, sd::Renderable>()) {
@@ -90,8 +130,10 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
       push.color[2] = 1.0f;
     }
 
-    vkCmdPushConstants(cmd, m_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Push), &push);
+    cmd.pushConstants(*m_layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Push), &push);
 
-    vkCmdDraw(cmd, 3, 1, 0, 0);
+    cmd.draw(3, 1, 0, 0);
   }
+
+  cmd.endRendering();
 }

@@ -4,7 +4,7 @@ struct VSOutput {
 };
 
 struct PushConstants {
-    row_major float4x4 mvp;
+    float4x4 mvp;
     float4 color;
 };
 

@@ -416,8 +416,8 @@ void EngineDebugLayer::display_ecs_inspector() {
       if (auto* transform_ptr = m_selected_scene->em.try_get_component<Transform>(entity)) {
         if (ImGui::TreeNode("Transform")) {
           for (int i = 0; i < 4; i++) {
-            if (ImGui::DragFloat4(("row " + std::to_string(i)).c_str(),
-                                  &transform_ptr->world_matrix(i, 0),
+            if (ImGui::DragFloat4(("col " + std::to_string(i)).c_str(),
+                                  &transform_ptr->world_matrix(0, i),
                                   0.01f)) {
               if (m_log_scene_changes) {
                 log::debug_layer::tagged("transform", "Entity {} transform changed", entity.index);

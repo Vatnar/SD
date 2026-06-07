@@ -27,7 +27,7 @@ target_include_directories(imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends
 )
 
-target_link_libraries(imgui PRIVATE glfw)
+target_link_libraries(imgui PRIVATE glfw VLA)
 
 # Unity build settings for imgui are controlled via CMAKE_UNITY_BUILD
 # in the preset. Backends are excluded unconditionally due to X11/Vulkan
