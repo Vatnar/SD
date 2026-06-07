@@ -510,8 +510,6 @@ void on_load(sd::Application& app, State& state) {
   }
 
 
-  setup_game_objects(app, state);
-
   app.push_layer<sd::EngineDebugLayer>(app.runtime(), app.services(), state.shared_scene);
 
   //~ ECS population

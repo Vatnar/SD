@@ -4,10 +4,15 @@
 //   - Note: This is a "kitchen sink" file - consider splitting
 //   - Categories: Error checking, buffer/image creation, texture loading
 #pragma once
+#include <algorithm>
 #include <expected>
 #include <filesystem>
 #include <limits>
+#include <ranges>
 #include <stb_image.h>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include <vulkan/vulkan.hpp>
 
@@ -38,7 +43,8 @@ namespace sd {
 //   - Performance considerations
 //   - Example usage
 inline std::expected<void, std::string>
-single_time_command(const vk::Device& device, const vk::Queue& queue,
+single_time_command(const vk::Device&                                    device,
+                    const vk::Queue&                                     queue,
                     const vk::CommandPool&                               command_pool,
                     const std::function<void(const vk::CommandBuffer&)>& action) {
   vk::CommandBufferAllocateInfo alloc_info{.commandPool        = command_pool,
@@ -97,8 +103,11 @@ single_time_command(const vk::Device& device, const vk::Queue& queue,
 //   - Note about VMA TODO - this will be deprecated
 //   - Example usage
 inline std::pair<vk::UniqueBuffer, vk::UniqueDeviceMemory>
-create_buffer(const vk::Device& device, const vk::PhysicalDevice& physical_device,
-              vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+create_buffer(const vk::Device&         device,
+              const vk::PhysicalDevice& physical_device,
+              vk::DeviceSize            size,
+              vk::BufferUsageFlags      usage,
+              vk::MemoryPropertyFlags   properties) {
   // TODO: Use VMA (Vulkan Memory Allocator) instead of manual memory allocation
   // TODO: Create a Buffer abstraction class to handle creation, mapping, and destruction
 
@@ -116,8 +125,9 @@ create_buffer(const vk::Device& device, const vk::PhysicalDevice& physical_devic
       .memoryTypeIndex =
           find_memory_type(physical_device, mem_requirements.memoryTypeBits, properties)};
 
-  vk::UniqueDeviceMemory buffer_memory = check_vulkan_res_val(
-      device.allocateMemoryUnique(allocate_info), "Failed to allocate unique memory for buffer: ");
+  vk::UniqueDeviceMemory buffer_memory =
+      check_vulkan_res_val(device.allocateMemoryUnique(allocate_info),
+                           "Failed to allocate unique memory for buffer: ");
 
   check_vulkan_res(device.bindBufferMemory(*buffer, *buffer_memory, 0),
                    "Failed to bind buffer memory");
@@ -130,9 +140,14 @@ create_buffer(const vk::Device& device, const vk::PhysicalDevice& physical_devic
 //   - Format, tiling, usage parameter guidance
 //   - Note about VMA TODO
 inline std::pair<vk::UniqueImage, vk::UniqueDeviceMemory>
-create_image(const vk::Device& device, const vk::PhysicalDevice& physical_device, uint32_t width,
-             uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage,
-             vk::MemoryPropertyFlags properties) {
+create_image(const vk::Device&         device,
+             const vk::PhysicalDevice& physical_device,
+             uint32_t                  width,
+             uint32_t                  height,
+             vk::Format                format,
+             vk::ImageTiling           tiling,
+             vk::ImageUsageFlags       usage,
+             vk::MemoryPropertyFlags   properties) {
   // TODO: Use VMA (Vulkan Memory Allocator) instead of manual memory allocation
   // TODO: Create an Image abstraction class to handle creation, views, and memory
   vk::ImageCreateInfo image_info{
@@ -155,8 +170,9 @@ create_image(const vk::Device& device, const vk::PhysicalDevice& physical_device
       .allocationSize = mem_requirements.size,
       .memoryTypeIndex =
           find_memory_type(physical_device, mem_requirements.memoryTypeBits, properties)};
-  vk::UniqueDeviceMemory image_memory = check_vulkan_res_val(
-      device.allocateMemoryUnique(allocate_info), "Failed to allocate unique memory:");
+  vk::UniqueDeviceMemory image_memory =
+      check_vulkan_res_val(device.allocateMemoryUnique(allocate_info),
+                           "Failed to allocate unique memory:");
 
   check_vulkan_res(device.bindImageMemory(*image, *image_memory, 0),
                    "Failed to bind image memory: ");
@@ -167,8 +183,11 @@ create_image(const vk::Device& device, const vk::PhysicalDevice& physical_device
 // TODO(docs): Document CopyBufferToImage function
 //   - Purpose: Copy buffer data to an image via command buffer
 //   - Requires image to be in eTransferDstOptimal layout
-inline void copy_buffer_to_image(const vk::CommandBuffer& cmd_buffer, const vk::Buffer& buffer,
-                                 const vk::Image& image, uint32_t width, uint32_t height) {
+inline void copy_buffer_to_image(const vk::CommandBuffer& cmd_buffer,
+                                 const vk::Buffer&        buffer,
+                                 const vk::Image&         image,
+                                 uint32_t                 width,
+                                 uint32_t                 height) {
   vk::BufferImageCopy region{
       .bufferOffset      = 0,
       .bufferRowLength   = 0,
@@ -188,9 +207,11 @@ inline void copy_buffer_to_image(const vk::CommandBuffer& cmd_buffer, const vk::
 //   - Supported transitions (Undefined->TransferDst, TransferDst->ShaderReadOnly)
 //   - Pipeline stage and access mask logic
 //   - Note about ImageMemoryBarrier2 TODO
-inline void transition_image_layout(const vk::CommandBuffer& cmd_buffer, const vk::Image& image,
-                                    [[maybe_unused]] vk::Format format, vk::ImageLayout old_layout,
-                                    vk::ImageLayout new_layout) {
+inline void transition_image_layout(const vk::CommandBuffer&    cmd_buffer,
+                                    const vk::Image&            image,
+                                    [[maybe_unused]] vk::Format format,
+                                    vk::ImageLayout             old_layout,
+                                    vk::ImageLayout             new_layout) {
   // TODO: Use vk::ImageMemoryBarrier2 for better synchronization (requires Vulkan 1.3 or extension)
   vk::PipelineStageFlags source_stage;
   vk::PipelineStageFlags destination_stage;
@@ -265,7 +286,10 @@ inline std::expected<Texture, std::string> create_texture(const vk::Device&     
   }
 
   auto [staging_buffer, staging_buffer_memory] = create_buffer(
-      device, physical_device, image_size, vk::BufferUsageFlagBits::eTransferSrc,
+      device,
+      physical_device,
+      image_size,
+      vk::BufferUsageFlagBits::eTransferSrc,
       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
   void* data = check_vulkan_res_val(device.mapMemory(*staging_buffer_memory, 0, image_size),
@@ -277,21 +301,36 @@ inline std::expected<Texture, std::string> create_texture(const vk::Device&     
   stbi_image_free(pixels);
 
   auto [image, image_memory] =
-      create_image(device, physical_device, tex_width, tex_height, vk::Format::eR8G8B8A8Srgb,
+      create_image(device,
+                   physical_device,
+                   tex_width,
+                   tex_height,
+                   vk::Format::eR8G8B8A8Srgb,
                    vk::ImageTiling::eOptimal,
                    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
                    vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-  auto cmd_res = single_time_command(
-      device, graphics_queue, command_pool, [&](const vk::CommandBuffer& cmdBuffer) {
-        transition_image_layout(cmdBuffer, *image, vk::Format::eR8G8B8A8Srgb,
-                                vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-        copy_buffer_to_image(cmdBuffer, *staging_buffer, *image, static_cast<uint32_t>(tex_width),
-                             static_cast<uint32_t>(tex_height));
-        transition_image_layout(cmdBuffer, *image, vk::Format::eR8G8B8A8Srgb,
-                                vk::ImageLayout::eTransferDstOptimal,
-                                vk::ImageLayout::eShaderReadOnlyOptimal);
-      });
+  auto cmd_res =
+      single_time_command(device,
+                          graphics_queue,
+                          command_pool,
+                          [&](const vk::CommandBuffer& cmdBuffer) {
+                            transition_image_layout(cmdBuffer,
+                                                    *image,
+                                                    vk::Format::eR8G8B8A8Srgb,
+                                                    vk::ImageLayout::eUndefined,
+                                                    vk::ImageLayout::eTransferDstOptimal);
+                            copy_buffer_to_image(cmdBuffer,
+                                                 *staging_buffer,
+                                                 *image,
+                                                 static_cast<uint32_t>(tex_width),
+                                                 static_cast<uint32_t>(tex_height));
+                            transition_image_layout(cmdBuffer,
+                                                    *image,
+                                                    vk::Format::eR8G8B8A8Srgb,
+                                                    vk::ImageLayout::eTransferDstOptimal,
+                                                    vk::ImageLayout::eShaderReadOnlyOptimal);
+                          });
 
   if (!cmd_res) {
     return std::unexpected(cmd_res.error());
@@ -328,5 +367,56 @@ inline vk::UniqueShaderModule create_shader_module(const vk::Device&        devi
                                          .pCode = reinterpret_cast<const uint32_t*>(code.data())};
   return check_vulkan_res_val(device.createShaderModuleUnique(create_info),
                               "Failed to create unique shaderModule: ");
+}
+/// Formats a range of items into aligned columns.
+/// @param items     Input range whose elements are convertible to string_view
+/// @param cols      Number of columns (default 4)
+/// @param spacing   Min spaces between columns (default 2)
+/// @param row_major When true (default), items fill left-to-right then down.
+///                  When false, items fill top-to-bottom then right.
+template<std::ranges::input_range R>
+  requires std::constructible_from<std::string_view, std::ranges::range_value_t<R>>
+std::string tab_format(R&& items, usize cols = 4, usize spacing = 2, bool row_major = true) {
+  std::vector<std::string_view> svs;
+  usize                         max_width = 0;
+  for (auto&& item : items) {
+    std::string_view sv(item);
+    svs.push_back(sv);
+    if (sv.size() > max_width)
+      max_width = sv.size();
+  }
+
+  if (svs.empty())
+    return {};
+
+  usize       col_width = max_width + spacing;
+  usize       cols_     = cols > 0 ? cols : 1;
+  usize       rows_     = (svs.size() + cols_ - 1) / cols_;
+  std::string result;
+  result.reserve(svs.size() * col_width + rows_);
+
+  if (row_major) {
+    for (usize i = 0; i < svs.size(); ++i) {
+      result += svs[i];
+      if (svs[i].size() < col_width)
+        result.append(col_width - svs[i].size(), ' ');
+      if ((i + 1) % cols_ == 0 && (i + 1) < svs.size())
+        result += '\n';
+    }
+  } else {
+    for (usize r = 0; r < rows_; ++r) {
+      for (usize c = 0; c < cols_; ++c) {
+        usize idx = r + c * rows_;
+        if (idx >= svs.size())
+          break;
+        result += svs[idx];
+        if (svs[idx].size() < col_width)
+          result.append(col_width - svs[idx].size(), ' ');
+      }
+      if (r + 1 < rows_)
+        result += '\n';
+    }
+  }
+  return result;
 }
 } // namespace sd

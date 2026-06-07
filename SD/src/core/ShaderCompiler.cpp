@@ -11,6 +11,7 @@
 
 #include "SD/core/logging.hpp"
 #include "SD/utils/FixedString.hpp"
+#include "SD/utils/utils.hpp"
 #ifdef _WIN32
 #include <wrl/client.h>
 using Microsoft::WRL::ComPtr;
@@ -36,14 +37,37 @@ struct ExtMapping {
   std::string_view profile;
 };
 
-// sorted lexicographically after 'ext' for binary serach
-constexpr std::array<ExtMapping, 29> k_ext_to_profile = {
-    {{"ahit", "lib"},   {"amp", "as"},   {"anyhit", "lib"}, {"as", "as"},     {"comp", "cs"},
-     {"compute", "cs"}, {"cs", "cs"},    {"ds", "ds"},      {"frag", "fs"},   {"fs", "fs"},
-     {"geom", "gs"},    {"gs", "gs"},    {"hs", "hs"},      {"lib", "lib"},   {"mesh", "ms"},
-     {"ms", "ms"},      {"pixel", "fs"}, {"ps", "fs"},      {"rahit", "lib"}, {"rcall", "lib"},
-     {"rchit", "lib"},  {"rgen", "lib"}, {"rint", "lib"},   {"rmiss", "lib"}, {"task", "as"},
-     {"tesc", "hs"},    {"tese", "ds"},  {"vert", "vs"},    {"vs", "vs"}}
+// Sorted lexicographically by ext for binary search in deduce_profile.
+constexpr std::array k_ext_to_profile = {
+    ExtMapping{   "ahit", "lib"},
+    ExtMapping{    "amp",  "as"},
+    ExtMapping{ "anyhit", "lib"},
+    ExtMapping{     "as",  "as"},
+    ExtMapping{   "comp",  "cs"},
+    ExtMapping{"compute",  "cs"},
+    ExtMapping{     "cs",  "cs"},
+    ExtMapping{     "ds",  "ds"},
+    ExtMapping{   "frag",  "ps"},
+    ExtMapping{     "fs",  "ps"},
+    ExtMapping{   "geom",  "gs"},
+    ExtMapping{     "gs",  "gs"},
+    ExtMapping{     "hs",  "hs"},
+    ExtMapping{    "lib", "lib"},
+    ExtMapping{   "mesh",  "ms"},
+    ExtMapping{     "ms",  "ms"},
+    ExtMapping{  "pixel",  "ps"},
+    ExtMapping{     "ps",  "ps"},
+    ExtMapping{  "rahit", "lib"},
+    ExtMapping{  "rcall", "lib"},
+    ExtMapping{  "rchit", "lib"},
+    ExtMapping{   "rgen", "lib"},
+    ExtMapping{   "rint", "lib"},
+    ExtMapping{  "rmiss", "lib"},
+    ExtMapping{   "task",  "as"},
+    ExtMapping{   "tesc",  "hs"},
+    ExtMapping{   "tese",  "ds"},
+    ExtMapping{   "vert",  "vs"},
+    ExtMapping{     "vs",  "vs"},
 };
 
 // TODO: compute max length
@@ -59,8 +83,19 @@ consteval std::array<ExtString, N> concatenate_mappings(std::array<ExtMapping, N
   return result;
 }
 
-constexpr std::array<ExtString, k_ext_to_profile.size()> k_valid_exts =
-    concatenate_mappings(k_ext_to_profile);
+template<usize N>
+constexpr std::array<ExtMapping, N> sort_by_profile(std::array<ExtMapping, N> mappings) {
+  for (usize i = 0; i < N; ++i)
+    for (usize j = i + 1; j < N; ++j)
+      if (mappings[i].profile > mappings[j].profile ||
+          (mappings[i].profile == mappings[j].profile && mappings[i].ext > mappings[j].ext))
+        std::swap(mappings[i], mappings[j]);
+  return mappings;
+}
+
+constexpr auto k_display_mappings = sort_by_profile(k_ext_to_profile);
+constexpr std::array<ExtString, k_display_mappings.size()> k_display_exts =
+    concatenate_mappings(k_display_mappings);
 
 // Only supports ASCII
 std::wstring to_wstring(const std::string& str) {
@@ -92,7 +127,6 @@ std::string deduce_profile(const std::string& filename) {
   for (auto& c : ext)
     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
-  // bin search small array is way faster than std::unordered_map
   auto it = std::lower_bound(
       k_ext_to_profile.begin(),
       k_ext_to_profile.end(),
@@ -102,15 +136,12 @@ std::string deduce_profile(const std::string& filename) {
     return std::string(it->profile) + '_' + k_shader_model;
   }
   std::string fallback_profile = std::string{"lib_"} + k_shader_model;
-  sd::log::engine::shader::error("Unknown file extension {} for HLSL shader, falling back to {}",
+  sd::log::engine::shader::error("Unknown file extension {} for HLSL shader, falling back to "
+                                 "{}\n The supported extensions are:\n{}",
                                  ext,
-                                 fallback_profile);
+                                 fallback_profile,
+                                 sd::tab_format(k_display_exts, 5));
 
-
-  sd::log::engine::shader::general("The are the supported extensions are:");
-  for (auto& valid_ext : k_valid_exts) {
-    sd::log::engine::shader::general("{}", valid_ext);
-  }
   return std::string{"lib_"} + k_shader_model;
 }
 } // namespace
@@ -134,13 +165,20 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
   std::wstring w_target_profile = to_wstring(target_profile);
 
   std::vector arguments = {
-      // w_filename.c_str(),
       L"-E",
       L"main",
       L"-T",
       w_target_profile.c_str(),
       L"-spirv",
+      L"-fvk-use-dx-layout",
   };
+
+  // -fvk-invert-y is only valid for vertex/domain/geometry/mesh/library stages
+  if (target_profile.size() >= 2) {
+    auto prefix = target_profile.substr(0, 2);
+    if (prefix == "vs" || prefix == "ds" || prefix == "gs" || prefix == "ms" || prefix == "li")
+      arguments.push_back(L"-fvk-invert-y");
+  }
 #if SD_DEBUG
   arguments.push_back(L"-D_DEBUG");
   arguments.push_back(L"-Zi");
@@ -170,7 +208,7 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
   }
 
   ComPtr<IDxcBlob> code;
-  result->GetResult(&code);
+  result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&code), nullptr);
 
   auto* ptr   = static_cast<const u32*>(code->GetBufferPointer());
   auto  count = code->GetBufferSize() / sizeof(u32);
