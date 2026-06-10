@@ -37,7 +37,7 @@ public:
   }
   [[nodiscard]] usize command_count() const;
 
-  EntityManager em;
+  EntityManager<ComponentGroup<>> em;
 
 private:
   CommandQueue m_commands;

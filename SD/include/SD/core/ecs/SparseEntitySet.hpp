@@ -18,7 +18,7 @@ public:
   ~SparseEntitySetBase() override    = default;
   virtual bool remove(Entity entity) = 0;
 
-  virtual std::optional<ComponentDebugInfo> get_debug_info(Entity e) = 0;
+  // virtual std::optional<ComponentDebugInfo> get_debug_info(Entity e) = 0;
 };
 
 // TODO(docs): Document SparseEntitySet class thoroughly
@@ -85,7 +85,7 @@ public:
   T*                     get(Entity entity);
   [[nodiscard]] const T* get(Entity entity) const;
 
-  std::optional<ComponentDebugInfo>        get_debug_info(Entity e) override;
+  // std::optional<ComponentDebugInfo>        get_debug_info(Entity e) override;
   T*                                       operator[](const Entity idx) { return get(idx); }
   [[nodiscard]] const std::vector<Entity>& get_dense_entities() const { return dense_entities; }
 

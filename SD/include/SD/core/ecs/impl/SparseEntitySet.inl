@@ -109,15 +109,15 @@ const T* SparseEntitySet<T>::get(const Entity entity) const {
 
   return &dense_data[dense_idx];
 }
-template<typename T>
-std::optional<ComponentDebugInfo> SparseEntitySet<T>::get_debug_info(Entity e) {
-  if constexpr (ComponentTraits<T>::s_is_registered) {
-    T* ptr = get(e);
-    if (!ptr)
-      return std::nullopt;
+// template<typename T>
+// std::optional<ComponentDebugInfo> SparseEntitySet<T>::get_debug_info(Entity e) {
+// if constexpr (ComponentTraits<T>::s_is_registered) {
+// T* ptr = get(e);
+// if (!ptr)
+// return std::nullopt;
 
-    return ComponentDebugInfo{ComponentTraits<T>::id, ComponentTraits<T>::name, ptr};
-  } else {
-    return std::nullopt; // not a component
-  }
-}
+// return ComponentDebugInfo{ComponentTraits<T>::id, ComponentTraits<T>::name, ptr};
+// } else {
+// return std::nullopt; // not a component
+// }
+// }

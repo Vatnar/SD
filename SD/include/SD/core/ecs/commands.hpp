@@ -16,7 +16,7 @@ public:
   EntityHandle m_handle;
   Entity       m_created_entity = {};
 
-  void execute(EntityManager& em, CommandQueue& queue) override {
+  void execute(EntityManager<ComponentGroup<>>& em, CommandQueue& queue) override {
     m_created_entity = em.create();
     queue.set_entity_for_handle(m_handle, m_created_entity);
   }
@@ -31,7 +31,9 @@ public:
   DestroyEntityCmd() = default;
   explicit DestroyEntityCmd(Entity e) : m_entity(e) {}
 
-  void execute(EntityManager& em, CommandQueue&) override { em.destroy(m_entity); }
+  void execute(EntityManager<ComponentGroup<>>& em, CommandQueue&) override {
+    em.destroy(m_entity);
+  }
   void serialize(Serializer& serializer) const override {
     serializer.write<u32>(m_entity.index);
     serializer.write<u32>(m_entity.generation);
@@ -51,7 +53,7 @@ public:
   AddComponentCmd() = default;
   AddComponentCmd(EntityHandle handle, T data) : m_handle(handle), m_data(data) {}
 
-  void execute(EntityManager& em, CommandQueue& queue) override {
+  void execute(EntityManager<ComponentGroup<>>& em, CommandQueue& queue) override {
     Entity e = queue.get_entity(m_handle);
     em.add_component<T>(e, m_data);
   }
@@ -75,7 +77,7 @@ public:
   RemoveComponentCmd() = default;
   explicit RemoveComponentCmd(EntityHandle handle) : m_handle(handle) {}
 
-  void execute(EntityManager& em, CommandQueue& queue) override {
+  void execute(EntityManager<ComponentGroup<>>& em, CommandQueue& queue) override {
     Entity e = queue.get_entity(m_handle);
     em.try_remove_component<T>(e);
   }
@@ -85,9 +87,10 @@ public:
 
 REGISTER_COMMAND(CreateEntityCmd);
 REGISTER_COMMAND(DestroyEntityCmd);
-REGISTER_COMPONENT_COMMANDS(Transform);
-REGISTER_COMPONENT_COMMANDS(Camera);
-REGISTER_COMPONENT_COMMANDS(Renderable);
-REGISTER_COMPONENT_COMMANDS(DebugName);
+// TODO: Re-enable when serialization system is rebuilt
+// REGISTER_COMPONENT_COMMANDS(Transform);
+// REGISTER_COMPONENT_COMMANDS(Camera);
+// REGISTER_COMPONENT_COMMANDS(Renderable);
+// REGISTER_COMPONENT_COMMANDS(DebugName);
 
 } // namespace sd

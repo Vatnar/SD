@@ -3,6 +3,8 @@
 #include <array>
 #include <string_view>
 
+#include <spdlog/fmt/bundled/core.h>
+
 #include "SD/core/types.hpp"
 
 // todo: move

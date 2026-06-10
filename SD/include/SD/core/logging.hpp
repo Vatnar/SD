@@ -94,10 +94,15 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
   constexpr auto        cMinLevel     = static_cast<::sd::log::LogLevel>(Level);              \
   constexpr const char* cCategoryPath = CategoryPath;                                         \
                                                                                               \
+  inline const auto& get_logger() {                                                           \
+    static auto logger = ::sd::log::get_category_logger_or_report(CategoryPath);              \
+    return logger;                                                                            \
+  }                                                                                           \
+                                                                                              \
   template<typename... Args>                                                                  \
   inline void trace(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::TRACE) {                                  \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+      if (const auto& logger = get_logger()) {                                                \
         logger->trace(fmt, std::forward<Args>(args)...);                                      \
       }                                                                                       \
     }                                                                                         \
@@ -106,7 +111,7 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
   template<typename... Args>                                                                  \
   inline void debug(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::DEBUG) {                                  \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+      if (const auto& logger = get_logger()) {                                                \
         logger->debug(fmt, std::forward<Args>(args)...);                                      \
       }                                                                                       \
     }                                                                                         \
@@ -115,7 +120,7 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
   template<typename... Args>                                                                  \
   inline void info(spdlog::format_string_t<Args...> fmt, Args&&... args) {                    \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::INFO) {                                   \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+      if (const auto& logger = get_logger()) {                                                \
         logger->info(fmt, std::forward<Args>(args)...);                                       \
       }                                                                                       \
     }                                                                                         \
@@ -124,7 +129,7 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
   template<typename... Args>                                                                  \
   inline void warn(spdlog::format_string_t<Args...> fmt, Args&&... args) {                    \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::WARN) {                                   \
-      if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {             \
+      if (const auto& logger = get_logger()) {                                                \
         logger->warn(fmt, std::forward<Args>(args)...);                                       \
       }                                                                                       \
     }                                                                                         \
@@ -132,14 +137,14 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
                                                                                               \
   template<typename... Args>                                                                  \
   inline void error(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
-    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+    if (const auto& logger = get_logger()) {                                                  \
       logger->error(fmt, std::forward<Args>(args)...);                                        \
     }                                                                                         \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
   [[noreturn]] inline void critical(spdlog::format_string_t<Args...> fmt, Args&&... args) {   \
-    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+    if (const auto& logger = get_logger()) {                                                  \
       logger->critical(fmt, std::forward<Args>(args)...);                                     \
     }                                                                                         \
     spdlog::shutdown();                                                                       \
@@ -148,7 +153,7 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
                                                                                               \
   template<typename... Args>                                                                  \
   inline void general(spdlog::format_string_t<Args...> fmt, Args&&... args) {                 \
-    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+    if (const auto& logger = get_logger()) {                                                  \
       logger->log(::sd::log::LOG_LEVEL_GENERAL, fmt, std::forward<Args>(args)...);            \
     }                                                                                         \
   }                                                                                           \
@@ -157,7 +162,7 @@ inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char*
   inline void tagged(std::string_view                 subcategory,                            \
                      spdlog::format_string_t<Args...> fmt,                                    \
                      Args&&... args) {                                                        \
-    if (auto logger = ::sd::log::get_category_logger_or_report(CategoryPath)) {               \
+    if (const auto& logger = get_logger()) {                                                  \
       auto msg =                                                                              \
           fmt::format("[{}] {}", subcategory, fmt::format(fmt, std::forward<Args>(args)...)); \
       logger->log(::sd::log::LOG_LEVEL_GENERAL, "{}", msg);                                   \
@@ -169,6 +174,9 @@ namespace sd::log {
 namespace engine {
 SD_LOG_CATEGORY_IMPL("engine", ENGINE_LOG_LEVEL_ENGINE)
 
+namespace profiler {
+SD_LOG_CATEGORY_IMPL("profiler", ENGINE_LOG_LEVEL_DEBUG)
+}
 namespace shader {
 SD_LOG_CATEGORY_IMPL("engine/shader", ENGINE_LOG_LEVEL_ENGINE)
 }

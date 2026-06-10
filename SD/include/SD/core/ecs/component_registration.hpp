@@ -1,107 +1,67 @@
-/**
- * @file Component.hpp
- * @brief Component registration and trait utilities for ECS
- *
- * @note This ECS implementation is single-threaded. All EntityManager and component
- *       operations must occur on the same thread. The ComponentIdGenerator uses
- *       static storage which is not thread-safe for concurrent registration.
- *
- * @section ComponentRegistration Component Registration
- *
- * To create a new component:
- * 1. Define the struct as pure data (no methods)
- * 2. Use REGISTER_SD_COMPONENT(Type) macro to register with ECS
- * 3. Specialize ComponentSerializer<Type> to implement Serialize/Deserialize
- *
- * Example:
- * @code
- * struct MyComponent {
- *     float value;
- *     int count;
- * };
- * REGISTER_SD_COMPONENT(MyComponent);
- *
- * template<>
- * struct ComponentSerializer<MyComponent> {
- *     static void Serialize(const MyComponent& c, Serializer& s) {
- *         s.Write(c.value);
- *         s.Write(c.count);
- *     }
- *     static void Deserialize(MyComponent& c, Serializer& s) {
- *         c.value = s.Read<float>();
- *         c.count = s.Read<int>();
- *     }
- * };
- * @endcode
- */
 #pragma once
 
+#include <meta>
+
 #include "SD/core/types.hpp"
+#include "SD/utils/FixedString.hpp"
 #include "SD/utils/serialization.hpp"
+// TODO: REMOVE< just for test
 
 namespace sd {
 template<typename... Ts>
 struct ComponentGroup {};
 
-template<typename T>
+
+template<typename>
+inline constexpr bool k_always_false = false;
+
+template<typename T, typename Group>
 struct ComponentTraits;
 
+template<typename A, typename B>
+struct ConcatComponentGroups;
+
+template<typename... As, typename... Bs>
+struct ConcatComponentGroups<ComponentGroup<As...>, ComponentGroup<Bs...>> {
+  using type = ComponentGroup<As..., Bs...>;
+};
+
+template<typename A, typename B>
+using ConcatComponentGroups_t = typename ConcatComponentGroups<A, B>::type;
+
+template<typename Group>
+struct IsUniqueComponentGroup;
+
+template<>
+struct IsUniqueComponentGroup<ComponentGroup<>> : std::true_type {};
+
+template<typename T, typename... Ts>
+struct IsUniqueComponentGroup<ComponentGroup<T, Ts...>>
+  : std::bool_constant<(!(std::same_as<T, Ts> || ...)) &&
+                       IsUniqueComponentGroup<ComponentGroup<Ts...>>::value> {};
+
+
+template<typename T, typename... Ts>
+struct ComponentTraits<T, ComponentGroup<Ts...>> {
+  static constexpr bool is_registered = (std::same_as<T, Ts> || ...);
+
+  static constexpr usize id() {
+    constexpr bool matches[] = {std::same_as<T, Ts>...};
+    for (usize i = 0; i < sizeof...(Ts); ++i) {
+      if (matches[i])
+        return i;
+    }
+    return static_cast<usize>(-1);
+  }
+
+  static constexpr auto name = std::meta::identifier_of(^^T);
+};
+
+// TODO: REFLECATION SERIALIZATION
 template<typename T>
 struct ComponentSerializer {
   static void serialize(const T& component, Serializer& s) = delete;
   static void deserialize(T& component, Serializer& s)     = delete;
-};
-
-namespace detail {
-struct ComponentIdGenerator {
-  ComponentIdGenerator()                                       = delete;
-  ~ComponentIdGenerator()                                      = delete;
-  ComponentIdGenerator(const ComponentIdGenerator&)            = delete;
-  ComponentIdGenerator& operator=(const ComponentIdGenerator&) = delete;
-
-  static usize next() { return m_counter++; }
-  static void  reset() { m_counter = 0; }
-
-private:
-  static inline usize m_counter = 0;
-};
-
-} // namespace detail
-
-template<typename T>
-struct ComponentTraits {
-  static constexpr bool s_is_registered = false;
-};
-
-/**
- * @brief Registers a SD component for use with ECS
- * @details Needs to be run to use a component with ECS
- * @param Type struct type
- */
-#define REGISTER_SD_COMPONENT(Type)                                                      \
-  template<>                                                                             \
-  struct ComponentTraits<Type> {                                                         \
-    static constexpr bool        s_is_registered = true;                                 \
-    static constexpr const char* name            = "SD_" #Type;                          \
-    static inline const usize    id              = detail::ComponentIdGenerator::next(); \
-  };
-
-/**
- * @brief Registers a component for use with ECS (non-namespaced)
- * @param Type struct type
- */
-#define REGISTER_COMPONENT(Type)                                                         \
-  template<>                                                                             \
-  struct ComponentTraits<Type> {                                                         \
-    static constexpr bool        s_is_registered = true;                                 \
-    static constexpr const char* name            = #Type;                                \
-    static inline const usize    id              = detail::ComponentIdGenerator::next(); \
-  };
-
-struct ComponentDebugInfo {
-  usize       id;
-  const char* name;
-  void*       data;
 };
 
 template<typename T>

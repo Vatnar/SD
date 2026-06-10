@@ -47,7 +47,7 @@ std::unique_ptr<Command> CommandFactory::create(u32 type_id) {
   return nullptr;
 }
 
-void CommandQueue::apply(EntityManager& em) {
+void CommandQueue::apply(EntityManager<ComponentGroup<>>& em) {
   for (const auto& cmd : m_commands) {
     cmd->execute(em, *this);
   }
@@ -102,7 +102,8 @@ void CommandQueue::deserialize(Serializer& serializer) {
       m_commands.push_back(std::move(cmd));
     } else {
       log::engine::error("Unknown command type ID {} during deserialization, skipping {} bytes",
-                         type_id, payload_size);
+                         type_id,
+                         payload_size);
       serializer.SetOffset(payload_start + payload_size);
     }
   }

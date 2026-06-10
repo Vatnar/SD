@@ -406,14 +406,15 @@ void EngineDebugLayer::display_ecs_inspector() {
     return;
   }
 
-  for (auto [entity, transform] : m_selected_scene->em.view<Transform>()) {
+  for (auto [entity, transform] : m_selected_scene->em.view<sd::components::Transform>()) {
     std::string label = "Entity " + std::to_string(entity.index);
-    if (auto* name = m_selected_scene->em.try_get_component<DebugName>(entity)) {
+    if (auto* name = m_selected_scene->em.try_get_component<sd::components::DebugName>(entity)) {
       label = name->name + " (ID: " + std::to_string(entity.index) + ")";
     }
 
     if (ImGui::TreeNode(label.c_str())) {
-      if (auto* transform_ptr = m_selected_scene->em.try_get_component<Transform>(entity)) {
+      if (auto* transform_ptr =
+              m_selected_scene->em.try_get_component<sd::components::Transform>(entity)) {
         if (ImGui::TreeNode("Transform")) {
           for (int i = 0; i < 4; i++) {
             if (ImGui::DragFloat4(("col " + std::to_string(i)).c_str(),
@@ -427,7 +428,8 @@ void EngineDebugLayer::display_ecs_inspector() {
           ImGui::TreePop();
         }
       }
-      if (auto* renderable = m_selected_scene->em.try_get_component<Renderable>(entity)) {
+      if (auto* renderable =
+              m_selected_scene->em.try_get_component<sd::components::Renderable>(entity)) {
         if (ImGui::TreeNode("Renderable")) {
           if (ImGui::ColorEdit4("Color", renderable->color)) {
             if (m_log_scene_changes) {

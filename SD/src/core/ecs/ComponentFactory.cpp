@@ -25,18 +25,12 @@ bool ComponentFactory::is_registered(u32 component_id) {
 
 void ComponentFactory::clear() {
   m_creators.clear();
-  detail::ComponentIdGenerator::reset();
+  // TODO: reset ComponentIdGenerator when serialization system is rebuilt
 }
 
 void ComponentFactory::register_default_pools() {
-  register_component(ComponentTraits<Transform>::id,
-                     [] { return std::make_unique<SparseEntitySet<Transform>>(); });
-  register_component(ComponentTraits<Camera>::id,
-                     [] { return std::make_unique<SparseEntitySet<Camera>>(); });
-  register_component(ComponentTraits<Renderable>::id,
-                     [] { return std::make_unique<SparseEntitySet<Renderable>>(); });
-  register_component(ComponentTraits<DebugName>::id,
-                     [] { return std::make_unique<SparseEntitySet<DebugName>>(); });
+  // TODO: re-implement when serialization system is rebuilt
+  // register_component(ComponentTraits<Transform>::id, ...)
 }
 
 } // namespace sd

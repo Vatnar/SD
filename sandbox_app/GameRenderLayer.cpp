@@ -115,7 +115,8 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
   // Just checks for equilateral triangle
   const bool inside = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 
-  for (auto [entity, transform, renderable] : m_scene->em.view<sd::Transform, sd::Renderable>()) {
+  for (auto [entity, transform, renderable] :
+       m_scene->em.view<sd::components::Transform, sd::components::Renderable>()) {
     if ((renderable.view_mask & 1u << static_cast<uint32_t>(m_view_id)) == 0 ||
         renderable.render_stage != m_stage_id)
       continue;

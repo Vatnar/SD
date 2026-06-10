@@ -11,7 +11,7 @@ public:
   void add(Args&&... args) {
     m_commands.push_back(std::make_unique<T>(std::forward<Args>(args)...));
   }
-  void apply(EntityManager& em);
+  void apply(EntityManager<ComponentGroup<>>& em);
 
   [[nodiscard]] Entity get_entity(EntityHandle handle) const;
 

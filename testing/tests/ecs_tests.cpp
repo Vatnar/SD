@@ -6,7 +6,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/fmt/bundled/ostream.h"
 
-namespace sd {
+namespace {
 struct Transform {
   VLA::Matrix4x4f transform;
 };
@@ -22,7 +22,8 @@ struct Health {
   int max;
 };
 REGISTER_SD_COMPONENT(Health);
-} // namespace sd
+} // namespace
+namespace sd {} // namespace sd
 
 TEST(ECSTest, ReplaceComponent) {
   sd::EntityManager entityManager;

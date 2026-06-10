@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <fstream>
+#include <x86gprintrin.h>
 
 #include <SD/Application.hpp>
 #include <SD/core/ShaderCompiler.hpp>
@@ -8,6 +9,7 @@
 #include <SD/game_api.hpp>
 
 #include "GameRenderLayer.hpp"
+#include "SD/profiler.hpp"
 #include "logging.hpp"
 
 static void register_game_categories() {
@@ -213,8 +215,12 @@ void on_load(sd::Application& app, State& state) {
     };
 
     // TODO: check this properly
+
+
     vk::UniquePipelineCache pipeline_cache{};
     {
+      PROFILE("pipeline_cache");
+
       // Load cached pipeline data from previous run if available
       std::vector<char> cache_data;
       std::ifstream     cache_file("cache/pipeline.spv", std::ios::binary | std::ios::ate);
@@ -224,6 +230,7 @@ void on_load(sd::Application& app, State& state) {
         cache_data.resize(static_cast<usize>(size));
         cache_file.read(cache_data.data(), static_cast<std::streamsize>(size));
         sd::log::game::info("Loaded pipeline cache ({} bytes)", size);
+        // printf("Loaded pipeline cache (%lu bytes)\n", size);
       }
 
       vk::PipelineCacheCreateInfo pipeline_cache_info{
@@ -238,6 +245,8 @@ void on_load(sd::Application& app, State& state) {
         sd::log::engine::warn("Failed to create pipeline cache");
       }
     }
+
+
     auto res = vulkan_context.get_vulkan_device()->createGraphicsPipelinesUnique(*pipeline_cache,
                                                                                  pipeline_info);
     if (res.result != vk::Result::eSuccess) {
@@ -260,9 +269,11 @@ void on_load(sd::Application& app, State& state) {
           cache_out.write(reinterpret_cast<const char*>(data.data()),
                           static_cast<std::streamsize>(data_sz));
           sd::log::game::info("Saved pipeline cache ({} bytes)", data_sz);
+          // printf("Saved pipeline cache (%lu bytes)\n", data_sz);
         }
       }
     }
+
 
     sd::log::game::info("Pipeline created");
   }
@@ -275,25 +286,28 @@ void on_load(sd::Application& app, State& state) {
   state.view_bit = 1u << game_view.get_view_id().value;
 
   auto ent = state.shared_scene->em.create();
-  state.shared_scene->em.add_component<sd::DebugName>(ent, "Triangle");
-  state.shared_scene->em.add_component<sd::Transform>(
+  state.shared_scene->em.add_component<sd::components::DebugName>(ent, "Triangle");
+  state.shared_scene->em.add_component<sd::components::Transform>(
       ent,
       VLA::Matrix4x4f::Scale({0.5f, 0.5f, 0.5f}) *
           VLA::Matrix4x4f::Translation({-0.5f, 0.0f, 0.0f}));
-  state.shared_scene->em.add_component<sd::Renderable>(ent,
-                                                       sd::Renderable{
-                                                           0,
-                                                           1,
-                                                           0,
-                                                           ~0u,
-                                                           {0.0f, 1.0f, 0.0f, 1.0f}
+  state.shared_scene->em.add_component<sd::components::Renderable>(ent,
+                                                                   sd::components::Renderable{
+                                                                       0,
+                                                                       1,
+                                                                       0,
+                                                                       ~0u,
+                                                                       {0.0f, 1.0f, 0.0f, 1.0f}
   });
 
   auto ent2 = state.shared_scene->em.create();
-  state.shared_scene->em.add_component<sd::DebugName>(ent2, "Better triangle");
-  state.shared_scene->em.add_component<sd::Transform>(ent2,
-                                                      VLA::Matrix4x4f::Scale({0.3f, 0.3f, 0.3f}));
-  state.shared_scene->em.add_component<sd::Renderable>(ent2, sd::Renderable{0, 0, 0, ~0u});
+  state.shared_scene->em.add_component<sd::components::DebugName>(ent2, "Better triangle");
+  state.shared_scene->em.add_component<sd::components::Transform>(
+      ent2,
+      VLA::Matrix4x4f::Scale({0.3f, 0.3f, 0.3f}));
+  state.shared_scene->em.add_component<sd::components::Renderable>(
+      ent2,
+      sd::components::Renderable{0, 0, 0, ~0u});
 
   game_view.push_layer<GameRenderLayer>("Game Render Layer",
                                         state.shared_scene,

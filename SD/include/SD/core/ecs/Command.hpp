@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "EntityManager.hpp"
 #include "SD/core/types.hpp"
 #include "SD/utils/serialization.hpp"
 
@@ -13,7 +14,6 @@ namespace sd {
 
 class Command;
 class CommandQueue;
-class EntityManager;
 
 class CommandRegistry {
 public:
@@ -115,7 +115,7 @@ public:
    * Called when Apply() is called on the queue
    * @param em entity manager
    */
-  virtual void execute(EntityManager& em, CommandQueue& queue) = 0;
+  virtual void execute(EntityManager<ComponentGroup<>>& em, CommandQueue& queue) = 0;
 
   /**
    * Serialize command to buffer (networking and files)

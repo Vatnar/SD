@@ -85,11 +85,13 @@ consteval std::array<ExtString, N> concatenate_mappings(std::array<ExtMapping, N
 
 template<usize N>
 constexpr std::array<ExtMapping, N> sort_by_profile(std::array<ExtMapping, N> mappings) {
-  for (usize i = 0; i < N; ++i)
-    for (usize j = i + 1; j < N; ++j)
-      if (mappings[i].profile > mappings[j].profile ||
-          (mappings[i].profile == mappings[j].profile && mappings[i].ext > mappings[j].ext))
-        std::swap(mappings[i], mappings[j]);
+  std::ranges::sort(mappings, [](const ExtMapping& a, const ExtMapping& b) constexpr {
+    if (a.profile < b.profile)
+      return true;
+    if (b.profile < a.profile)
+      return false;
+    return a.ext < b.ext;
+  });
   return mappings;
 }
 

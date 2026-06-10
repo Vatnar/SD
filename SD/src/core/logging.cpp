@@ -413,8 +413,9 @@ void init() {
 
   register_category("engine", ImVec4(0.0f, 0.8f, 1.0f, 1.0f));          // Cyan
   register_category("engine/renderer", ImVec4(0.8f, 0.4f, 1.0f, 1.0f)); // Purple
-  register_category("engine/ecs", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));      // Yellow
-  register_category("engine/network", ImVec4(0.0f, 1.0f, 0.6f, 1.0f));  // Teal
+  register_category("profiler", ImVec4(1.0f, 0.4f, 1.0f, 1.0f));
+  register_category("engine/ecs", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));     // Yellow
+  register_category("engine/network", ImVec4(0.0f, 1.0f, 0.6f, 1.0f)); // Teal
   register_category("engine/shader", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));
   register_category("vulkan", ImVec4(1.0f, 0.4f, 0.0f, 1.0f));
   register_category("debug_layer", ImVec4(1.0f, 0.5f, 0.8f, 1.0f));

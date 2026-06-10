@@ -13,25 +13,34 @@
 #include "SD/core/logging.hpp"
 #include "SparseEntitySet.hpp"
 #include "component_registration.hpp"
+#include "components.hpp"
 
 
 namespace sd {
-class EntityManager;
+
 
 // TODO(docs): Document ViewImpl class
 //   - Purpose: Iterator for entities with specific components
 //   - Iteration pattern and validity checking
 //   - begin()/end() semantics
 //   - Example: Iterating over entities with Transform and Velocity
-template<typename... Components>
+
+
+template<typename ExtraComponents>
+class EntityManager;
+
+template<typename ExtraComponents = ComponentGroup<>, typename... Components>
 class ViewImpl {
-  EntityManager&             m_manager;
+  using manager_type   = EntityManager<ExtraComponents>;
+  using all_components = ConcatComponentGroups_t<components::EngineComponents, ExtraComponents>;
+
+  manager_type&              m_manager;
   const std::vector<Entity>* m_smallest_pool = nullptr;
 
 public:
-  explicit ViewImpl(EntityManager& manager);
+  explicit ViewImpl(manager_type& manager);
   struct Iterator {
-    EntityManager&             manager;
+    manager_type&              manager;
     const std::vector<Entity>* entities;
     usize                      index;
 
@@ -41,7 +50,7 @@ public:
     using pointer           = void;
     using reference         = value_type;
 
-    Iterator(EntityManager& em, const std::vector<Entity>* dense_entities, usize idx);
+    Iterator(manager_type& em, const std::vector<Entity>* dense_entities, usize idx);
     Iterator& operator++();
 
     bool operator==(const Iterator& other) const {
@@ -80,7 +89,15 @@ private:
  * created per component, for multiple components, or of a ComponentGroup of components.
  *
  */
+template<typename ExtraComponents>
 class EntityManager : public Serializable {
+  using all_components = ConcatComponentGroups_t<components::EngineComponents, ExtraComponents>;
+  template<typename T>
+  using component_info = ComponentTraits<T, all_components>;
+
+  static_assert(IsUniqueComponentGroup<all_components>::value,
+                "Duplicate component type in ECS schema");
+
 public:
   Entity create();
 
@@ -113,7 +130,7 @@ public:
     m_entity_masks.clear();
   }
 
-  [[nodiscard]] std::vector<ComponentDebugInfo> get_all_component_info(Entity e) const;
+  // [[nodiscard]] std::vector<ComponentDebugInfo> get_all_component_info(Entity e) const;
 
   [[nodiscard]] bool is_alive(Entity e) const;
   [[nodiscard]] int  get_entity_count() const { return m_entity_masks.size(); }
@@ -133,12 +150,12 @@ public:
   };
   template<typename... Ts>
   struct UnpackGroup<std::tuple<Ts...>> {
-    using type                     = ViewImpl<Ts...>;
+    using type                     = ViewImpl<ExtraComponents, Ts...>;
     static constexpr bool is_group = true;
   };
   template<typename... Ts>
   struct UnpackGroup<ComponentGroup<Ts...>> {
-    using type                     = ViewImpl<Ts...>;
+    using type                     = ViewImpl<ExtraComponents, Ts...>;
     static constexpr bool is_group = true;
   };
 
