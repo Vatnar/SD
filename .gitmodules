@@ -1,9 +1,6 @@
 [submodule "vendor/glfw"]
 	path = vendor/glfw
 	url = https://github.com/glfw/glfw.git
-[submodule "vendor/spdlog"]
-	path = vendor/spdlog
-	url = https://github.com/gabime/spdlog.git
 [submodule "vendor/imgui"]
 	path = vendor/imgui
 	url = https://github.com/ocornut/imgui.git
@@ -14,3 +11,9 @@
 [submodule "vendor/tomlplusplus"]
 	path = vendor/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
+[submodule "vendor/quill"]
+	path = vendor/quill
+	url = https://github.com/odygrd/quill.git
+[submodule "vendor/fmt"]
+	path = vendor/fmt
+	url = https://github.com/fmtlib/fmt.git

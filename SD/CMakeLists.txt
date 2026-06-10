@@ -50,7 +50,8 @@ target_link_libraries(SD
         glfw
         stb
         VLA
-        spdlog::spdlog
+        quill::quill
+        fmt::fmt
         imgui
         vma
         dxc
@@ -64,13 +65,12 @@ target_compile_definitions(SD
         SD_SUPPRESS_VULKAN_INFO
         SD_FAIL_ON_VULKAN_VALIDATION_ERROR
 
-        SPDLOG_COMPILED_LIB
         VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
         VULKAN_HPP_NO_CONSTRUCTORS
         VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
         VULKAN_HPP_USE_STD_EXPECTED=1
         VULKAN_HPP_NO_EXCEPTIONS=1
-        SPDLOG_NO_EXCEPTIONS
+        QUILL_NO_EXCEPTIONS
 )
 
 if (SD_DEBUG_ENABLED)
@@ -83,7 +83,11 @@ endif ()
 target_precompile_headers(SD PRIVATE
         <vulkan/vulkan.h>
         <GLFW/glfw3.h>
-        <spdlog/spdlog.h>
+        <quill/LogMacros.h>
+        <quill/LogFunctions.h>
+        <quill/Logger.h>
+
+        <fmt/core.h>
 
         <vector>
         <string>
@@ -119,6 +123,7 @@ else ()
             -Wextra
             -freflection
             -Wpedantic
+            -mclflushopt
             $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
     )
 endif ()

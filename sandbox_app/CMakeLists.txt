@@ -27,6 +27,7 @@ else ()
             -freflection
             -Wextra
             -Wpedantic
+            -mclflushopt
             $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
     )
 endif ()
@@ -69,6 +70,7 @@ if (UNIX AND NOT APPLE)
                 -freflection
                 -Wextra
                 -Wpedantic
+                -mclflushopt
                 $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
         )
     endif ()
@@ -132,6 +134,7 @@ if (MSVC)
                 -freflection
                 -Wextra
                 -Wpedantic
+                -mclflushopt
                 $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
         )
     endif ()

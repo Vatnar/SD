@@ -1,4 +1,7 @@
 #pragma once
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string_view>
 #include <x86intrin.h>
 
@@ -7,9 +10,33 @@
 
 namespace sd {
 
+namespace detail {
+
+inline u64 get_cpu_mhz() {
+  static u64 cached_mhz = [] {
+    u64 mhz = 0;
+    if (FILE* f = fopen("/proc/cpuinfo", "r")) {
+      char buf[256];
+      while (fgets(buf, sizeof(buf), f)) {
+        if (const char* p = std::strstr(buf, "cpu MHz")) {
+          mhz = static_cast<u64>(std::strtod(p + 7, nullptr));
+          break;
+        }
+      }
+      fclose(f);
+    }
+    return mhz ? mhz : 3000;
+  }();
+  return cached_mhz;
+}
+
+} // namespace detail
+
 struct Profile {
   u64         start{};
   const char* name{};
+
+  Profile() = default;
 
   Profile(const char* name) : name{name} {
     _mm_lfence();
@@ -17,18 +44,44 @@ struct Profile {
   }
 
   ~Profile() noexcept {
+    if (!name)
+      return;
     u32 aux;
     u64 end = __rdtscp(&aux);
     _mm_lfence();
+    u64 elapsed = end - start;
+    u64 cur_mhz = detail::get_cpu_mhz();
+    sd::log::engine::profiler::debug(
+        "{}: {} cycles, {:.2f} ms @ 3GHz, {:.2f} ms @ {} MHz (current)",
+        name,
+        elapsed,
+        elapsed / 3'000'000.0,
+        elapsed / (cur_mhz * 1000.0),
+        cur_mhz);
+  }
 
-    // TODO: consider how long debug takes
-    // _mm_lfence();
-    // u64 start2 = __rdtsc();
-    // sd::log::engine::profiler::debug("{}: {} cycles", name, end - start);
-    printf("[profiler] [debug] %s: %lu cycles\n", name, end - start);
-    // u64 end2 = __rdtscp(&aux);
-    // _mm_lfence();
-    // sd::log::engine::profiler::debug("logging: {} cycles", end2 - start2);
+  void begin(const char* new_name) {
+    name = new_name;
+    _mm_lfence();
+    start = __rdtsc();
+  }
+
+  u64 end() {
+    u32 aux;
+    u64 end_tsc = __rdtscp(&aux);
+    _mm_lfence();
+    u64 elapsed = end_tsc - start;
+    u64 cur_mhz = detail::get_cpu_mhz();
+
+    sd::log::engine::profiler::debug(
+        "{}: {} cycles, {:.2f} ms @ 3GHz, {:.2f} ms @ {} MHz (current)",
+        name,
+        elapsed,
+        elapsed / 3'000'000.0,
+        elapsed / (cur_mhz * 1000.0),
+        cur_mhz);
+    name = nullptr;
+    return elapsed;
   }
 
   Profile(const Profile&)            = delete;
@@ -36,6 +89,8 @@ struct Profile {
   Profile(Profile&&)                 = delete;
   Profile& operator=(Profile&&)      = delete;
 };
+
+inline thread_local Profile _sd_active_profile{};
 } // namespace sd
 
 #define SD_CONCAT_INNER(a, b) a##b
@@ -45,4 +100,7 @@ struct Profile {
   ::sd::Profile SD_CONCAT(_sd_profile_, __LINE__) { \
     name                                            \
   }
-#define PROFILE_FUNCTION() PROFILE(__func__)
+#define PROFILE_FUNCTION()  PROFILE(__func__)
+
+#define PROFILE_START(name) ::sd::_sd_active_profile.begin(name)
+#define PROFILE_END()       ::sd::_sd_active_profile.end()

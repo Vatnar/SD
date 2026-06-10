@@ -1,7 +1,5 @@
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include "SD/core/logging.hpp"
 
 #if defined(_MSC_VER)
@@ -11,12 +9,12 @@
 #else
 #error Unknown trap intrinsic for compiler.
 #endif
-#define ASSERT_ALWAYS(x)                                                      \
-  do {                                                                        \
-    if (!(x)) {                                                               \
-      spdlog::critical("ASSERT FAILED: {} at {}:{}", #x, __FILE__, __LINE__); \
-      TRAP();                                                                 \
-    }                                                                         \
+#define ASSERT_ALWAYS(x)                                                                 \
+  do {                                                                                   \
+    if (!(x)) {                                                                          \
+      ::sd::log::engine::critical("ASSERT FAILED: {} at {}:{}", #x, __FILE__, __LINE__); \
+      TRAP();                                                                            \
+    }                                                                                    \
   } while (0)
 
 #ifdef SD_DEBUG

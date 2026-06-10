@@ -1,16 +1,23 @@
 add_subdirectory(glfw)
-
-# Disable exceptions in spdlog so it aborts instead of throwing through -fno-exceptions code
-set(SPDLOG_NO_EXCEPTIONS ON CACHE BOOL "" FORCE)
-add_subdirectory(spdlog)
+add_subdirectory(fmt)
 add_subdirectory(stb)
 add_subdirectory(dxc)
 add_subdirectory(VLA)
 add_subdirectory(tomlplusplus)
 
-# glfw and spdlog have macro conflicts in unity builds; these exclusions
-# are safe to set unconditionally — they are no-ops when unity is off.
-set_target_properties(glfw spdlog PROPERTIES UNITY_BUILD OFF)
+# Quill: low-latency async logging
+set(QUILL_NO_EXCEPTIONS ON CACHE BOOL "" FORCE)
+set(QUILL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(QUILL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(QUILL_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+set(QUILL_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+# Quill uses architecture-specific assumptions for cache coherence (prefetch, clflush)
+set(QUILL_X86ARCH ON CACHE BOOL "" FORCE)
+add_subdirectory(quill)
+
+# glfw has macro conflicts in unity builds; this exclusion
+# is safe to set unconditionally — it is a no-op when unity is off.
+set_target_properties(glfw PROPERTIES UNITY_BUILD OFF)
 
 add_library(imgui STATIC
         imgui/imgui.cpp

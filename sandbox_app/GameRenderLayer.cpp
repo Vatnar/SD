@@ -7,6 +7,8 @@
 #include <SD/utils/utils.hpp>
 #include <VLA/Matrix.hpp>
 
+#include "SD/profiler.hpp"
+
 GameRenderLayer::GameRenderLayer(const std::string&       name,
                                  sd::Scene*               scene,
                                  vk::UniquePipeline       pipeline,

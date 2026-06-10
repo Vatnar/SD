@@ -3,7 +3,7 @@
 #include <array>
 #include <string_view>
 
-#include <spdlog/fmt/bundled/core.h>
+#include <fmt/core.h>
 
 #include "SD/core/types.hpp"
 
@@ -38,12 +38,13 @@ struct FixedString {
     return std::string_view(data.data(), size);
   }
 };
-//~ Make fmt and spdlog compatible
 template<usize N>
-struct fmt::formatter<FixedString<N>> : fmt::formatter<std::string_view> {
-  auto format(const FixedString<N>& value, format_context& ctx) const {
-    return fmt::formatter<std::string_view>::format(std::string_view(value.data.data(), value.size),
-                                                    ctx);
+struct fmt::formatter<FixedString<N>> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto           format(const FixedString<N>& value, format_context& ctx) {
+    return std::copy(value.data.begin(),
+                     value.data.begin() + static_cast<std::ptrdiff_t>(value.size),
+                     ctx.out());
   }
 };
 

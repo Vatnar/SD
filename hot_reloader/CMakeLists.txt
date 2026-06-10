@@ -7,7 +7,7 @@ if (UNIX AND NOT APPLE)
 
     target_link_libraries(HotReloadApp PRIVATE
             SD
-            spdlog::spdlog
+            quill::quill
             ${CMAKE_DL_LIBS}
     )
 
@@ -27,6 +27,7 @@ if (UNIX AND NOT APPLE)
     )
     target_compile_options(HotReloadApp PRIVATE
             -freflection
+            -mclflushopt
     )
 
     #~ INSTALL

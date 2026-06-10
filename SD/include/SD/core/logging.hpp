@@ -9,8 +9,10 @@
 #include <vector>
 
 #include <SD/export.hpp>
-#include <spdlog/common.h>
-#include <spdlog/spdlog.h>
+#include <fmt/format.h>
+#include <quill/Backend.h>
+#include <quill/LogFunctions.h>
+#include <quill/core/LogLevel.h>
 
 #define ENGINE_LOG_LEVEL_TRACE    0
 #define ENGINE_LOG_LEVEL_DEBUG    1
@@ -69,103 +71,91 @@ SD_EXPORT void                       register_category(const char* name, ImVec4 
 
 bool is_category_under(const std::string& child, const std::string& parent);
 
-/**
- * @brief Initializes all category loggers, shared sinks, and the ImGui sink
- */
 SD_EXPORT void init();
 
-spdlog::level::level_enum to_spdlog_level(LogLevel level);
+quill::LogLevel to_quill_level(LogLevel level);
 
-LogLevel from_spdlog_level(spdlog::level::level_enum level);
+LogLevel from_quill_level(quill::LogLevel level);
 
-constexpr auto LOG_LEVEL_GENERAL = spdlog::level::level_enum(7);
-
-inline std::shared_ptr<spdlog::logger> get_category_logger_or_report(const char* categoryPath) {
-  if (auto logger = spdlog::get(categoryPath)) {
-    return logger;
-  }
-
-  spdlog::error("Log category '{}' is not registered. Message was not logged.", categoryPath);
-  return nullptr;
-}
+quill::Logger* get_category_logger_or_report(const char* categoryPath);
 
 } // namespace sd::log
+
 #define SD_LOG_CATEGORY_IMPL(CategoryPath, Level)                                             \
   constexpr auto        cMinLevel     = static_cast<::sd::log::LogLevel>(Level);              \
   constexpr const char* cCategoryPath = CategoryPath;                                         \
                                                                                               \
-  inline const auto& get_logger() {                                                           \
-    static auto logger = ::sd::log::get_category_logger_or_report(CategoryPath);              \
+  inline ::quill::Logger* get_logger() {                                                      \
+    static ::quill::Logger* logger = ::sd::log::get_category_logger_or_report(CategoryPath);  \
     return logger;                                                                            \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void trace(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
+  inline void trace(fmt::format_string<Args...> fmt, Args&&... args) {                        \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::TRACE) {                                  \
-      if (const auto& logger = get_logger()) {                                                \
-        logger->trace(fmt, std::forward<Args>(args)...);                                      \
+      if (auto* logger = get_logger()) {                                                      \
+        ::quill::tracel3(logger, fmt.get().data(), std::forward<Args>(args)...);              \
       }                                                                                       \
     }                                                                                         \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void debug(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
+  inline void debug(fmt::format_string<Args...> fmt, Args&&... args) {                        \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::DEBUG) {                                  \
-      if (const auto& logger = get_logger()) {                                                \
-        logger->debug(fmt, std::forward<Args>(args)...);                                      \
+      if (auto* logger = get_logger()) {                                                      \
+        ::quill::debug(logger, fmt.get().data(), std::forward<Args>(args)...);                \
       }                                                                                       \
     }                                                                                         \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void info(spdlog::format_string_t<Args...> fmt, Args&&... args) {                    \
+  inline void info(fmt::format_string<Args...> fmt, Args&&... args) {                         \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::INFO) {                                   \
-      if (const auto& logger = get_logger()) {                                                \
-        logger->info(fmt, std::forward<Args>(args)...);                                       \
+      if (auto* logger = get_logger()) {                                                      \
+        ::quill::info(logger, fmt.get().data(), std::forward<Args>(args)...);                 \
       }                                                                                       \
     }                                                                                         \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void warn(spdlog::format_string_t<Args...> fmt, Args&&... args) {                    \
+  inline void warn(fmt::format_string<Args...> fmt, Args&&... args) {                         \
     if constexpr (cMinLevel <= ::sd::log::LogLevel::WARN) {                                   \
-      if (const auto& logger = get_logger()) {                                                \
-        logger->warn(fmt, std::forward<Args>(args)...);                                       \
+      if (auto* logger = get_logger()) {                                                      \
+        ::quill::warning(logger, fmt.get().data(), std::forward<Args>(args)...);              \
       }                                                                                       \
     }                                                                                         \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void error(spdlog::format_string_t<Args...> fmt, Args&&... args) {                   \
-    if (const auto& logger = get_logger()) {                                                  \
-      logger->error(fmt, std::forward<Args>(args)...);                                        \
+  inline void error(fmt::format_string<Args...> fmt, Args&&... args) {                        \
+    if (auto* logger = get_logger()) {                                                        \
+      ::quill::error(logger, fmt.get().data(), std::forward<Args>(args)...);                  \
     }                                                                                         \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  [[noreturn]] inline void critical(spdlog::format_string_t<Args...> fmt, Args&&... args) {   \
-    if (const auto& logger = get_logger()) {                                                  \
-      logger->critical(fmt, std::forward<Args>(args)...);                                     \
+  [[noreturn]] inline void critical(fmt::format_string<Args...> fmt, Args&&... args) {        \
+    if (auto* logger = get_logger()) {                                                        \
+      ::quill::critical(logger, fmt.get().data(), std::forward<Args>(args)...);               \
+      logger->flush_log();                                                                    \
     }                                                                                         \
-    spdlog::shutdown();                                                                       \
+    ::quill::Backend::stop();                                                                 \
     std::abort();                                                                             \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void general(spdlog::format_string_t<Args...> fmt, Args&&... args) {                 \
-    if (const auto& logger = get_logger()) {                                                  \
-      logger->log(::sd::log::LOG_LEVEL_GENERAL, fmt, std::forward<Args>(args)...);            \
-    }                                                                                         \
+  inline void general(Args&&... args) {                                                       \
+    info(std::forward<Args>(args)...);                                                        \
   }                                                                                           \
                                                                                               \
   template<typename... Args>                                                                  \
-  inline void tagged(std::string_view                 subcategory,                            \
-                     spdlog::format_string_t<Args...> fmt,                                    \
+  inline void tagged(std::string_view            subcategory,                                 \
+                     fmt::format_string<Args...> fmt,                                         \
                      Args&&... args) {                                                        \
-    if (const auto& logger = get_logger()) {                                                  \
+    if (auto* logger = get_logger()) {                                                        \
       auto msg =                                                                              \
           fmt::format("[{}] {}", subcategory, fmt::format(fmt, std::forward<Args>(args)...)); \
-      logger->log(::sd::log::LOG_LEVEL_GENERAL, "{}", msg);                                   \
+      ::quill::info(logger, msg.c_str());                                                     \
     }                                                                                         \
   }
 

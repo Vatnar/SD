@@ -4,12 +4,18 @@
 #include <array>
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <mutex>
 #include <vector>
 
-#include "spdlog/async.h"
-#include "spdlog/sinks/base_sink.h"
-#include "spdlog/sinks/basic_file_sink.h"
+#include <fmt/chrono.h>
+#include <fmt/format.h>
+#include <quill/Backend.h>
+#include <quill/Frontend.h>
+#include <quill/sinks/FileSink.h>
+#include <quill/sinks/Sink.h>
+
+#include "SD/profiler.hpp"
 
 namespace sd::log {
 
@@ -60,7 +66,6 @@ static std::vector<LogEntry> read_entries_from_file(size_t offset, size_t count)
       continue;
     *p3++ = '\0';
 
-    // Strip trailing newline from message
     size_t mlen = strlen(p3);
     while (mlen > 0 && (p3[mlen - 1] == '\n' || p3[mlen - 1] == '\r'))
       p3[--mlen] = '\0';
@@ -110,14 +115,12 @@ std::vector<LogEntry> get_entries(size_t offset, size_t count) {
   std::lock_guard       lock(g_log_mutex);
   std::vector<LogEntry> result;
 
-  // File portion
   if (offset < g_file_entry_count) {
     size_t from_file = std::min(count, g_file_entry_count - offset);
     auto   fe        = read_entries_from_file(offset, from_file);
     result           = std::move(fe);
   }
 
-  // Memory portion
   size_t mem_offset = offset > g_file_entry_count ? offset - g_file_entry_count : 0;
   if (mem_offset < g_log_history.size() && result.size() < count) {
     size_t from_mem = std::min(count - result.size(), g_log_history.size() - mem_offset);
@@ -135,47 +138,45 @@ std::vector<CategoryInfo>& get_category_registry() {
   return g_category_registry;
 }
 
-static std::vector<spdlog::sink_ptr> g_shared_sinks;
-static spdlog::sink_ptr              g_engine_file_sink;
-static spdlog::sink_ptr              g_game_file_sink;
-
-spdlog::level::level_enum to_spdlog_level(const LogLevel level) {
+quill::LogLevel to_quill_level(const LogLevel level) {
   switch (level) {
     case LogLevel::TRACE:
-      return spdlog::level::trace;
+      return quill::LogLevel::TraceL3;
     case LogLevel::DEBUG:
-      return spdlog::level::debug;
+      return quill::LogLevel::Debug;
     case LogLevel::INFO:
-      return spdlog::level::info;
+      return quill::LogLevel::Info;
     case LogLevel::WARN:
-      return spdlog::level::warn;
+      return quill::LogLevel::Warning;
     case LogLevel::ERROR:
-      return spdlog::level::err;
+      return quill::LogLevel::Error;
     case LogLevel::CRITICAL:
-      return spdlog::level::critical;
+      return quill::LogLevel::Critical;
     case LogLevel::OFF:
-      return spdlog::level::off;
-    case LogLevel::GENERAL:
-      return LOG_LEVEL_GENERAL;
+      return quill::LogLevel::None;
+    default:
+      return quill::LogLevel::Info;
   }
-  return spdlog::level::info;
 }
 
-LogLevel from_spdlog_level(spdlog::level::level_enum level) {
+LogLevel from_quill_level(const quill::LogLevel level) {
   switch (level) {
-    case spdlog::level::trace:
+    case quill::LogLevel::TraceL3:
+    case quill::LogLevel::TraceL2:
+    case quill::LogLevel::TraceL1:
       return LogLevel::TRACE;
-    case spdlog::level::debug:
+    case quill::LogLevel::Debug:
       return LogLevel::DEBUG;
-    case spdlog::level::info:
+    case quill::LogLevel::Info:
+    case quill::LogLevel::Notice:
       return LogLevel::INFO;
-    case spdlog::level::warn:
+    case quill::LogLevel::Warning:
       return LogLevel::WARN;
-    case spdlog::level::err:
+    case quill::LogLevel::Error:
       return LogLevel::ERROR;
-    case spdlog::level::critical:
+    case quill::LogLevel::Critical:
       return LogLevel::CRITICAL;
-    case spdlog::level::off:
+    case quill::LogLevel::None:
       return LogLevel::OFF;
     default:
       return LogLevel::GENERAL;
@@ -197,160 +198,196 @@ static std::string ansi_fg_color(ImVec4 c) {
                      static_cast<int>(c.z * 255));
 }
 
-static std::string level_ansi_color(spdlog::level::level_enum level) {
-  static constexpr std::array colors = {
-      ImVec4{0.7f, 0.7f, 0.7f, 1.0f}, // trace
-      ImVec4{0.0f, 0.8f, 1.0f, 1.0f}, // debug
-      ImVec4{0.0f, 1.0f, 0.0f, 1.0f}, // info
-      ImVec4{1.0f, 1.0f, 0.0f, 1.0f}, // warn
-      ImVec4{1.0f, 0.0f, 0.0f, 1.0f}, // err
-      ImVec4{1.0f, 0.0f, 1.0f, 1.0f}, // critical
-  };
-  auto idx = static_cast<size_t>(level);
-  if (idx >= colors.size())
-    return ansi_fg_color(colors.back());
-  return ansi_fg_color(colors[idx]);
+static std::string level_ansi_color(quill::LogLevel level) {
+  ImVec4 c;
+  switch (level) {
+    case quill::LogLevel::TraceL3:
+    case quill::LogLevel::TraceL2:
+    case quill::LogLevel::TraceL1:
+      c = ImVec4{0.7f, 0.7f, 0.7f, 1.0f};
+      break;
+    case quill::LogLevel::Debug:
+      c = ImVec4{0.0f, 0.8f, 1.0f, 1.0f};
+      break;
+    case quill::LogLevel::Info:
+    case quill::LogLevel::Notice:
+      c = ImVec4{0.0f, 1.0f, 0.0f, 1.0f};
+      break;
+    case quill::LogLevel::Warning:
+      c = ImVec4{1.0f, 1.0f, 0.0f, 1.0f};
+      break;
+    case quill::LogLevel::Error:
+      c = ImVec4{1.0f, 0.0f, 0.0f, 1.0f};
+      break;
+    case quill::LogLevel::Critical:
+      c = ImVec4{1.0f, 0.0f, 1.0f, 1.0f};
+      break;
+    default:
+      c = ImVec4{0.7f, 0.7f, 0.7f, 1.0f};
+      break;
+  }
+  return ansi_fg_color(c);
 }
 
-static const char* level_str(spdlog::level::level_enum level) {
+static const char* level_str(quill::LogLevel level) {
   switch (level) {
-    case spdlog::level::trace:
+    case quill::LogLevel::TraceL3:
+    case quill::LogLevel::TraceL2:
+    case quill::LogLevel::TraceL1:
       return "trace";
-    case spdlog::level::debug:
+    case quill::LogLevel::Debug:
       return "debug";
-    case spdlog::level::info:
+    case quill::LogLevel::Info:
+    case quill::LogLevel::Notice:
       return "info";
-    case spdlog::level::warn:
+    case quill::LogLevel::Warning:
       return "warn";
-    case spdlog::level::err:
+    case quill::LogLevel::Error:
       return "error";
-    case spdlog::level::critical:
+    case quill::LogLevel::Critical:
       return "critical";
     default:
       return "?";
   }
 }
 
-class CategoryConsoleSink : public spdlog::sinks::base_sink<std::mutex> {
-protected:
-  void sink_it_(const spdlog::details::log_msg& msg) override {
-    spdlog::memory_buf_t formatted;
-    formatter_->format(msg, formatted);
+class CategoryConsoleSink final : public quill::Sink {
+public:
+  CategoryConsoleSink() :
+    quill::Sink(quill::PatternFormatterOptions{
+        "%(time) ",      // format_pattern: just the timestamp prefix
+        "%H:%M:%S.%Qus", // timestamp_pattern: HH:MM:SS.ffffff
+        quill::Timezone::LocalTime,
+        true,
+        '\0' // no suffix — we add our own
+    }) {}
 
-    // Strip trailing newline added by spdlog formatter
-    if (formatted.size() > 0 && formatted.data()[formatted.size() - 1] == '\n')
-      formatted.resize(formatted.size() - 1);
-
-    std::string cat_name(msg.logger_name.data(), msg.logger_name.size());
-    auto        payload = fmt::basic_string_view<char>(msg.payload.data(), msg.payload.size());
-
+  void write_log(const quill::MacroMetadata*,
+                 uint64_t,
+                 std::string_view,
+                 std::string_view,
+                 const std::string&,
+                 std::string_view logger_name,
+                 quill::LogLevel  log_level,
+                 std::string_view,
+                 std::string_view,
+                 const std::vector<std::pair<std::string, std::string>>*,
+                 std::string_view log_message,
+                 std::string_view log_statement) override {
     std::string cat_color;
     {
       std::lock_guard lock(g_registry_mutex);
       auto&           reg = get_category_registry();
       for (auto& cat : reg) {
-        if (is_category_under(cat_name, cat.name)) {
+        if (is_category_under(std::string(logger_name.data(), logger_name.size()), cat.name)) {
           cat_color = ansi_fg_color(cat.color);
           break;
         }
       }
     }
-    auto lev_color = level_ansi_color(msg.level);
-    auto lev_str   = level_str(msg.level);
 
     std::string out;
-    out.append(formatted.data(), formatted.size());
+    out.append(log_statement.data(), log_statement.size());
+
     if (!cat_color.empty()) {
       out += cat_color;
       out += '[';
-      out += cat_name;
+      out.append(logger_name.data(), logger_name.size());
       out += ']';
       out += "\033[0m";
     } else {
       out += '[';
-      out += cat_name;
+      out.append(logger_name.data(), logger_name.size());
       out += ']';
     }
-    if (msg.level != LOG_LEVEL_GENERAL) {
-      out += " [";
-      out += lev_color;
-      out += lev_str;
-      out += "\033[0m] ";
-    } else {
-      out += ' ';
-    }
 
-    if (msg.level == LOG_LEVEL_GENERAL && payload.size() > 0 && payload[0] == '[') {
-      std::string_view payload_sv(payload.data(), payload.size());
-      auto             close = payload_sv.find(']');
+    // tagged/general messages start with '[' — no level label
+    if (log_message.size() > 0 && log_message[0] == '[') {
+      out += ' ';
+      auto close = log_message.find(']');
       if (close != std::string_view::npos && !cat_color.empty()) {
         out += cat_color;
-        out.append(payload.data(), close + 1);
+        out.append(log_message.data(), close + 1);
         out += "\033[0m";
-        out.append(payload.data() + close + 1, payload.size() - close - 1);
+        out.append(log_message.data() + close + 1, log_message.size() - close - 1);
       } else {
-        out.append(payload.data(), payload.size());
+        out.append(log_message.data(), log_message.size());
       }
     } else {
-      out.append(payload.data(), payload.size());
+      out += " [";
+      out += level_ansi_color(log_level);
+      out += level_str(log_level);
+      out += "\033[0m] ";
+      out.append(log_message.data(), log_message.size());
     }
+
     out += '\n';
     fwrite(out.data(), 1, out.size(), stdout);
   }
 
-  void flush_() override { fflush(stdout); }
+  void flush_sink() noexcept override { fflush(stdout); }
 };
 
-template<typename Mutex>
-class imgui_sink : public spdlog::sinks::base_sink<Mutex> {
-protected:
-  void sink_it_(const spdlog::details::log_msg& msg) override {
-    spdlog::memory_buf_t formatted;
-    spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, formatted);
+class ImguiSink final : public quill::Sink {
+public:
+  ImguiSink() :
+    quill::Sink(quill::PatternFormatterOptions{"%v", // message only
+                                               "%H:%M:%S.%Qus",
+                                               quill::Timezone::LocalTime,
+                                               true,
+                                               quill::PatternFormatterOptions::NO_SUFFIX}) {}
 
-    add_log_entry({.category   = std::string(msg.logger_name.data(), msg.logger_name.size()),
-                   .level      = from_spdlog_level(msg.level),
-                   .message    = fmt::to_string(formatted),
+  void write_log(const quill::MacroMetadata*,
+                 uint64_t,
+                 std::string_view,
+                 std::string_view,
+                 const std::string&,
+                 std::string_view logger_name,
+                 quill::LogLevel  log_level,
+                 std::string_view,
+                 std::string_view,
+                 const std::vector<std::pair<std::string, std::string>>*,
+                 std::string_view log_message,
+                 std::string_view) override {
+    add_log_entry({.category   = std::string(logger_name.data(), logger_name.size()),
+                   .level      = from_quill_level(log_level),
+                   .message    = std::string(log_message.data(), log_message.size()),
                    .uptime_sec = get_uptime_sec()});
   }
 
-  void flush_() override {}
+  void flush_sink() noexcept override {}
 };
 
-using ImguiSinkMt = imgui_sink<std::mutex>;
+static std::shared_ptr<quill::Sink> g_console_sink;
+static std::shared_ptr<quill::Sink> g_imgui_sink;
+static std::shared_ptr<quill::Sink> g_engine_file_sink;
+static std::shared_ptr<quill::Sink> g_game_file_sink;
+static std::shared_ptr<quill::Sink> g_profiler_file_sink;
 
-static void create_category_logger(const char* name, const LogLevel minLevel) {
-  if (g_shared_sinks.empty())
-    return; // Init() not called yet
-
-  // Safe guard: spdlog already has a logger with this name (e.g. after hot-reload)
-  if (spdlog::get(name))
+static void create_category_logger(const char* name, LogLevel minLevel) {
+  if (!g_console_sink)
     return;
 
-  std::vector<spdlog::sink_ptr> catSinks = g_shared_sinks; // console + imgui
+  if (quill::Frontend::get_logger(name))
+    return;
 
-  // Route to the correct file sink based on category prefix
+  std::vector<std::shared_ptr<quill::Sink>> catSinks = {g_console_sink, g_imgui_sink};
+
   std::string_view sv(name);
-  if (sv.starts_with("game")) {
+  if (sv == "profiler") {
+    catSinks.push_back(g_profiler_file_sink);
+  } else if (sv.starts_with("game")) {
     catSinks.push_back(g_game_file_sink);
   } else {
-    // Unknown category -> engine.log as fallback
     catSinks.push_back(g_engine_file_sink);
   }
 
-  auto logger = std::make_shared<spdlog::async_logger>(name,
-                                                       catSinks.begin(),
-                                                       catSinks.end(),
-                                                       spdlog::thread_pool(),
-                                                       spdlog::async_overflow_policy::block);
-
-  logger->set_level(to_spdlog_level(minLevel));
-  logger->flush_on(spdlog::level::err); // Immediate flush on error/critical for crash debugging
-  spdlog::register_logger(logger);
+  auto* logger = quill::Frontend::create_or_get_logger(name, std::move(catSinks));
+  logger->set_log_level(to_quill_level(minLevel));
+  logger->set_immediate_flush(0);
 }
 
 void register_category(const char* name, ImVec4 color) {
-  // Avoid duplicates
   bool found = false;
   {
     std::lock_guard lock(g_registry_mutex);
@@ -364,7 +401,6 @@ void register_category(const char* name, ImVec4 color) {
     }
   }
   if (!found) {
-    // Create the logger immediately
     create_category_logger(name, LogLevel::TRACE);
   }
 }
@@ -374,50 +410,66 @@ bool is_category_under(const std::string& child, const std::string& parent) {
     return true;
   if (child.size() <= parent.size())
     return false;
-  // child starts with parent + "/"
   return child.compare(0, parent.size(), parent) == 0 && child[parent.size()] == '/';
 }
 
 void init() {
   s_start_time = std::chrono::steady_clock::now();
   g_category_registry.clear();
-  g_shared_sinks.clear();
+  g_console_sink.reset();
+  g_imgui_sink.reset();
+  g_engine_file_sink.reset();
+  g_game_file_sink.reset();
+  g_profiler_file_sink.reset();
 
-  spdlog::init_thread_pool(8192, 1);
-
-  // Rotate overflow history file
   std::rename(HISTORY_FILE, "debug_history.log.old");
 
-  // Shared sinks
-  auto console = std::make_shared<CategoryConsoleSink>();
-  auto imgui   = std::make_shared<ImguiSinkMt>();
+  quill::BackendOptions backend_opts;
+  backend_opts.error_notifier = [](const std::string&) {
+  };
+  quill::Backend::start(backend_opts);
 
-  auto engine_file = std::make_shared<spdlog::sinks::basic_file_sink_mt>("engine.log", true);
-  auto game_file   = std::make_shared<spdlog::sinks::basic_file_sink_mt>("game.log", true);
+  g_console_sink = quill::Frontend::create_or_get_sink<CategoryConsoleSink>("console");
+  g_imgui_sink   = quill::Frontend::create_or_get_sink<ImguiSink>("imgui");
 
-  // Console: timestamp only — sink adds category/level colors
-  std::string console_pattern = "%H:%M:%S.%e ";
-  console->set_pattern(console_pattern);
+  auto make_file_sink = [](const char* filename) {
+    quill::FileSinkConfig cfg;
+    cfg.set_open_mode('w');
+    quill::PatternFormatterOptions file_pattern(
+        "%(time) [%(logger)] %(log_level_short_code) %(message)",
+        "%H:%M:%S.%Qms",
+        quill::Timezone::LocalTime,
+        true,
+        '\n');
+    cfg.set_override_pattern_formatter_options(std::move(file_pattern));
+    return quill::Frontend::create_or_get_sink<quill::FileSink>(std::filesystem::path{filename},
+                                                                std::move(cfg));
+  };
 
-  // File: [HH:MM:SS.mmm] [category] [level] message
-  std::string file_pattern = "%H:%M:%S.%e [%n] [%l] %v";
-  engine_file->set_pattern(file_pattern);
-  game_file->set_pattern(file_pattern);
+  g_engine_file_sink   = make_file_sink("engine.log");
+  g_game_file_sink     = make_file_sink("game.log");
+  g_profiler_file_sink = make_file_sink("profiler.log");
 
-  // ImGui sink: raw message only (timestamp/category/level added by ImGui display code)
-  imgui->set_pattern("%v");
-
-  g_shared_sinks     = {console, imgui};
-  g_engine_file_sink = engine_file;
-  g_game_file_sink   = game_file;
-
-  register_category("engine", ImVec4(0.0f, 0.8f, 1.0f, 1.0f));          // Cyan
-  register_category("engine/renderer", ImVec4(0.8f, 0.4f, 1.0f, 1.0f)); // Purple
+  register_category("engine", ImVec4(0.0f, 0.8f, 1.0f, 1.0f));
+  register_category("engine/renderer", ImVec4(0.8f, 0.4f, 1.0f, 1.0f));
   register_category("profiler", ImVec4(1.0f, 0.4f, 1.0f, 1.0f));
-  register_category("engine/ecs", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));     // Yellow
-  register_category("engine/network", ImVec4(0.0f, 1.0f, 0.6f, 1.0f)); // Teal
+  register_category("engine/ecs", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));
+  register_category("engine/network", ImVec4(0.0f, 1.0f, 0.6f, 1.0f));
   register_category("engine/shader", ImVec4(1.0f, 0.8f, 0.0f, 1.0f));
   register_category("vulkan", ImVec4(1.0f, 0.4f, 0.0f, 1.0f));
   register_category("debug_layer", ImVec4(1.0f, 0.5f, 0.8f, 1.0f));
+
+  sd::detail::get_cpu_mhz();
 }
+
+SD_EXPORT quill::Logger* get_category_logger_or_report(const char* categoryPath) {
+  auto* logger = quill::Frontend::get_logger(categoryPath);
+  if (!logger) {
+    fmt::println(stderr,
+                 "Log category '{}' is not registered. Message was not logged.",
+                 categoryPath);
+  }
+  return logger;
+}
+
 } // namespace sd::log

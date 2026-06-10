@@ -25,7 +25,7 @@ target_compile_definitions(SDGTest PRIVATE
 )
 
 # Tests need exceptions (GoogleTest requirement); override -fno-exceptions inherited from SD
-target_compile_options(SDGTest PRIVATE -fexceptions -freflection)
+target_compile_options(SDGTest PRIVATE -fexceptions -freflection -mclflushopt)
 
 if (SD_ENABLE_ASAN)
     if (NOT MSVC)

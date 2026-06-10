@@ -46,6 +46,7 @@ void on_load(sd::Application& app, State& state) {
   vk::UniquePipelineLayout pipeline_layout;
 
   {
+    PROFILE("Pipeline creation");
     struct Push {
       VLA::Matrix4x4f mvp{};
       float           color[4]{};
@@ -85,6 +86,7 @@ void on_load(sd::Application& app, State& state) {
 
     vk::UniqueShaderModule vert_module;
     {
+      PROFILE("vert_module");
       auto spv = sd::compile_shader(vert_path);
       if (!spv) {
         sd::log::game::error("Failed to compile vertex shader: {}", vert_path);
@@ -106,6 +108,7 @@ void on_load(sd::Application& app, State& state) {
 
     vk::UniqueShaderModule frag_module;
     {
+      PROFILE("frag module");
       auto spv = sd::compile_shader(frag_path);
       if (!spv) {
         sd::log::game::error("Failed to compile frag shader at: {}", frag_path);
@@ -247,8 +250,10 @@ void on_load(sd::Application& app, State& state) {
     }
 
 
+    PROFILE_START("createGraphicsPipelinesUnique creation");
     auto res = vulkan_context.get_vulkan_device()->createGraphicsPipelinesUnique(*pipeline_cache,
                                                                                  pipeline_info);
+    PROFILE_END();
     if (res.result != vk::Result::eSuccess) {
       sd::log::engine::critical("Rip, we failed, error is: {} ", static_cast<u32>(res.result));
     } else {
@@ -277,7 +282,6 @@ void on_load(sd::Application& app, State& state) {
 
     sd::log::game::info("Pipeline created");
   }
-
 
   app.push_layer<sd::EngineDebugLayer>(app.runtime(), app.services(), state.shared_scene);
 
