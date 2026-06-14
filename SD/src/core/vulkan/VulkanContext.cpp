@@ -11,9 +11,11 @@ namespace sd {
 class LayerList;
 
 #ifdef SD_DEBUG
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-    vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT /*type*/,
-    const vk::DebugUtilsMessengerCallbackDataEXT* callback_data, void* /*user_data*/) {
+static VKAPI_ATTR
+    VkBool32 VKAPI_CALL debug_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+                                       vk::DebugUtilsMessageTypeFlagsEXT /*type*/,
+                                       const vk::DebugUtilsMessengerCallbackDataEXT* callback_data,
+                                       void* /*user_data*/) {
   switch (severity) {
 #ifndef SD_SUPPRESS_VULKAN_INFO
     case vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose:
@@ -138,7 +140,7 @@ vk::PhysicalDeviceVulkan13Features& VulkanContext::get_features13() {
   return m_features13;
 }
 
-u32 VulkanContext::get_graphics_family_index() const {
+U32 VulkanContext::get_graphics_family_index() const {
   return m_graphics_family_index;
 }
 vk::Queue VulkanContext::get_graphics_queue() const {
@@ -181,7 +183,7 @@ vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
   vk::InstanceCreateInfo inst_info{
       .pApplicationInfo = &app_info,
 #ifdef SD_DEBUG
-      .enabledLayerCount   = static_cast<u32>(layers.size()),
+      .enabledLayerCount   = static_cast<U32>(layers.size()),
       .ppEnabledLayerNames = layers.data(),
 #endif
       .enabledExtensionCount   = static_cast<uint32_t>(instance_exts.size()),
@@ -217,9 +219,9 @@ vk::UniqueInstance VulkanContext::create_vulkan_application_instance() {
 }
 void VulkanContext::setup_queues(vk::SurfaceKHR surface) {
   auto queue_families        = m_phys_dev.getQueueFamilyProperties();
-  u32  graphics_family_index = UINT32_MAX;
+  U32  graphics_family_index = UINT32_MAX;
 
-  for (u32 i = 0; i < queue_families.size(); ++i) {
+  for (U32 i = 0; i < queue_families.size(); ++i) {
     if ((queue_families[i].queueFlags & vk::QueueFlagBits::eGraphics) ==
         vk::QueueFlagBits::eGraphics) {
       vk::Bool32 supports_present = vk::False;
@@ -278,7 +280,7 @@ void VulkanContext::create_vulkan_device() {
       .pNext                   = &m_features2,
       .queueCreateInfoCount    = 1,
       .pQueueCreateInfos       = &queue_info,
-      .enabledExtensionCount   = static_cast<u32>(m_device_exts.size()),
+      .enabledExtensionCount   = static_cast<U32>(m_device_exts.size()),
       .ppEnabledExtensionNames = m_device_exts.data(),
   };
   dev_info.setPNext(&m_features2);

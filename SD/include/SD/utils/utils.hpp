@@ -376,9 +376,9 @@ inline vk::UniqueShaderModule create_shader_module(const vk::Device&        devi
 ///                  When false, items fill top-to-bottom then right.
 template<std::ranges::input_range R>
   requires std::constructible_from<std::string_view, std::ranges::range_value_t<R>>
-std::string tab_format(R&& items, usize cols = 4, usize spacing = 2, bool row_major = true) {
+std::string tab_format(R&& items, USize cols = 4, USize spacing = 2, bool row_major = true) {
   std::vector<std::string_view> svs;
-  usize                         max_width = 0;
+  USize                         max_width = 0;
   for (auto&& item : items) {
     std::string_view sv(item);
     svs.push_back(sv);
@@ -389,14 +389,14 @@ std::string tab_format(R&& items, usize cols = 4, usize spacing = 2, bool row_ma
   if (svs.empty())
     return {};
 
-  usize       col_width = max_width + spacing;
-  usize       cols_     = cols > 0 ? cols : 1;
-  usize       rows_     = (svs.size() + cols_ - 1) / cols_;
+  USize       col_width = max_width + spacing;
+  USize       cols_     = cols > 0 ? cols : 1;
+  USize       rows_     = (svs.size() + cols_ - 1) / cols_;
   std::string result;
   result.reserve(svs.size() * col_width + rows_);
 
   if (row_major) {
-    for (usize i = 0; i < svs.size(); ++i) {
+    for (USize i = 0; i < svs.size(); ++i) {
       result += svs[i];
       if (svs[i].size() < col_width)
         result.append(col_width - svs[i].size(), ' ');
@@ -404,9 +404,9 @@ std::string tab_format(R&& items, usize cols = 4, usize spacing = 2, bool row_ma
         result += '\n';
     }
   } else {
-    for (usize r = 0; r < rows_; ++r) {
-      for (usize c = 0; c < cols_; ++c) {
-        usize idx = r + c * rows_;
+    for (USize r = 0; r < rows_; ++r) {
+      for (USize c = 0; c < cols_; ++c) {
+        USize idx = r + c * rows_;
         if (idx >= svs.size())
           break;
         result += svs[idx];

@@ -17,21 +17,21 @@ class CommandQueue;
 
 class CommandRegistry {
 public:
-  static u32         register_(const char* name, u32 component_id = 0);
-  static u32         get_id(const char* name, u32 componentId = 0);
-  static const char* get_name(u32 id);
+  static U32         register_(const char* name, U32 component_id = 0);
+  static U32         get_id(const char* name, U32 componentId = 0);
+  static const char* get_name(U32 id);
 
 private:
   static inline std::vector<const char*>             names;
-  static inline std::unordered_map<std::string, u32> map;
+  static inline std::unordered_map<std::string, U32> map;
 };
 
 class CommandFactory {
 public:
   using CreatorFn = std::function<std::unique_ptr<Command>()>;
 
-  static void                     register_(u32 type_id, CreatorFn creator);
-  static std::unique_ptr<Command> create(u32 type_id);
+  static void                     register_(U32 type_id, CreatorFn creator);
+  static std::unique_ptr<Command> create(U32 type_id);
 
 private:
   static inline std::vector<CreatorFn> creators;
@@ -39,8 +39,8 @@ private:
 
 #define COMMAND_ID(Name)                           \
 public:                                            \
-  inline static u32 s_type_id;                     \
-  u32               get_type_id() const override { \
+  inline static U32 s_type_id;                     \
+  U32               get_type_id() const override { \
     return s_type_id;                              \
   }                                                \
                                                    \
@@ -48,8 +48,8 @@ private:
 
 #define COMMAND_ID_T(Name, T)                      \
 public:                                            \
-  inline static u32 s_type_id;                     \
-  u32               get_type_id() const override { \
+  inline static U32 s_type_id;                     \
+  U32               get_type_id() const override { \
     return s_type_id;                              \
   }                                                \
                                                    \
@@ -95,11 +95,11 @@ private:
  * Represents a "future" entity in the command queue
  */
 struct EntityHandle {
-  u32 id;
-  EntityHandle() : id(g_type_max<u32>) {}
-  explicit EntityHandle(const u32 id) : id(id) {}
+  U32 id;
+  EntityHandle() : id(g_type_max<U32>) {}
+  explicit EntityHandle(const U32 id) : id(id) {}
 
-  [[nodiscard]] bool is_valid() const { return id != g_type_max<u32>; }
+  [[nodiscard]] bool is_valid() const { return id != g_type_max<U32>; }
 
   bool operator==(const EntityHandle& other) const { return id == other.id; }
   bool operator!=(const EntityHandle& other) const { return !(*this == other); }
@@ -109,7 +109,7 @@ class Command {
 public:
   virtual ~Command() = default;
 
-  virtual u32 get_type_id() const = 0;
+  virtual U32 get_type_id() const = 0;
 
   /**
    * Called when Apply() is called on the queue
@@ -134,6 +134,6 @@ public:
 template<>
 struct std::hash<sd::EntityHandle> {
   inline std::size_t operator()(sd::EntityHandle h) const noexcept {
-    return std::hash<u32>{}(h.id);
+    return std::hash<U32>{}(h.id);
   }
 };

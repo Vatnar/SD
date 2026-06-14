@@ -3,7 +3,7 @@
 template<typename ExtraComponents, typename... Components>
 ViewImpl<ExtraComponents, Components...>::ViewImpl(EntityManager<ExtraComponents>& manager) :
   m_manager(manager) {
-  usize min_size = std::numeric_limits<usize>::max();
+  USize min_size = std::numeric_limits<USize>::max();
 
   (check_size<Components>(min_size), ...);
 }
@@ -13,7 +13,7 @@ template<typename ExtraComponents, typename... Components>
 ViewImpl<ExtraComponents, Components...>::Iterator::Iterator(
     EntityManager<ExtraComponents>& em,
     const std::vector<Entity>*      dense_entities,
-    usize                           idx) : manager(em), entities(dense_entities), index(idx) {
+    USize                           idx) : manager(em), entities(dense_entities), index(idx) {
   if (entities && index < entities->size() && !is_valid()) {
     next();
   }
@@ -70,7 +70,7 @@ ViewImpl<ExtraComponents, Components...>::Iterator ViewImpl<ExtraComponents, Com
 }
 template<typename ExtraComponents, typename... Components>
 template<typename Component>
-void ViewImpl<ExtraComponents, Components...>::check_size(usize& minSize) {
+void ViewImpl<ExtraComponents, Components...>::check_size(USize& minSize) {
   if (!m_manager.template has_component_pool<Component>()) {
     minSize         = 0;
     m_smallest_pool = nullptr;
@@ -89,7 +89,7 @@ template<typename T, typename... Args>
 T* EntityManager<ExtraComponents>::add_component(Entity e, Args&&... args) {
   static_assert(component_info<T>::is_registered,
                 "Error: Component type is not registered, register it");
-  const usize type_id = component_info<T>::id();
+  const USize type_id = component_info<T>::id();
 
 
   if (type_id >= m_component_pools.size())
@@ -116,7 +116,7 @@ T* EntityManager<ExtraComponents>::try_get_component(Entity e) {
   static_assert(component_info<T>::is_registered,
                 "Error: Component type is not registered, register it");
 
-  usize type_id = component_info<T>::id();
+  USize type_id = component_info<T>::id();
   if (type_id >= m_component_pools.size() || !m_component_pools[type_id] ||
       !m_entity_masks[e]->test(type_id))
     return nullptr;
@@ -128,7 +128,7 @@ T* EntityManager<ExtraComponents>::try_get_component(Entity e) {
 template<typename ExtraComponents>
 template<typename T>
 T& EntityManager<ExtraComponents>::get_component(Entity e) {
-  usize typeId = component_info<T>::id();
+  USize typeId = component_info<T>::id();
   assert(has_component<T>(e) && "Entity doesnt have component");
 
   auto* pool = static_cast<SparseEntitySet<T>*>(m_component_pools[typeId].get());
@@ -138,7 +138,7 @@ T& EntityManager<ExtraComponents>::get_component(Entity e) {
 template<typename ExtraComponents>
 template<typename T>
 const T& EntityManager<ExtraComponents>::get_component(Entity e) const {
-  usize type_id = component_info<T>::id();
+  USize type_id = component_info<T>::id();
   assert(has_component<T>(e) && "Entity doesnt have component");
 
   auto* pool = static_cast<const SparseEntitySet<T>*>(m_component_pools[type_id].get());
@@ -151,7 +151,7 @@ bool EntityManager<ExtraComponents>::try_remove_component(Entity e) {
   static_assert(component_info<T>::is_registered,
                 "Error: Can't remove component type that isn't registered");
 
-  usize type_id = component_info<T>::id();
+  USize type_id = component_info<T>::id();
   if (type_id >= m_component_pools.size() || !m_component_pools[type_id] ||
       !m_entity_masks[e]->test(type_id))
     return false;
@@ -205,7 +205,7 @@ template<typename ExtraComponents>
 template<typename T>
 SparseEntitySet<T>* EntityManager<ExtraComponents>::get_component_pool() {
   static_assert(component_info<T>::is_registered != false, "Unregistered Component");
-  const usize type_id = component_info<T>::id();
+  const USize type_id = component_info<T>::id();
   if (type_id >= m_component_pools.size() || !m_component_pools[type_id])
     return nullptr;
 
@@ -216,7 +216,7 @@ template<typename ExtraComponents>
 template<typename T>
 bool EntityManager<ExtraComponents>::has_component_pool() {
   static_assert(component_info<T>::is_registered != false, "Unregistered Component");
-  const usize type_id = component_info<T>::id();
+  const USize type_id = component_info<T>::id();
   return type_id < m_component_pools.size() && m_component_pools[type_id];
 }
 
@@ -245,7 +245,7 @@ inline void EntityManager<ExtraComponents>::destroy(const Entity e) {
   ComponentMask* mask = m_entity_masks[e];
   assert(mask);
 
-  for (usize i = 0; i < mask->size(); ++i) {
+  for (USize i = 0; i < mask->size(); ++i) {
     if (mask->test(i)) {
       if (m_component_pools[i])
         m_component_pools[i]->remove(e);
@@ -291,7 +291,7 @@ inline void EntityManager<ExtraComponents>::serialize(Serializer& s) const {
 
   // Serialize entity masks - only serialize alive entities
   const auto& mask_entities = m_entity_masks.get_dense_entities();
-  u32         aliveCount    = 0;
+  U32         aliveCount    = 0;
   for (Entity e : mask_entities) {
     if (is_alive(e))
       aliveCount++;
@@ -307,32 +307,32 @@ inline void EntityManager<ExtraComponents>::serialize(Serializer& s) const {
     const ComponentMask* mask = m_entity_masks.get(e);
     // Pack 256-bit mask into 4 x u64 values (instead of 256 x u64)
     if (mask) {
-      for (usize word = 0; word < 4; ++word) {
-        u64 packed = 0;
-        for (usize bit = 0; bit < 64; ++bit) {
+      for (USize word = 0; word < 4; ++word) {
+        U64 packed = 0;
+        for (USize bit = 0; bit < 64; ++bit) {
           if (mask->test(word * 64 + bit)) {
-            packed |= (u64(1) << bit);
+            packed |= (U64(1) << bit);
           }
         }
         s.write(packed);
       }
     } else {
-      for (usize i = 0; i < 4; ++i) {
-        s.write(static_cast<u64>(0));
+      for (USize i = 0; i < 4; ++i) {
+        s.write(static_cast<U64>(0));
       }
     }
   }
 
   // Serialize component pools - only registered serializable ones
-  u32 serializable_count = 0;
-  for (u32 i = 0; i < m_component_pools.size(); ++i) {
+  U32 serializable_count = 0;
+  for (U32 i = 0; i < m_component_pools.size(); ++i) {
     if (m_component_pools[i] && sd::ComponentFactory::is_registered(i)) {
       serializable_count++;
     }
   }
   s.write(serializable_count);
 
-  for (u32 i = 0; i < m_component_pools.size(); ++i) {
+  for (U32 i = 0; i < m_component_pools.size(); ++i) {
     if (m_component_pools[i] && sd::ComponentFactory::is_registered(i)) {
       s.write(i); // component type ID
       m_component_pools[i]->serialize(s);
@@ -345,43 +345,43 @@ inline void EntityManager<ExtraComponents>::deserialize(Serializer& s) {
   s.read(m_free_list);
 
   // Deserialize alive entity masks
-  u32 maskCount = s.read<u32>();
-  for (u32 i = 0; i < maskCount; ++i) {
-    u32    index      = s.read<u32>();
-    u32    generation = s.read<u32>();
+  U32 maskCount = s.read<U32>();
+  for (U32 i = 0; i < maskCount; ++i) {
+    U32    index      = s.read<U32>();
+    U32    generation = s.read<U32>();
     Entity e{index, generation};
     m_entity_masks.add(e, ComponentMask{});
     ComponentMask* mask = m_entity_masks.get(e);
     // Read 4 x u64 values and unpack to 256-bit mask
     if (mask) {
-      for (usize word = 0; word < 4; ++word) {
-        u64 packed = s.read<u64>();
-        for (usize bit = 0; bit < 64; ++bit) {
-          if (packed & (static_cast<u64>(1) << bit)) {
+      for (USize word = 0; word < 4; ++word) {
+        U64 packed = s.read<U64>();
+        for (USize bit = 0; bit < 64; ++bit) {
+          if (packed & (static_cast<U64>(1) << bit)) {
             mask->set(word * 64 + bit);
           }
         }
       }
     } else {
-      for (usize j = 0; j < 4; ++j) {
-        s.read<u64>();
+      for (USize j = 0; j < 4; ++j) {
+        s.read<U64>();
       }
     }
   }
 
   // Reconstruct mask entries for destroyed entities (needed for invariants)
-  for (u32 idx : m_free_list) {
+  for (U32 idx : m_free_list) {
     assert(m_generations[idx] > 0 && "Freelist index has generation 0");
     Entity e{idx, m_generations[idx] - 1};
     m_entity_masks.add(e, ComponentMask{});
   }
 
   // Deserialize component pools
-  u32 serializable_count = s.read<u32>();
+  U32 serializable_count = s.read<U32>();
   m_component_pools.clear();
 
-  for (u32 i = 0; i < serializable_count; ++i) {
-    u32  componentId = s.read<u32>();
+  for (U32 i = 0; i < serializable_count; ++i) {
+    U32  componentId = s.read<U32>();
     auto pool        = sd::ComponentFactory::create(componentId);
     if (pool) {
       pool->deserialize(s);

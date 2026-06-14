@@ -15,6 +15,6 @@ namespace sd {
  * https://docs.vulkan.org/guide/latest/hlsl.html#_vulkan_shader_stage_to_hlsl_target_shader_profile_mapping
  * for what shader stage is needed for the different HLSL target shader profiles
  */
-SD_EXPORT std::optional<std::vector<u32>> compile_shader(const std::string& filename,
+SD_EXPORT std::optional<std::vector<U32>> compile_shader(const std::string& filename,
                                                          const std::string& profile = {});
 } // namespace sd

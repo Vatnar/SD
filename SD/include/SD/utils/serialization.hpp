@@ -46,7 +46,7 @@ public:
   }
 
   // Write a C-style array
-  template<typename T, usize N>
+  template<typename T, USize N>
   void write(const T (&arr)[N]) {
     for (const auto& val : arr) {
       write(val);
@@ -54,7 +54,7 @@ public:
   }
 
   // Write std::array
-  template<typename T, usize N>
+  template<typename T, USize N>
   void write(const std::array<T, N>& arr) {
     for (const auto& val : arr) {
       write(val);
@@ -63,7 +63,7 @@ public:
 
   // Write string
   void write(const std::string& value) {
-    write(static_cast<u32>(value.size()));
+    write(static_cast<U32>(value.size()));
     const auto* bytes = reinterpret_cast<const std::byte*>(&value[0]);
     m_buffer.insert(m_buffer.end(), bytes, bytes + value.size());
   }
@@ -72,14 +72,14 @@ public:
   template<typename T>
     requires std::is_arithmetic_v<T>
   void write(const std::vector<T>& vec) {
-    write(static_cast<u32>(vec.size()));
+    write(static_cast<U32>(vec.size()));
     for (const auto& val : vec) {
       write(val);
     }
   }
 
   // Write raw bytes
-  void write(const void* data, const usize size) {
+  void write(const void* data, const USize size) {
     const auto bytes = static_cast<const std::byte*>(data);
     m_buffer.insert(m_buffer.end(), bytes, bytes + size);
   }
@@ -102,7 +102,7 @@ public:
   }
 
   // Read C-style array
-  template<typename T, usize N>
+  template<typename T, USize N>
   void read(T (&arr)[N]) {
     assert(m_read_offset + sizeof(T) * N <= get_written_size());
     for (auto& val : arr) {
@@ -111,7 +111,7 @@ public:
   }
 
   // Read std::array
-  template<typename T, usize N>
+  template<typename T, USize N>
   void read(std::array<T, N>& arr) {
     assert(m_read_offset + sizeof(T) * N <= get_written_size());
     for (auto& val : arr) {
@@ -121,8 +121,8 @@ public:
 
   // Read string
   std::string read_string() {
-    assert(m_read_offset + sizeof(u32) <= get_written_size());
-    const usize size = read<u32>();
+    assert(m_read_offset + sizeof(U32) <= get_written_size());
+    const USize size = read<U32>();
     assert(m_read_offset + size * sizeof(char) <= get_written_size());
     const char* ptr = reinterpret_cast<const char*>(m_buffer.data() + m_read_offset);
     std::string str(ptr, size);
@@ -134,9 +134,9 @@ public:
   template<typename T>
     requires std::is_arithmetic_v<T>
   void read(std::vector<T>& vec) {
-    u32 size = read<u32>();
+    U32 size = read<U32>();
     vec.resize(size);
-    for (u32 i = 0; i < size; ++i) {
+    for (U32 i = 0; i < size; ++i) {
       vec[i] = read<T>();
     }
   }
@@ -152,17 +152,17 @@ public:
   }
 
   void                reset_offset() { m_read_offset = 0; }
-  [[nodiscard]] usize get_offset() const { return m_read_offset; }
-  void                SetOffset(usize offset) { m_read_offset = offset; }
+  [[nodiscard]] USize get_offset() const { return m_read_offset; }
+  void                SetOffset(USize offset) { m_read_offset = offset; }
 
-  [[nodiscard]] usize get_written_size() const { return m_buffer.size(); }
+  [[nodiscard]] USize get_written_size() const { return m_buffer.size(); }
   void                clear() { m_buffer.clear(); }
 
   [[nodiscard]] std::span<std::byte> get_span() const { return {m_buffer.data(), m_buffer.size()}; }
 
 private:
   std::vector<std::byte>& m_buffer;
-  usize                   m_read_offset = 0;
+  USize                   m_read_offset = 0;
 };
 
 } // namespace sd

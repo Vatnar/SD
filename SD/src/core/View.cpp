@@ -16,12 +16,12 @@ sd::View::~View() {
 vk::Extent2D sd::View::get_im_gui_extent() {
   const ImVec2 size = ImGui::GetContentRegionAvail();
 
-  auto clamp_to_u32 = [](float v) -> u32 {
+  auto clamp_to_u32 = [](float v) -> U32 {
     if (v <= 0.0f)
       return 1;
-    if (v >= static_cast<float>(std::numeric_limits<u32>::max()))
-      return std::numeric_limits<u32>::max() - 1;
-    return static_cast<u32>(v);
+    if (v >= static_cast<float>(std::numeric_limits<U32>::max()))
+      return std::numeric_limits<U32>::max() - 1;
+    return static_cast<U32>(v);
   };
 
   return {clamp_to_u32(size.x), clamp_to_u32(size.y)};

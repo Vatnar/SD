@@ -21,7 +21,7 @@ public:
     queue.set_entity_for_handle(m_handle, m_created_entity);
   }
   void serialize(Serializer& serializer) const override { serializer.write(m_handle.id); }
-  void deserialize(Serializer& serializer) override { m_handle.id = serializer.read<u32>(); }
+  void deserialize(Serializer& serializer) override { m_handle.id = serializer.read<U32>(); }
 };
 
 class DestroyEntityCmd : public Command {
@@ -35,12 +35,12 @@ public:
     em.destroy(m_entity);
   }
   void serialize(Serializer& serializer) const override {
-    serializer.write<u32>(m_entity.index);
-    serializer.write<u32>(m_entity.generation);
+    serializer.write<U32>(m_entity.index);
+    serializer.write<U32>(m_entity.generation);
   }
   void deserialize(Serializer& serializer) override {
-    m_entity.index      = serializer.read<u32>();
-    m_entity.generation = serializer.read<u32>();
+    m_entity.index      = serializer.read<U32>();
+    m_entity.generation = serializer.read<U32>();
   }
 };
 
@@ -64,7 +64,7 @@ public:
   }
 
   void deserialize(Serializer& serializer) override {
-    m_handle.id = serializer.read<u32>();
+    m_handle.id = serializer.read<U32>();
     ComponentSerializer<T>::deserialize(m_data, serializer);
   }
 };
@@ -82,7 +82,7 @@ public:
     em.try_remove_component<T>(e);
   }
   void serialize(Serializer& serializer) const override { serializer.write(m_handle.id); }
-  void deserialize(Serializer& serializer) override { m_handle.id = serializer.read<u32>(); }
+  void deserialize(Serializer& serializer) override { m_handle.id = serializer.read<U32>(); }
 };
 
 REGISTER_COMMAND(CreateEntityCmd);

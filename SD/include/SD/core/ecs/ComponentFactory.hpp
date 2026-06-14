@@ -14,9 +14,9 @@ class SD_EXPORT ComponentFactory {
 public:
   using PoolCreatorFn = std::function<std::unique_ptr<SparseEntitySetBase>()>;
 
-  static void register_component(u32 component_id, PoolCreatorFn creator);
-  static std::unique_ptr<SparseEntitySetBase> create(u32 component_id);
-  static bool                                 is_registered(u32 component_id);
+  static void register_component(U32 component_id, PoolCreatorFn creator);
+  static std::unique_ptr<SparseEntitySetBase> create(U32 component_id);
+  static bool                                 is_registered(U32 component_id);
 
   // Clears all registrations and resets the ID counter.
   // register_default_pools() re-registers the engine's built-in components

@@ -13,7 +13,7 @@
 namespace sd {
 // TODO(docs): Document BIT() helper
 //   - Purpose: Compile-time bit shifting for event categories
-static consteval usize bit(usize idx) {
+static consteval USize bit(USize idx) {
   return 1ULL << idx;
 }
 
@@ -34,7 +34,7 @@ enum class EventType {
   /* mousebutton*/ MOUSE_PRESSED, MOUSE_RELEASED,
   // clang-format on
 };
-enum class EventCategory : u16 {
+enum class EventCategory : U16 {
   NONE                        = 0,
   EVENT_CATEGORY_ENGINE       = bit(0),
   EVENT_CATEGORY_APPLICATION  = bit(1), // For application specifics
@@ -46,11 +46,11 @@ enum class EventCategory : u16 {
   EVENT_CATEGORY_CONTROLLER   = bit(7),
 };
 inline EventCategory operator|(const EventCategory a, const EventCategory b) {
-  return static_cast<EventCategory>(static_cast<u16>(a) | static_cast<u16>(b));
+  return static_cast<EventCategory>(static_cast<U16>(a) | static_cast<U16>(b));
 }
 
 inline bool operator&(int lhs, EventCategory rhs) {
-  return (static_cast<u16>(lhs) & static_cast<u16>(rhs)) != 0;
+  return (static_cast<U16>(lhs) & static_cast<U16>(rhs)) != 0;
 }
 
 class Event {

@@ -7,10 +7,14 @@ namespace sd {
 //   - Explain the pattern for Vulkan error handling
 //   - When to use each function
 //   - Example usage patterns
-inline void check_vulkan_res(vk::Result result, std::string_view message,
+inline void check_vulkan_res(vk::Result           result,
+                             std::string_view     message,
                              std::source_location loc = std::source_location::current()) {
   if (result != vk::Result::eSuccess) {
-    log::engine::critical("{}:{} {}: {}", loc.file_name(), loc.line(), message,
+    log::engine::critical("{}:{} {}: {}",
+                          loc.file_name(),
+                          loc.line(),
+                          message,
                           vk::to_string(result));
     // TODO: why doesnt the vk::to_string(result) work correctly, it shjould return the correct
     // string
@@ -18,7 +22,8 @@ inline void check_vulkan_res(vk::Result result, std::string_view message,
 }
 
 template<typename T>
-auto check_vulkan_res_val(T&& result, std::string_view message,
+auto check_vulkan_res_val(T&&                  result,
+                          std::string_view     message,
                           std::source_location loc = std::source_location::current()) {
   // Try to detect if it's a vk::ResultValue or something like std::expected
   if constexpr (requires { result.result; }) {
@@ -35,10 +40,11 @@ auto check_vulkan_res_val(T&& result, std::string_view message,
   }
 }
 
-inline u32 find_memory_type(const vk::PhysicalDevice& physical_device, u32 type_filter,
-                            vk::MemoryPropertyFlags properties) {
+inline U32 find_memory_type(const vk::PhysicalDevice& physical_device,
+                            U32                       type_filter,
+                            vk::MemoryPropertyFlags   properties) {
   vk::PhysicalDeviceMemoryProperties mem_properties = physical_device.getMemoryProperties();
-  for (u32 i = 0; i < mem_properties.memoryTypeCount; i++) {
+  for (U32 i = 0; i < mem_properties.memoryTypeCount; i++) {
     if ((type_filter & (1 << i)) &&
         (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
       return i;

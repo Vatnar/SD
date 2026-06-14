@@ -42,7 +42,7 @@ public:
   struct Iterator {
     manager_type&              manager;
     const std::vector<Entity>* entities;
-    usize                      index;
+    USize                      index;
 
     using iterator_category = std::forward_iterator_tag;
     using value_type        = std::tuple<Entity, Components&...>;
@@ -50,7 +50,7 @@ public:
     using pointer           = void;
     using reference         = value_type;
 
-    Iterator(manager_type& em, const std::vector<Entity>* dense_entities, usize idx);
+    Iterator(manager_type& em, const std::vector<Entity>* dense_entities, USize idx);
     Iterator& operator++();
 
     bool operator==(const Iterator& other) const {
@@ -74,7 +74,7 @@ public:
 
 private:
   template<typename Component>
-  void check_size(usize& minSize);
+  void check_size(USize& minSize);
 };
 
 
@@ -179,9 +179,9 @@ public:
 
 
 private:
-  u32              pop_free_list();
-  std::vector<u32> m_generations;
-  std::vector<u32> m_free_list;
+  U32              pop_free_list();
+  std::vector<U32> m_generations;
+  std::vector<U32> m_free_list;
 
   std::vector<std::unique_ptr<SparseEntitySetBase>> m_component_pools;
   // NOTE: Hard capped at 256 for now, shouldn't really be a problem. Change in future if needed
@@ -197,7 +197,7 @@ private:
 #ifdef SD_DEBUG
   void ValidateInvariants() const {
     assert(m_entity_masks.size() == m_generations.size());
-    for (u32 idx : m_free_list) {
+    for (U32 idx : m_free_list) {
       assert(idx < m_generations.size());
     }
   }

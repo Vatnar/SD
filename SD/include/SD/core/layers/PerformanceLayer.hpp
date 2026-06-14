@@ -24,7 +24,7 @@ public:
     m_frame_count++;
     m_time_accumulator += dt;
 
-    u64 current_cycles{__rdtsc()};
+    U64 current_cycles{__rdtsc()};
     if (m_last_cycles != 0) {
       m_cycle_accumulator += (current_cycles - m_last_cycles);
     }
@@ -38,7 +38,9 @@ public:
           static_cast<double>(m_cycle_accumulator - m_sleep_cycle_accumulator) / m_frame_count;
 
 
-      log::engine::info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}", fps, msPerFrame,
+      log::engine::info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}",
+                        fps,
+                        msPerFrame,
                         avgCycles);
 
       m_frame_count             = 0;
@@ -61,14 +63,14 @@ public:
   }
 
 private:
-  u32   m_frame_count       = 0;
+  U32   m_frame_count       = 0;
   float m_time_accumulator  = 0.0f;
-  u64   m_cycle_accumulator = 0;
-  u64   m_last_cycles       = 0;
+  U64   m_cycle_accumulator = 0;
+  U64   m_last_cycles       = 0;
 
   float                                                       m_sleep_time_accumulator  = 0;
-  u64                                                         m_sleep_cycle_accumulator = 0;
-  u64                                                         m_sleep_start_cycles      = 0;
+  U64                                                         m_sleep_cycle_accumulator = 0;
+  U64                                                         m_sleep_start_cycles      = 0;
   std::chrono::time_point<std::chrono::high_resolution_clock> m_sleep_start_time;
 };
 } // namespace sd

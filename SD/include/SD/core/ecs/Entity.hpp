@@ -16,8 +16,8 @@ namespace sd {
 //   - Note about generation preventing use-after-free
 //   - Example: Entity e = manager.Create(); // e = {index: 0, generation: 0}
 struct Entity {
-  u32 index;
-  u32 generation;
+  U32 index;
+  U32 generation;
 
   bool operator==(Entity other) const {
     return index == other.index && generation == other.generation;

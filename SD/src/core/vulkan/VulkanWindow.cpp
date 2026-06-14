@@ -47,8 +47,8 @@ VulkanWindow::~VulkanWindow() {
 
 void VulkanWindow::recreate_swapchain(LayerList& layers) {
   ASSERT(m_device && "Device must be valid");
-  u32 old_width  = m_swapchain_extent.width;
-  u32 old_height = m_swapchain_extent.height;
+  U32 old_width  = m_swapchain_extent.width;
+  U32 old_height = m_swapchain_extent.height;
 
   auto [fb_width, fb_height] = m_window.get_framebuffer_size();
 
@@ -59,7 +59,7 @@ void VulkanWindow::recreate_swapchain(LayerList& layers) {
   }
   m_is_minimized = false;
 
-  if (static_cast<u32>(fb_width) == old_width && static_cast<u32>(fb_height) == old_height) {
+  if (static_cast<U32>(fb_width) == old_width && static_cast<U32>(fb_height) == old_height) {
     // Already correct size
     return;
   }
@@ -81,7 +81,7 @@ FrameSync& VulkanWindow::get_frame_sync() {
   ASSERT(current_frame < m_frame_syncs.size() && "CurrentFrame exceeds frame syncs size");
   return m_frame_syncs[current_frame];
 }
-SwapchainSync& VulkanWindow::get_swapchain_sync(const u32 image_index) {
+SwapchainSync& VulkanWindow::get_swapchain_sync(const U32 image_index) {
   ASSERT(image_index < m_swapchain_syncs.size() && "Image index out of bounds");
   return m_swapchain_syncs[image_index];
 }
@@ -104,12 +104,15 @@ const std::vector<vk::UniqueImageView>& VulkanWindow::get_swapchain_image_views(
   return m_swapchain_image_views;
 }
 
-std::expected<u32, vk::Result>
+std::expected<U32, vk::Result>
 VulkanWindow::get_vulkan_images(vk::UniqueSemaphore& image_acquired) {
   ASSERT(m_swapchain && "Swapchain must be valid");
   ASSERT(image_acquired && "Semaphore must be valid");
-  u32        image_index;
-  vk::Result res = m_device.acquireNextImageKHR(*m_swapchain, UINT64_MAX, *image_acquired, nullptr,
+  U32        image_index;
+  vk::Result res = m_device.acquireNextImageKHR(*m_swapchain,
+                                                UINT64_MAX,
+                                                *image_acquired,
+                                                nullptr,
                                                 &image_index);
 
   current_image_index = image_index;
@@ -119,7 +122,7 @@ VulkanWindow::get_vulkan_images(vk::UniqueSemaphore& image_acquired) {
   return std::unexpected(res);
 }
 
-vk::Result VulkanWindow::present_image(u32 image_index) {
+vk::Result VulkanWindow::present_image(U32 image_index) {
   ASSERT(m_swapchain && "Swapchain must be valid");
   ASSERT(image_index < m_swapchain_syncs.size() && "Image index out of bounds");
   ASSERT(m_swapchain_syncs[image_index].render_complete &&
@@ -133,8 +136,9 @@ vk::Result VulkanWindow::present_image(u32 image_index) {
 
   // Use the raw C API to avoid Vulkan-Hpp ASSERTions on exit
   VkPresentInfoKHR present_info_raw = present_info;
-  return static_cast<vk::Result>(vkQueuePresentKHR(
-      static_cast<VkQueue>(m_vulkan_ctx.get_graphics_queue()), &present_info_raw));
+  return static_cast<vk::Result>(
+      vkQueuePresentKHR(static_cast<VkQueue>(m_vulkan_ctx.get_graphics_queue()),
+                        &present_info_raw));
 }
 
 
@@ -146,13 +150,15 @@ void VulkanWindow::rebuild_per_image_sync() {
   m_swapchain_syncs.clear();
   m_swapchain_syncs.reserve(image_count);
 
-  std::ranges::generate_n(
-      std::back_inserter(m_swapchain_syncs), static_cast<int>(image_count), [&] {
-        SwapchainSync sync;
-        sync.render_complete = check_vulkan_res_val(m_device.createSemaphoreUnique({}),
-                                                    "Failed to create unique semaphore: ");
-        return sync;
-      });
+  std::ranges::generate_n(std::back_inserter(m_swapchain_syncs),
+                          static_cast<int>(image_count),
+                          [&] {
+                            SwapchainSync sync;
+                            sync.render_complete =
+                                check_vulkan_res_val(m_device.createSemaphoreUnique({}),
+                                                     "Failed to create unique semaphore: ");
+                            return sync;
+                          });
 }
 void VulkanWindow::resize(int width, int height) {
   if (width == 0 || height == 0) {
@@ -177,13 +183,15 @@ void VulkanWindow::create_swapchain() {
   if (caps.currentExtent.width != UINT32_MAX) {
     m_swapchain_extent = caps.currentExtent;
   } else {
-    m_swapchain_extent.width = std::clamp(static_cast<u32>(window_width), caps.minImageExtent.width,
-                                          caps.maxImageExtent.width);
-    m_swapchain_extent.height = std::clamp(static_cast<u32>(window_height),
-                                           caps.minImageExtent.height, caps.maxImageExtent.height);
+    m_swapchain_extent.width  = std::clamp(static_cast<U32>(window_width),
+                                           caps.minImageExtent.width,
+                                           caps.maxImageExtent.width);
+    m_swapchain_extent.height = std::clamp(static_cast<U32>(window_height),
+                                           caps.minImageExtent.height,
+                                           caps.maxImageExtent.height);
   }
 
-  u32 desired_image_count = caps.minImageCount + 1;
+  U32 desired_image_count = caps.minImageCount + 1;
   if (caps.maxImageCount > 0 && desired_image_count > caps.maxImageCount)
     desired_image_count = caps.maxImageCount;
 
@@ -258,12 +266,15 @@ void VulkanWindow::create_swapchain_dependent_resources() {
     create_info.setImage(image)
         .setViewType(vk::ImageViewType::e2D)
         .setFormat(m_surface_format.format)
-        .setComponents({vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity,
-                        vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity})
+        .setComponents({vk::ComponentSwizzle::eIdentity,
+                        vk::ComponentSwizzle::eIdentity,
+                        vk::ComponentSwizzle::eIdentity,
+                        vk::ComponentSwizzle::eIdentity})
         .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-    m_swapchain_image_views.push_back(check_vulkan_res_val(
-        m_device.createImageViewUnique(create_info), "Failed to create unique imageview: "));
+    m_swapchain_image_views.push_back(
+        check_vulkan_res_val(m_device.createImageViewUnique(create_info),
+                             "Failed to create unique imageview: "));
   }
 }
 

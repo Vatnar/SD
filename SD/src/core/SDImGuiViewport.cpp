@@ -8,8 +8,10 @@
 
 namespace sd {
 
-SDImGuiViewport::SDImGuiViewport(EngineServices& services, const std::string& name, u32 width,
-                                 u32 height) :
+SDImGuiViewport::SDImGuiViewport(EngineServices&    services,
+                                 const std::string& name,
+                                 U32                width,
+                                 U32                height) :
   m_name(name), m_vulkan_ctx(services.vulkan), m_imgui_ctx(services.imgui) {
   m_framebuffer = std::make_unique<VulkanFramebuffer>(m_vulkan_ctx, width, height);
 
@@ -55,8 +57,8 @@ void SDImGuiViewport::begin() {
 
   ImVec2 viewport_panel_size = ImGui::GetContentRegionAvail();
   if (viewport_panel_size.x > 0 && viewport_panel_size.y > 0) {
-    u32 width  = static_cast<u32>(viewport_panel_size.x);
-    u32 height = static_cast<u32>(viewport_panel_size.y);
+    U32 width  = static_cast<U32>(viewport_panel_size.x);
+    U32 height = static_cast<U32>(viewport_panel_size.y);
 
     if (m_framebuffer->get_extent().width != width ||
         m_framebuffer->get_extent().height != height) {
@@ -69,7 +71,8 @@ void SDImGuiViewport::begin() {
     // auto& app = Application::Get();
     // auto pool = app.GetImGuiContext().GetDescriptorPool();
 
-    m_texture_id = ImGui_ImplVulkan_AddTexture(*m_sampler, m_framebuffer->get_color_image_view(),
+    m_texture_id = ImGui_ImplVulkan_AddTexture(*m_sampler,
+                                               m_framebuffer->get_color_image_view(),
                                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   }
 

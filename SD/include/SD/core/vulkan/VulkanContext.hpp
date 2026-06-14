@@ -34,7 +34,7 @@ public:
   vk::PhysicalDeviceVulkan13Features& get_features13();
   VmaAllocator                        get_vma_allocator() const { return m_allocator; }
 
-  [[nodiscard]] u32                  get_graphics_family_index() const;
+  [[nodiscard]] U32                  get_graphics_family_index() const;
   [[nodiscard]] vk::Queue            get_graphics_queue() const;
   [[nodiscard]] vk::SurfaceFormatKHR get_surface_format() const { return m_surface_format; }
   bool is_initialized() { return m_instance.get() && m_vulkan_device && m_phys_dev; }
@@ -53,7 +53,7 @@ private:
   vk::UniqueDevice   m_vulkan_device;
 
   vk::Queue            m_graphics_queue;
-  u32                  m_graphics_family_index{};
+  U32                  m_graphics_family_index{};
   vk::SurfaceFormatKHR m_surface_format;
 
 

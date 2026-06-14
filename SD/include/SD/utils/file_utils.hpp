@@ -28,7 +28,7 @@ inline std::expected<std::vector<char>, FileError> read_file(const std::string& 
     return std::unexpected(FileError::ERROR);
   }
 
-  const usize       file_size = file.tellg();
+  const USize       file_size = file.tellg();
   std::vector<char> buffer(file_size);
 
   file.seekg(0);
@@ -78,8 +78,9 @@ inline FileError read_binary(const std::filesystem::path& path, std::vector<std:
   }
   return FileError::NONE;
 }
-inline FileError write_binary(const std::filesystem::path& path, const std::vector<std::byte>& data,
-                              bool overwrite_existing = false) {
+inline FileError write_binary(const std::filesystem::path&  path,
+                              const std::vector<std::byte>& data,
+                              bool                          overwrite_existing = false) {
   if (std::filesystem::exists(path)) {
     if (!overwrite_existing)
       return FileError::ALREADY_EXISTS;

@@ -12,14 +12,14 @@ namespace sd {
 
 namespace detail {
 
-inline u64 get_cpu_mhz() {
-  static u64 cached_mhz = [] {
-    u64 mhz = 0;
+inline U64 get_cpu_mhz() {
+  static U64 cached_mhz = [] {
+    U64 mhz = 0;
     if (FILE* f = fopen("/proc/cpuinfo", "r")) {
       char buf[256];
       while (fgets(buf, sizeof(buf), f)) {
         if (const char* p = std::strstr(buf, "cpu MHz")) {
-          mhz = static_cast<u64>(std::strtod(p + 7, nullptr));
+          mhz = static_cast<U64>(std::strtod(p + 7, nullptr));
           break;
         }
       }
@@ -33,7 +33,7 @@ inline u64 get_cpu_mhz() {
 } // namespace detail
 
 struct Profile {
-  u64         start{};
+  U64         start{};
   const char* name{};
 
   Profile() = default;
@@ -46,11 +46,11 @@ struct Profile {
   ~Profile() noexcept {
     if (!name)
       return;
-    u32 aux;
-    u64 end = __rdtscp(&aux);
+    U32 aux;
+    U64 end = __rdtscp(&aux);
     _mm_lfence();
-    u64 elapsed = end - start;
-    u64 cur_mhz = detail::get_cpu_mhz();
+    U64 elapsed = end - start;
+    U64 cur_mhz = detail::get_cpu_mhz();
     sd::log::engine::profiler::debug(
         "{}: {} cycles, {:.2f} ms @ 3GHz, {:.2f} ms @ {} MHz (current)",
         name,
@@ -66,12 +66,12 @@ struct Profile {
     start = __rdtsc();
   }
 
-  u64 end() {
-    u32 aux;
-    u64 end_tsc = __rdtscp(&aux);
+  U64 end() {
+    U32 aux;
+    U64 end_tsc = __rdtscp(&aux);
     _mm_lfence();
-    u64 elapsed = end_tsc - start;
-    u64 cur_mhz = detail::get_cpu_mhz();
+    U64 elapsed = end_tsc - start;
+    U64 cur_mhz = detail::get_cpu_mhz();
 
     sd::log::engine::profiler::debug(
         "{}: {} cycles, {:.2f} ms @ 3GHz, {:.2f} ms @ {} MHz (current)",

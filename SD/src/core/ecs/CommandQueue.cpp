@@ -5,42 +5,42 @@
 
 namespace sd {
 
-u32 CommandRegistry::register_(const char* name, u32 component_id) {
+U32 CommandRegistry::register_(const char* name, U32 component_id) {
   std::string key = std::string(name) + "_" + std::to_string(component_id);
   auto        it  = map.find(key);
   if (it != map.end()) {
     return it->second;
   }
-  u32 id = static_cast<u32>(names.size());
+  U32 id = static_cast<U32>(names.size());
   names.push_back(name);
   map[key] = id;
   return id;
 }
 
-u32 CommandRegistry::get_id(const char* name, u32 component_id) {
+U32 CommandRegistry::get_id(const char* name, U32 component_id) {
   std::string key = std::string(name) + "_" + std::to_string(component_id);
   auto        it  = map.find(key);
   if (it != map.end()) {
     return it->second;
   }
-  return g_type_max<u32>;
+  return g_type_max<U32>;
 }
 
-const char* CommandRegistry::get_name(u32 id) {
+const char* CommandRegistry::get_name(U32 id) {
   if (id < names.size()) {
     return names[id];
   }
   return "Unknown";
 }
 
-void CommandFactory::register_(u32 type_id, CreatorFn creator) {
+void CommandFactory::register_(U32 type_id, CreatorFn creator) {
   if (type_id >= creators.size()) {
     creators.resize(type_id + 1);
   }
   creators[type_id] = std::move(creator);
 }
 
-std::unique_ptr<Command> CommandFactory::create(u32 type_id) {
+std::unique_ptr<Command> CommandFactory::create(U32 type_id) {
   if (type_id < creators.size() && creators[type_id]) {
     return creators[type_id]();
   }
@@ -67,7 +67,7 @@ void CommandQueue::clear() {
   m_commands.clear();
   m_handle_to_entity.clear();
 }
-usize CommandQueue::get_count() const {
+USize CommandQueue::get_count() const {
   return m_commands.size();
 }
 Entity CommandQueue::get_entity(EntityHandle handle) const {
@@ -76,27 +76,27 @@ Entity CommandQueue::get_entity(EntityHandle handle) const {
 }
 
 void CommandQueue::serialize(Serializer& serializer) const {
-  serializer.write(static_cast<u32>(m_commands.size()));
+  serializer.write(static_cast<U32>(m_commands.size()));
   for (const auto& cmd : m_commands) {
     serializer.write(cmd->get_type_id());
     // Serialize command to temp buffer to know its size
     std::vector<std::byte> payload;
     Serializer             payload_serializer(payload);
     cmd->serialize(payload_serializer);
-    serializer.write(static_cast<u32>(payload.size()));
+    serializer.write(static_cast<U32>(payload.size()));
     serializer.write(payload.data(), payload.size());
   }
 }
 
 void CommandQueue::deserialize(Serializer& serializer) {
-  u32 count = serializer.read<u32>();
+  U32 count = serializer.read<U32>();
   m_commands.clear();
   m_commands.reserve(count);
 
-  for (u32 i = 0; i < count; ++i) {
-    u32   type_id       = serializer.read<u32>();
-    u32   payload_size  = serializer.read<u32>();
-    usize payload_start = serializer.get_offset();
+  for (U32 i = 0; i < count; ++i) {
+    U32   type_id       = serializer.read<U32>();
+    U32   payload_size  = serializer.read<U32>();
+    USize payload_start = serializer.get_offset();
     if (auto cmd = CommandFactory::create(type_id)) {
       cmd->deserialize(serializer);
       m_commands.push_back(std::move(cmd));

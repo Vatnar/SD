@@ -1,15 +1,15 @@
 #include <filesystem>
 #include <fstream>
-#include <x86gprintrin.h>
 
 #include <SD/Application.hpp>
 #include <SD/core/ShaderCompiler.hpp>
 #include <SD/core/ecs/components.hpp>
 #include <SD/core/layers/EngineDebugLayer.hpp>
+#include <SD/core/types.hpp>
 #include <SD/game_api.hpp>
+#include <SD/profiler.hpp>
 
 #include "GameRenderLayer.hpp"
-#include "SD/profiler.hpp"
 #include "logging.hpp"
 
 static void register_game_categories() {
@@ -45,29 +45,176 @@ void on_load(sd::Application& app, State& state) {
   vk::UniquePipeline       pipeline;
   vk::UniquePipelineLayout pipeline_layout;
 
+  // NOTE: Should pipeline creation be templated so we can have different push structs? Like can
+  //  pipelines have different push constants etc, or should we find something standardized. Most
+  //  likely some pipelines will be created dynamically but maybe its smart to have like 3 or 4
+  //  different kinds based on whats needed. Or should we just have different functions for those
+  //  different pipelines, since we will have compute shaders etc as well. Maybe just make this
+  //  beneath into some pipeline creation function, and rather create new ones where needed. and
+  //  abstract shared things into other functions later.
+  // TODO: compress pipeline creation
+
+  // NOTE: What should be changable between pipelines:
+  //  Shader Stages
+  //  Vertex input
+  //  Input Assembly
+  //  Rasterizer
+  // MultiSampling
+  // Depth/stencil
+  // Blend attachments
+  // dynamic state
+  // color depth formats
+  // [pipeline layouts
+
+
+  // What changes between different pipelines
+  // Shaders and shader stages.
+  // Push Constants
+
+
+  const char* vert_path{"assets/engine/shaders/world.vert"};
+  const char* frag_path{"assets/engine/shaders/world.frag"};
+
+
+  vk::UniqueShaderModule vert_module;
   {
-    PROFILE("Pipeline creation");
-    struct Push {
-      VLA::Matrix4x4f mvp{};
-      float           color[4]{};
-    };
-    auto                         physical_device = vulkan_context.get_physical_device();
-    vk::PhysicalDeviceProperties props           = physical_device.getProperties();
-    u32                          max_push_size   = props.limits.maxPushConstantsSize;
-    if (max_push_size < sizeof(Push)) {
-      sd::log::game::error("Push size {} exceeds maxPushConstantsSize{}",
-                           sizeof(Push),
-                           max_push_size);
+    PROFILE("vert_module");
+    auto spv = sd::compile_shader(vert_path);
+    if (!spv) {
+      sd::log::game::error("Failed to compile vertex shader: {}", vert_path);
+      return;
     }
 
-    {
-      vk::PushConstantRange push_constant_range{
-          .stageFlags = vk::ShaderStageFlagBits::eVertex,
-          .size       = static_cast<u32>(sizeof(Push)),
+    vk::ShaderModuleCreateInfo create_info{.codeSize = spv->size() * sizeof(U32),
+                                           .pCode    = spv->data()};
+
+    auto vulkan_device = vulkan_context.get_vulkan_device().get();
+    auto res           = vulkan_device.createShaderModuleUnique(create_info);
+
+    if (res.result != vk::Result::eSuccess) {
+      sd::log::engine::critical("Shader comp failed");
+      return;
+    }
+    vert_module = std::move(res.value);
+  }
+
+  vk::UniqueShaderModule frag_module;
+  {
+    PROFILE("frag module");
+    auto spv = sd::compile_shader(frag_path);
+    if (!spv) {
+      sd::log::game::error("Failed to compile frag shader at: {}", frag_path);
+      return;
+    }
+
+    vk::ShaderModuleCreateInfo create_info{
+        .codeSize = spv->size() * sizeof(U32),
+        .pCode    = spv->data(),
+    };
+
+    auto vulkan_device = vulkan_context.get_vulkan_device().get();
+    auto res           = vulkan_device.createShaderModuleUnique(create_info);
+    if (res.result != vk::Result::eSuccess) {
+      sd::log::engine::critical("Shader comp failed");
+      return;
+    }
+    frag_module = std::move(res.value);
+  }
+
+  vk::PipelineShaderStageCreateInfo vert_stage{
+      .stage  = vk::ShaderStageFlagBits::eVertex,
+      .module = *vert_module,
+      .pName  = "main",
+  };
+
+  vk::PipelineShaderStageCreateInfo frag_stage{
+      .stage  = vk::ShaderStageFlagBits::eFragment,
+      .module = *frag_module,
+      .pName  = "main",
+  };
+
+  std::array shader_stages{vert_stage, frag_stage};
+
+  struct Push {
+    VLA::Matrix4x4f mvp{};
+    F32             color[4]{};
+  };
+  static_assert(sizeof(Push) <= 128, "Push must fit in vulkan spec minimum");
+
+  vk::PushConstantRange push_constant_range{
+      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      .size       = static_cast<U32>(sizeof(Push)),
+  };
+
+  vk::DescriptorSetLayoutBinding binding1 = {
+
+  };
+
+  std::array descriptor_set_layout_bindings{binding1};
+
+  vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info{
+      .bindingCount = descriptor_set_layout_bindings.size(),
+      .pBindings    = descriptor_set_layout_bindings.data()};
+
+  auto res = vulkan_context.get_vulkan_device()->createDescriptorSetLayoutUnique(
+      descriptor_set_layout_info);
+  if (res.result != vk::Result::eSuccess) {
+    sd::log::engine::critical("Failed to create descriptor set layout");
+  }
+
+  std::array descriptor_set_layouts{(std::move(res.value))};
+
+  struct VertexPNUV {
+    VLA::Vector3f position;
+    VLA::Vector3f normal;
+    VLA::Vector2f uv;
+
+    static constexpr std::array<vk::VertexInputBindingDescription, 1> binding_descriptions() {
+      return {{{.binding   = 0,
+                .stride    = sizeof(VertexPNUV),
+                .inputRate = vk::VertexInputRate::eVertex}}};
+    }
+
+    static constexpr std::array<vk::VertexInputAttributeDescription, 3> attribute_descriptions() {
+      return {
+          {
+           {
+                  .location = 0,
+                  .binding  = 0,
+                  .format   = vk::Format::eR32G32B32Sfloat,
+                  .offset   = static_cast<U32>(offsetof(VertexPNUV, position)),
+              }, {
+                  .location = 1,
+                  .binding  = 0,
+                  .format   = vk::Format::eR32G32B32Sfloat,
+                  .offset   = static_cast<U32>(offsetof(VertexPNUV, normal)),
+              }, {
+                  .location = 2,
+                  .binding  = 0,
+                  .format   = vk::Format::eR32G32Sfloat,
+                  .offset   = static_cast<U32>(offsetof(VertexPNUV, uv)),
+              }, }
       };
+    };
+  };
+
+  auto binding_descriptions   = VertexPNUV::binding_descriptions();
+  auto attribute_descriptions = VertexPNUV::attribute_descriptions();
+  {
+    PROFILE("Pipeline creation");
+
+    {
+      std::vector<vk::DescriptorSetLayout> raw_layouts;
+      raw_layouts.reserve(descriptor_set_layouts.size());
+      for (auto& layout : descriptor_set_layouts) {
+        raw_layouts.push_back(*layout);
+      }
+
+      // NOTE: This might be sharted accross pipelines, should be cached or reused when descritpor
+      // set layout list and push constant ranges are identical
       vk::PipelineLayoutCreateInfo pipeline_layout_info{
-          .setLayoutCount         = 0,
-          .pSetLayouts            = nullptr,
+          .setLayoutCount         = descriptor_set_layouts.size(),
+          .pSetLayouts            = raw_layouts.data(),
           .pushConstantRangeCount = 1,
           .pPushConstantRanges    = &push_constant_range};
 
@@ -80,70 +227,14 @@ void on_load(sd::Application& app, State& state) {
       pipeline_layout = std::move(res.value);
     }
 
-    const char* vert_path{"assets/engine/shaders/world.vert"};
-    const char* frag_path{"assets/engine/shaders/world.frag"};
 
+    vk::PipelineVertexInputStateCreateInfo vertex_input_info{
+        .vertexBindingDescriptionCount   = binding_descriptions.size(),
+        .pVertexBindingDescriptions      = binding_descriptions.data(),
+        .vertexAttributeDescriptionCount = attribute_descriptions.size(),
+        .pVertexAttributeDescriptions    = attribute_descriptions.data(),
 
-    vk::UniqueShaderModule vert_module;
-    {
-      PROFILE("vert_module");
-      auto spv = sd::compile_shader(vert_path);
-      if (!spv) {
-        sd::log::game::error("Failed to compile vertex shader: {}", vert_path);
-        return;
-      }
-
-      vk::ShaderModuleCreateInfo create_info{.codeSize = spv->size() * sizeof(u32),
-                                             .pCode    = spv->data()};
-
-      auto vulkan_device = vulkan_context.get_vulkan_device().get();
-      auto res           = vulkan_device.createShaderModuleUnique(create_info);
-
-      if (res.result != vk::Result::eSuccess) {
-        sd::log::engine::critical("Shader comp failed");
-        return;
-      }
-      vert_module = std::move(res.value);
-    }
-
-    vk::UniqueShaderModule frag_module;
-    {
-      PROFILE("frag module");
-      auto spv = sd::compile_shader(frag_path);
-      if (!spv) {
-        sd::log::game::error("Failed to compile frag shader at: {}", frag_path);
-        return;
-      }
-
-      vk::ShaderModuleCreateInfo create_info{
-          .codeSize = spv->size() * sizeof(u32),
-          .pCode    = spv->data(),
-      };
-
-      auto vulkan_device = vulkan_context.get_vulkan_device().get();
-      auto res           = vulkan_device.createShaderModuleUnique(create_info);
-      if (res.result != vk::Result::eSuccess) {
-        sd::log::engine::critical("Shader comp failed");
-        return;
-      }
-      frag_module = std::move(res.value);
-    }
-
-    vk::PipelineShaderStageCreateInfo vert_stage{
-        .stage  = vk::ShaderStageFlagBits::eVertex,
-        .module = *vert_module,
-        .pName  = "main",
     };
-
-    vk::PipelineShaderStageCreateInfo frag_stage{
-        .stage  = vk::ShaderStageFlagBits::eFragment,
-        .module = *frag_module,
-        .pName  = "main",
-    };
-
-    std::array shader_stages{vert_stage, frag_stage};
-
-    vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
 
     vk::PipelineInputAssemblyStateCreateInfo input_assembly{
         .topology = vk::PrimitiveTopology::eTriangleList,
@@ -189,7 +280,6 @@ void on_load(sd::Application& app, State& state) {
     };
 
 
-    //~ Actual pipeline creation
     auto                            color_format = game_view.get_color_format();
     vk::PipelineRenderingCreateInfo rendering_info{
         .colorAttachmentCount    = 1,
@@ -228,9 +318,9 @@ void on_load(sd::Application& app, State& state) {
       std::vector<char> cache_data;
       std::ifstream     cache_file("cache/pipeline.spv", std::ios::binary | std::ios::ate);
       if (cache_file) {
-        auto size = static_cast<u64>(cache_file.tellg());
+        auto size = static_cast<U64>(cache_file.tellg());
         cache_file.seekg(0);
-        cache_data.resize(static_cast<usize>(size));
+        cache_data.resize(static_cast<USize>(size));
         cache_file.read(cache_data.data(), static_cast<std::streamsize>(size));
         sd::log::game::info("Loaded pipeline cache ({} bytes)", size);
         // printf("Loaded pipeline cache (%lu bytes)\n", size);
@@ -255,7 +345,7 @@ void on_load(sd::Application& app, State& state) {
                                                                                  pipeline_info);
     PROFILE_END();
     if (res.result != vk::Result::eSuccess) {
-      sd::log::engine::critical("Rip, we failed, error is: {} ", static_cast<u32>(res.result));
+      sd::log::engine::critical("Rip, we failed, error is: {} ", static_cast<U32>(res.result));
     } else {
       pipeline = std::move(res.value.front());
     }

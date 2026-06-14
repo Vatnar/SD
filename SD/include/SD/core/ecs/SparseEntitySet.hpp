@@ -40,9 +40,9 @@ public:
 // per archetype or similar
 template<typename T>
 class SparseEntitySet : public SparseEntitySetBase {
-  static constexpr usize PAGE_SIZE = 1024;
-  static constexpr usize SHIFT     = math::log2_int(PAGE_SIZE);
-  static constexpr usize MASK      = PAGE_SIZE - 1;
+  static constexpr USize PAGE_SIZE = 1024;
+  static constexpr USize SHIFT     = math::log2_int(PAGE_SIZE);
+  static constexpr USize MASK      = PAGE_SIZE - 1;
 
   // INVARIANTS:
   // 1. dense_entities.size() == dense_data.size() (parallel arrays)
@@ -54,15 +54,15 @@ class SparseEntitySet : public SparseEntitySetBase {
     assert(dense_entities.size() == dense_data.size());
     for (size_t i = 0; i < dense_entities.size(); ++i) {
       Entity e      = dense_entities[i];
-      usize  page   = e.index >> SHIFT;
-      usize  offset = e.index & MASK;
+      USize  page   = e.index >> SHIFT;
+      USize  offset = e.index & MASK;
       assert(page < sparse.size() && sparse[page]);
       assert(sparse[page][offset] == i);
     }
   }
 #endif
 
-  std::vector<std::unique_ptr<usize[]>> sparse;
+  std::vector<std::unique_ptr<USize[]>> sparse;
   std::vector<T>                        dense_data;
   std::vector<Entity>                   dense_entities;
 
@@ -89,7 +89,7 @@ public:
   T*                                       operator[](const Entity idx) { return get(idx); }
   [[nodiscard]] const std::vector<Entity>& get_dense_entities() const { return dense_entities; }
 
-  [[nodiscard]] usize size() const { return dense_entities.size(); }
+  [[nodiscard]] USize size() const { return dense_entities.size(); }
 
   void clear() {
     sparse.clear();
@@ -133,14 +133,14 @@ public:
     sparse.clear();
     for (size_t i = 0; i < entity_count; ++i) {
       Entity      e      = dense_entities[i];
-      const usize page   = e.index >> SHIFT;
-      const usize offset = e.index & MASK;
+      const USize page   = e.index >> SHIFT;
+      const USize offset = e.index & MASK;
 
       if (page >= sparse.size())
         sparse.resize(page + 1);
       if (!sparse[page]) {
-        sparse[page] = std::make_unique<usize[]>(PAGE_SIZE); // TODO: here
-        std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<usize>::max());
+        sparse[page] = std::make_unique<USize[]>(PAGE_SIZE); // TODO: here
+        std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<USize>::max());
       }
       sparse[page][offset] = i;
     }
@@ -150,7 +150,7 @@ public:
   }
 
   void serialize(Serializer& s) const override {
-    s.write(static_cast<u32>(dense_entities.size()));
+    s.write(static_cast<U32>(dense_entities.size()));
     for (const auto& e : dense_entities) {
       s.write(e.index);
       s.write(e.generation);
@@ -164,11 +164,11 @@ public:
   }
 
   void deserialize(Serializer& s) override {
-    u32 count = s.read<u32>();
+    U32 count = s.read<U32>();
     dense_entities.resize(count);
-    for (u32 i = 0; i < count; ++i) {
-      dense_entities[i].index      = s.read<u32>();
-      dense_entities[i].generation = s.read<u32>();
+    for (U32 i = 0; i < count; ++i) {
+      dense_entities[i].index      = s.read<U32>();
+      dense_entities[i].generation = s.read<U32>();
     }
     dense_data.resize(dense_entities.size());
     if constexpr (SerializableComponent<T>) {
@@ -180,15 +180,15 @@ public:
     sparse.clear();
     for (size_t i = 0; i < dense_entities.size(); ++i) {
       Entity      e      = dense_entities[i];
-      const usize page   = e.index >> SHIFT;
-      const usize offset = e.index & MASK;
+      const USize page   = e.index >> SHIFT;
+      const USize offset = e.index & MASK;
 
       if (page >= sparse.size())
         sparse.resize(page + 1);
       if (!sparse[page]) {
         // TODO: here
-        sparse[page] = std::make_unique<usize[]>(PAGE_SIZE);
-        std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<usize>::max());
+        sparse[page] = std::make_unique<USize[]>(PAGE_SIZE);
+        std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<USize>::max());
       }
       sparse[page][offset] = i;
     }

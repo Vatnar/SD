@@ -45,13 +45,13 @@ template<typename T, typename... Ts>
 struct ComponentTraits<T, ComponentGroup<Ts...>> {
   static constexpr bool is_registered = (std::same_as<T, Ts> || ...);
 
-  static constexpr usize id() {
+  static constexpr USize id() {
     constexpr bool matches[] = {std::same_as<T, Ts>...};
-    for (usize i = 0; i < sizeof...(Ts); ++i) {
+    for (USize i = 0; i < sizeof...(Ts); ++i) {
       if (matches[i])
         return i;
     }
-    return static_cast<usize>(-1);
+    return static_cast<USize>(-1);
   }
 
   static constexpr auto name = std::meta::identifier_of(^^T);

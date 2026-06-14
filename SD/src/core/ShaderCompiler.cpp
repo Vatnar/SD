@@ -72,18 +72,18 @@ constexpr std::array k_ext_to_profile = {
 
 // TODO: compute max length
 using ExtString = FixedString<20>; // slightly overkill, but doesnt matter
-template<usize N>
+template<USize N>
 consteval std::array<ExtString, N> concatenate_mappings(std::array<ExtMapping, N> mappings) {
   std::array<ExtString, N> result;
 
-  for (usize i = 0; i < mappings.size(); ++i) {
+  for (USize i = 0; i < mappings.size(); ++i) {
     result[i] = ExtString{mappings[i].ext} + ExtString{':'} + ExtString{mappings[i].profile};
   }
 
   return result;
 }
 
-template<usize N>
+template<USize N>
 constexpr std::array<ExtMapping, N> sort_by_profile(std::array<ExtMapping, N> mappings) {
   std::ranges::sort(mappings, [](const ExtMapping& a, const ExtMapping& b) constexpr {
     if (a.profile < b.profile)
@@ -149,7 +149,7 @@ std::string deduce_profile(const std::string& filename) {
 } // namespace
 
 namespace sd {
-std::optional<std::vector<u32>> compile_shader(const std::string& filename,
+std::optional<std::vector<U32>> compile_shader(const std::string& filename,
                                                const std::string& profile) {
   static ComPtr<IDxcUtils>     s_utils    = init_dxc_utils();
   static ComPtr<IDxcCompiler3> s_compiler = init_dxc_compiler();
@@ -188,7 +188,7 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
   ComPtr<IDxcResult> result;
   hres = s_compiler->Compile(&buffer,
                              arguments.data(),
-                             static_cast<u32>(arguments.size()),
+                             static_cast<U32>(arguments.size()),
                              nullptr,
                              IID_PPV_ARGS(&result));
   if (SUCCEEDED(hres))
@@ -206,8 +206,8 @@ std::optional<std::vector<u32>> compile_shader(const std::string& filename,
   ComPtr<IDxcBlob> code;
   result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&code), nullptr);
 
-  auto* ptr   = static_cast<const u32*>(code->GetBufferPointer());
-  auto  count = code->GetBufferSize() / sizeof(u32);
-  return std::vector<u32>(ptr, ptr + count);
+  auto* ptr   = static_cast<const U32*>(code->GetBufferPointer());
+  auto  count = code->GetBufferSize() / sizeof(U32);
+  return std::vector<U32>(ptr, ptr + count);
 }
 } // namespace sd

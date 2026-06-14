@@ -35,10 +35,10 @@ struct Camera {
 // };
 
 struct Renderable {
-  u32   mesh_id      = 0;
-  u32   material_id  = 0;
-  i32   render_stage = 0;
-  u32   view_mask    = 0;
+  U32   mesh_id      = 0;
+  U32   material_id  = 0;
+  I32   render_stage = 0;
+  U32   view_mask    = 0;
   float color[4]     = {1.0f, 0.0f, 0.0f, 1.0f};
 };
 

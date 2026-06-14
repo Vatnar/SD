@@ -18,7 +18,7 @@ public:
   void                set_entity_for_handle(EntityHandle entity_handle, Entity entity);
   [[nodiscard]] bool  is_handle_resolved(EntityHandle handle) const;
   void                clear();
-  [[nodiscard]] usize get_count() const;
+  [[nodiscard]] USize get_count() const;
 
   void serialize(Serializer& serializer) const;
   void deserialize(Serializer& serializer);

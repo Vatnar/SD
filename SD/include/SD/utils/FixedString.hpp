@@ -14,10 +14,10 @@ void compile_time_assert_failed(
 // accidental exceptions in other stuff
 
 
-template<usize MAX_SIZE>
+template<USize MAX_SIZE>
 struct FixedString {
   std::array<char, MAX_SIZE> data{};
-  usize                      size{};
+  USize                      size{};
   constexpr FixedString() = default;
   consteval explicit FixedString(std::string_view sv) {
     if (sv.size() > MAX_SIZE)
@@ -38,7 +38,7 @@ struct FixedString {
     return std::string_view(data.data(), size);
   }
 };
-template<usize N>
+template<USize N>
 struct fmt::formatter<FixedString<N>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
   auto           format(const FixedString<N>& value, format_context& ctx) {

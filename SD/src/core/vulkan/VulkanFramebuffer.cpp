@@ -4,7 +4,7 @@
 
 namespace sd {
 
-VulkanFramebuffer::VulkanFramebuffer(VulkanContext& ctx, u32 width, u32 height) :
+VulkanFramebuffer::VulkanFramebuffer(VulkanContext& ctx, U32 width, U32 height) :
   m_ctx(ctx), m_extent(width, height) {
   create_resources();
 }
@@ -13,7 +13,7 @@ VulkanFramebuffer::~VulkanFramebuffer() {
   destroy_resources();
 }
 
-void VulkanFramebuffer::resize(u32 width, u32 height) {
+void VulkanFramebuffer::resize(U32 width, U32 height) {
   if (m_extent.width == width && m_extent.height == height)
     return;
 
@@ -31,7 +31,11 @@ void VulkanFramebuffer::create_resources() {
 
   // 1. Create Color Image
   auto [image, memory] =
-      create_image(*device, phys_dev, m_extent.width, m_extent.height, vk::Format::eR8G8B8A8Srgb,
+      create_image(*device,
+                   phys_dev,
+                   m_extent.width,
+                   m_extent.height,
+                   vk::Format::eR8G8B8A8Srgb,
                    vk::ImageTiling::eOptimal,
                    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
                    vk::MemoryPropertyFlagBits::eDeviceLocal);

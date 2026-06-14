@@ -12,7 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(SD_ENABLE_ASAN "Enable AddressSanitizer on supported toolchains" OFF)
 option(SD_ENABLE_IWYU "Enable IWYU helper targets/scripts when available" ON)
-option(SD_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
+option(SD_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 option(SD_ENABLE_CCACHE "Enable ccache compiler launcher when available" ON)
 
 

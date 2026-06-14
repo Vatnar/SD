@@ -35,7 +35,7 @@ public:
     m_commands.apply(em);
     m_commands.clear();
   }
-  [[nodiscard]] usize command_count() const;
+  [[nodiscard]] USize command_count() const;
 
   EntityManager<ComponentGroup<>> em;
 
@@ -44,7 +44,7 @@ private:
   std::string  m_name;
   bool         m_is_active = false;
 };
-inline usize Scene::command_count() const {
+inline USize Scene::command_count() const {
   return m_commands.get_count();
 }
 } // namespace sd
