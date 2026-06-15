@@ -10,6 +10,7 @@
 #include <SD/profiler.hpp>
 
 #include "GameRenderLayer.hpp"
+#include "SD/Vertex.hpp"
 #include "logging.hpp"
 
 static void register_game_categories() {
@@ -164,42 +165,18 @@ void on_load(sd::Application& app, State& state) {
 
   std::array descriptor_set_layouts{(std::move(res.value))};
 
-  struct VertexPNUV {
-    VLA::Vector3f position;
-    VLA::Vector3f normal;
-    VLA::Vector2f uv;
 
-    static constexpr std::array<vk::VertexInputBindingDescription, 1> binding_descriptions() {
-      return {{{.binding   = 0,
-                .stride    = sizeof(VertexPNUV),
-                .inputRate = vk::VertexInputRate::eVertex}}};
-    }
+  static_assert(std::is_standard_layout_v<SD::VertexPNUV>);
+  static_assert(sizeof(VLA::Vector3f) == 12);
+  static_assert(sizeof(VLA::Vector2f) == 8);
+  static_assert(offsetof(SD::VertexPNUV, position) == 0);
+  static_assert(offsetof(SD::VertexPNUV, normal) == 12);
+  static_assert(offsetof(SD::VertexPNUV, uv) == 24);
+  static_assert(sizeof(SD::VertexPNUV) == 32);
 
-    static constexpr std::array<vk::VertexInputAttributeDescription, 3> attribute_descriptions() {
-      return {
-          {
-           {
-                  .location = 0,
-                  .binding  = 0,
-                  .format   = vk::Format::eR32G32B32Sfloat,
-                  .offset   = static_cast<U32>(offsetof(VertexPNUV, position)),
-              }, {
-                  .location = 1,
-                  .binding  = 0,
-                  .format   = vk::Format::eR32G32B32Sfloat,
-                  .offset   = static_cast<U32>(offsetof(VertexPNUV, normal)),
-              }, {
-                  .location = 2,
-                  .binding  = 0,
-                  .format   = vk::Format::eR32G32Sfloat,
-                  .offset   = static_cast<U32>(offsetof(VertexPNUV, uv)),
-              }, }
-      };
-    };
-  };
 
-  auto binding_descriptions   = VertexPNUV::binding_descriptions();
-  auto attribute_descriptions = VertexPNUV::attribute_descriptions();
+  auto binding_descriptions   = SD::VertexPNUV::binding_descriptions();
+  auto attribute_descriptions = SD::VertexPNUV::attribute_descriptions();
   {
     PROFILE("Pipeline creation");
 

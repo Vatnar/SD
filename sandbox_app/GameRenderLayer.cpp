@@ -1,12 +1,15 @@
 #include "GameRenderLayer.hpp"
 
+#include <cstring>
 #include <imgui.h>
 
+#include <SD/Application.hpp>
 #include <SD/core/View.hpp>
 #include <SD/core/ecs/components.hpp>
 #include <SD/utils/utils.hpp>
 #include <VLA/Matrix.hpp>
 
+#include "SD/Vertex.hpp"
 #include "SD/profiler.hpp"
 
 GameRenderLayer::GameRenderLayer(const std::string&       name,
@@ -16,7 +19,43 @@ GameRenderLayer::GameRenderLayer(const std::string&       name,
   RenderStage(name, scene), m_pipeline(std::move(pipeline)), m_layout(std::move(layout)) {
 }
 
+void GameRenderLayer::create_vertex_buffer() {
+  constexpr std::array<SD::VertexPNUV, 3> triangle = {
+      {
+       {.position = {0.0f, -0.8f, 0.0f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.5f, 0.0f}},
+       {.position = {-0.8f, 0.8f, 0.0f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 1.0f}},
+       {.position = {0.8f, 0.8f, 0.0f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}},
+       }
+  };
+
+  const vk::DeviceSize buffer_size = sizeof(triangle);
+
+  auto& device   = *m_app->services().vulkan.get_vulkan_device();
+  auto& phys_dev = m_app->services().vulkan.get_physical_device();
+
+  auto [vb, vm] = sd::create_buffer(
+      device,
+      phys_dev,
+      buffer_size,
+      vk::BufferUsageFlagBits::eVertexBuffer,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+  void* mapped = sd::check_vulkan_res_val(device.mapMemory(*vm, 0, buffer_size),
+                                          "Failed to map vertex buffer memory");
+  std::memcpy(mapped, triangle.data(), static_cast<size_t>(buffer_size));
+  device.unmapMemory(*vm);
+
+  m_vertex_buffer  = std::move(vb);
+  m_vertex_memory  = std::move(vm);
+  m_vertex_count   = triangle.size();
+  m_buffer_created = true;
+}
+
 void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
+  if (!m_buffer_created) {
+    create_vertex_buffer();
+  }
+
   ASSERT(cmd != VK_NULL_HANDLE && "Invalid cmd buffer");
   ASSERT(m_pipeline && "Invalid pipeline - was it destroyed or recreated?");
   ASSERT(m_layout && "Invalid layout");
@@ -117,6 +156,8 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
   // Just checks for equilateral triangle
   const bool inside = !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 
+  // todo: should be on a mesh component, (or not on the component, but indexed to or something)
+
   for (auto [entity, transform, renderable] :
        m_scene->em.view<sd::components::Transform, sd::components::Renderable>()) {
     if ((renderable.view_mask & 1u << static_cast<uint32_t>(m_view_id)) == 0 ||
@@ -127,15 +168,21 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
     push.mvp = m_view->get_projection() * transform.world_matrix;
     memcpy(push.color, renderable.color, sizeof(float) * 4);
 
+
     if (inside) {
       push.color[0] = 1.0f;
       push.color[1] = 1.0f;
       push.color[2] = 1.0f;
     }
 
-    cmd.pushConstants(*m_layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Push), &push);
 
-    cmd.draw(3, 1, 0, 0);
+    cmd.pushConstants(*m_layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Push), &push);
+    const vk::Buffer     vertex_buffer = *m_vertex_buffer;
+    const vk::DeviceSize offset        = 0;
+
+    cmd.bindVertexBuffers(0, 1, &vertex_buffer, &offset);
+
+    cmd.draw(m_vertex_count, 1, 0, 0);
   }
 
   cmd.endRendering();
