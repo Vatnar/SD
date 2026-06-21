@@ -354,20 +354,6 @@ inline std::expected<Texture, std::string> create_texture(const vk::Device&     
                  .image_view   = std::move(image_view)};
 }
 
-/**
- * Create a Vulkan shader module from SPIR-V bytecode.
- *
- * @note The input buffer must be 4-byte aligned. SPIR-V files from DXC are,
- *       but if loading from arbitrary sources, ensure alignment before calling.
- */
-inline vk::UniqueShaderModule create_shader_module(const vk::Device&        device,
-                                                   const std::vector<char>& code) {
-  ASSERT_ALWAYS(code.size() % 4 == 0 && "SPIR-V code size must be a multiple of 4");
-  vk::ShaderModuleCreateInfo create_info{.codeSize = code.size(),
-                                         .pCode = reinterpret_cast<const uint32_t*>(code.data())};
-  return check_vulkan_res_val(device.createShaderModuleUnique(create_info),
-                              "Failed to create unique shaderModule: ");
-}
 /// Formats a range of items into aligned columns.
 /// @param items     Input range whose elements are convertible to string_view
 /// @param cols      Number of columns (default 4)

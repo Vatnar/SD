@@ -13,7 +13,7 @@ int main() {
       .height          = 720,
       .enableHotReload = false,
   };
-  sd::Application app(spec);
+  sd::Application app{spec};
 
   game::State state{};
   game::on_load(app, state);

@@ -118,14 +118,15 @@ ComPtr<IDxcCompiler3> init_dxc_compiler() {
   return compiler;
 }
 
-std::string deduce_profile(const std::string& filename) {
+std::string deduce_profile(std::string_view filename) {
   auto dot = filename.rfind('.');
   if (dot == std::string::npos) {
     sd::log::engine::shader::warn("No extension in '{}', falling back to lib_6_9", filename);
     return std::string{"lib_"} + k_shader_model;
   }
 
-  std::string ext = filename.substr(dot + 1);
+  std::string s_filename{std::string{filename}};
+  std::string ext = s_filename.substr(dot + 1);
   for (auto& c : ext)
     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
@@ -149,13 +150,14 @@ std::string deduce_profile(const std::string& filename) {
 } // namespace
 
 namespace sd {
-std::optional<std::vector<U32>> compile_shader(const std::string& filename,
-                                               const std::string& profile) {
+std::optional<std::vector<U32>> compile_shader(std::string_view filename,
+                                               std::string_view profile) {
   static ComPtr<IDxcUtils>     s_utils    = init_dxc_utils();
   static ComPtr<IDxcCompiler3> s_compiler = init_dxc_compiler();
 
   ComPtr<IDxcBlobEncoding> source_blob;
-  std::wstring             w_filename = to_wstring(filename);
+  std::string              s_filename = std::string(filename);
+  std::wstring             w_filename = to_wstring(s_filename);
 
   HRESULT hres = s_utils->LoadFile(w_filename.c_str(), nullptr, &source_blob);
   if (FAILED(hres)) {
@@ -163,7 +165,7 @@ std::optional<std::vector<U32>> compile_shader(const std::string& filename,
     return {};
   }
 
-  std::string  target_profile   = profile.empty() ? deduce_profile(filename) : profile;
+  std::string  target_profile   = profile.empty() ? deduce_profile(filename) : std::string{profile};
   std::wstring w_target_profile = to_wstring(target_profile);
 
   std::vector arguments = {

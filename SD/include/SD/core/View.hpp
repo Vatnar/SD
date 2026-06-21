@@ -101,8 +101,8 @@ public:
   const LayerList& get_layers() const { return m_layers; }
 
   // --- Viewport state ---
-  VkExtent2D get_extent() const { return m_extent; }
-  void       resize(VkExtent2D extent);
+  vk::Extent2D get_extent() const { return m_extent; }
+  void         resize(vk::Extent2D extent);
 
   AspectMode get_aspect_mode() const { return m_aspect_mode; }
   void       set_aspect_mode(AspectMode mode) {

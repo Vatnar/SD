@@ -49,8 +49,7 @@ inline U32 find_memory_type(const vk::PhysicalDevice& physical_device,
         (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
       return i;
   }
-  log::engine::critical("Failed to find memory type");
-  return {};
+  NOT_IMPLEMENTED; // fallback??
 }
 
 } // namespace sd

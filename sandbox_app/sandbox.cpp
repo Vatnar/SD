@@ -19,6 +19,28 @@ static void register_game_categories() {
   sd::log::register_category("game/ui", ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
   sd::log::register_category("game/audio", ImVec4(0.4f, 0.8f, 1.0f, 1.0f));
 }
+// in anonymous namespace until i decide where to move it
+namespace {
+vk::UniqueShaderModule create_shader_module(vk::Device device, std::string_view shader_path) {
+  PROFILE((shader_path.data()));
+  auto spv{sd::compile_shader(shader_path)};
+  if (!spv) {
+    sd::log::game::error("Failed to compile vertex shader: {}", shader_path);
+    return {};
+  }
+
+  vk::ShaderModuleCreateInfo create_info{.codeSize = spv->size() * sizeof(U32),
+                                         .pCode    = spv->data()};
+
+  auto res{device.createShaderModuleUnique(create_info)};
+
+  if (res.result != vk::Result::eSuccess) {
+    NOT_IMPLEMENTED;
+    return {};
+  }
+  return std::move(res.value);
+}
+} // namespace
 
 namespace game {
 
@@ -32,155 +54,121 @@ void on_load(sd::Application& app, State& state) {
 
   //~ pipeline creation stuff
   sd::WindowId main_win{0};
-  auto& ctrl = app.push_window_layer<sd::Panel>(main_win, "Sandbox Controls", state.another_scene);
+  sd::Panel&   ctrl{
+      app.push_window_layer<sd::Panel>(main_win, "Sandbox Controls", state.another_scene)};
+
   ctrl.set_scene(state.shared_scene);
 
-  auto& game_view      = app.create_view<sd::View>("Game", app.services());
-  auto& vulkan_context = app.services().vulkan;
+  sd::View&          game_view{app.create_view<sd::View>("Game", app.services())};
+  sd::VulkanContext& vulkan_context{app.services().vulkan};
   game_view.create_viewport();
 
   // NOTE: Pipeline is baked from shadermodules, swapchains and everything, so the rest of the stuff
   // below we can keep between pipelines really. and just the pipelieninfo changing slightly
 
   vk::PolygonMode          polygon_mode{VK_POLYGON_MODE_FILL}; // rasterizer
-  vk::UniquePipeline       pipeline;
-  vk::UniquePipelineLayout pipeline_layout;
-
-  // NOTE: Should pipeline creation be templated so we can have different push structs? Like can
-  //  pipelines have different push constants etc, or should we find something standardized. Most
-  //  likely some pipelines will be created dynamically but maybe its smart to have like 3 or 4
-  //  different kinds based on whats needed. Or should we just have different functions for those
-  //  different pipelines, since we will have compute shaders etc as well. Maybe just make this
-  //  beneath into some pipeline creation function, and rather create new ones where needed. and
-  //  abstract shared things into other functions later.
-  // TODO: compress pipeline creation
-
-  // NOTE: What should be changable between pipelines:
-  //  Shader Stages
-  //  Vertex input
-  //  Input Assembly
-  //  Rasterizer
-  // MultiSampling
-  // Depth/stencil
-  // Blend attachments
-  // dynamic state
-  // color depth formats
-  // [pipeline layouts
-
-
-  // What changes between different pipelines
-  // Shaders and shader stages.
-  // Push Constants
-
-
-  const char* vert_path{"assets/engine/shaders/world.vert"};
-  const char* frag_path{"assets/engine/shaders/world.frag"};
-
-
-  vk::UniqueShaderModule vert_module;
+  vk::UniquePipeline       pipeline{};
+  vk::UniquePipelineLayout pipeline_layout{};
   {
-    PROFILE("vert_module");
-    auto spv = sd::compile_shader(vert_path);
-    if (!spv) {
-      sd::log::game::error("Failed to compile vertex shader: {}", vert_path);
+    const vk::Device vulkan_device{*vulkan_context.get_vulkan_device()};
+    // NOTE: Should pipeline creation be templated so we can have different push structs? Like can
+    //  pipelines have different push constants etc, or should we find something standardized. Most
+    //  likely some pipelines will be created dynamically but maybe its smart to have like 3 or 4
+    //  different kinds based on whats needed. Or should we just have different functions for those
+    //  different pipelines, since we will have compute shaders etc as well. Maybe just make this
+    //  beneath into some pipeline creation function, and rather create new ones where needed. and
+    //  abstract shared things into other functions later.
+    // TODO: compress pipeline creation
+
+    // NOTE: What should be changable between pipelines:
+    //  Shader Stages
+    //  Vertex input
+    //  Input Assembly
+    //  Rasterizer
+    // MultiSampling
+    // Depth/stencil
+    // Blend attachments
+    // dynamic state
+    // color depth formats
+    // [pipeline layouts
+
+
+    // What changes between different pipelines
+    // Shaders and shader stages.
+    // Push Constants
+
+    const char* vert_path{"assets/engine/shaders/world.vert"};
+    const char* frag_path{"assets/engine/shaders/world.frag"};
+
+
+    vk::UniqueShaderModule vert_module{create_shader_module(vulkan_device, vert_path)};
+    if (!vert_module) {
+      return;
+    }
+    vk::UniqueShaderModule frag_module{create_shader_module(vulkan_device, frag_path)};
+    if (!frag_module) {
       return;
     }
 
-    vk::ShaderModuleCreateInfo create_info{.codeSize = spv->size() * sizeof(U32),
-                                           .pCode    = spv->data()};
-
-    auto vulkan_device = vulkan_context.get_vulkan_device().get();
-    auto res           = vulkan_device.createShaderModuleUnique(create_info);
-
-    if (res.result != vk::Result::eSuccess) {
-      sd::log::engine::critical("Shader comp failed");
-      return;
-    }
-    vert_module = std::move(res.value);
-  }
-
-  vk::UniqueShaderModule frag_module;
-  {
-    PROFILE("frag module");
-    auto spv = sd::compile_shader(frag_path);
-    if (!spv) {
-      sd::log::game::error("Failed to compile frag shader at: {}", frag_path);
-      return;
-    }
-
-    vk::ShaderModuleCreateInfo create_info{
-        .codeSize = spv->size() * sizeof(U32),
-        .pCode    = spv->data(),
+    vk::PipelineShaderStageCreateInfo vert_stage{
+        .stage  = vk::ShaderStageFlagBits::eVertex,
+        .module = *vert_module,
+        .pName  = "main",
     };
 
-    auto vulkan_device = vulkan_context.get_vulkan_device().get();
-    auto res           = vulkan_device.createShaderModuleUnique(create_info);
-    if (res.result != vk::Result::eSuccess) {
-      sd::log::engine::critical("Shader comp failed");
-      return;
-    }
-    frag_module = std::move(res.value);
-  }
+    vk::PipelineShaderStageCreateInfo frag_stage{
+        .stage  = vk::ShaderStageFlagBits::eFragment,
+        .module = *frag_module,
+        .pName  = "main",
+    };
 
-  vk::PipelineShaderStageCreateInfo vert_stage{
-      .stage  = vk::ShaderStageFlagBits::eVertex,
-      .module = *vert_module,
-      .pName  = "main",
-  };
+    std::array shader_stages{vert_stage, frag_stage};
 
-  vk::PipelineShaderStageCreateInfo frag_stage{
-      .stage  = vk::ShaderStageFlagBits::eFragment,
-      .module = *frag_module,
-      .pName  = "main",
-  };
+    struct Push {
+      VLA::Matrix4x4f mvp{};
+      F32             color[4]{};
+    };
+    static_assert(sizeof(Push) <= 128, "Push must fit in vulkan spec minimum");
 
-  std::array shader_stages{vert_stage, frag_stage};
+    vk::PushConstantRange push_constant_range{
+        .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        .size       = static_cast<U32>(sizeof(Push)),
+    };
 
-  struct Push {
-    VLA::Matrix4x4f mvp{};
-    F32             color[4]{};
-  };
-  static_assert(sizeof(Push) <= 128, "Push must fit in vulkan spec minimum");
+    vk::DescriptorSetLayoutBinding binding1 = {
 
-  vk::PushConstantRange push_constant_range{
-      .stageFlags = vk::ShaderStageFlagBits::eVertex,
-      .size       = static_cast<U32>(sizeof(Push)),
-  };
+    };
 
-  vk::DescriptorSetLayoutBinding binding1 = {
+    std::array descriptor_set_layout_bindings{binding1};
 
-  };
-
-  std::array descriptor_set_layout_bindings{binding1};
-
-  vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info{
-      .bindingCount = descriptor_set_layout_bindings.size(),
-      .pBindings    = descriptor_set_layout_bindings.data()};
-
-  auto res = vulkan_context.get_vulkan_device()->createDescriptorSetLayoutUnique(
-      descriptor_set_layout_info);
-  if (res.result != vk::Result::eSuccess) {
-    sd::log::engine::critical("Failed to create descriptor set layout");
-  }
-
-  std::array descriptor_set_layouts{(std::move(res.value))};
+    vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info{
+        .bindingCount = descriptor_set_layout_bindings.size(),
+        .pBindings    = descriptor_set_layout_bindings.data()};
 
 
-  static_assert(std::is_standard_layout_v<SD::VertexPNUV>);
-  static_assert(sizeof(VLA::Vector3f) == 12);
-  static_assert(sizeof(VLA::Vector2f) == 8);
-  static_assert(offsetof(SD::VertexPNUV, position) == 0);
-  static_assert(offsetof(SD::VertexPNUV, normal) == 12);
-  static_assert(offsetof(SD::VertexPNUV, uv) == 24);
-  static_assert(sizeof(SD::VertexPNUV) == 32);
+    std::array descriptor_set_layouts{[&] {
+      auto res{vulkan_device.createDescriptorSetLayoutUnique(descriptor_set_layout_info)};
+      if (res.result != vk::Result::eSuccess) {
+        NOT_IMPLEMENTED;
+      }
+      return std::move(res.value);
+    }()};
 
 
-  auto binding_descriptions   = SD::VertexPNUV::binding_descriptions();
-  auto attribute_descriptions = SD::VertexPNUV::attribute_descriptions();
-  {
-    PROFILE("Pipeline creation");
+    static_assert(std::is_standard_layout_v<SD::VertexPNUV>);
+    static_assert(sizeof(VLA::Vector3f) == 12);
+    static_assert(sizeof(VLA::Vector2f) == 8);
+    static_assert(offsetof(SD::VertexPNUV, position) == 0);
+    static_assert(offsetof(SD::VertexPNUV, normal) == 12);
+    static_assert(offsetof(SD::VertexPNUV, uv) == 24);
+    static_assert(sizeof(SD::VertexPNUV) == 32);
 
+
+    auto binding_descriptions{SD::VertexPNUV::binding_descriptions()};
+    auto attribute_descriptions{SD::VertexPNUV::attribute_descriptions()};
     {
+      PROFILE("Pipeline creation");
+
       std::vector<vk::DescriptorSetLayout> raw_layouts;
       raw_layouts.reserve(descriptor_set_layouts.size());
       for (auto& layout : descriptor_set_layouts) {
@@ -195,11 +183,9 @@ void on_load(sd::Application& app, State& state) {
           .pushConstantRangeCount = 1,
           .pPushConstantRanges    = &push_constant_range};
 
-      auto res =
-          vulkan_context.get_vulkan_device().get().createPipelineLayoutUnique(pipeline_layout_info);
+      auto res{vulkan_device.createPipelineLayoutUnique(pipeline_layout_info)};
       if (res.result != vk::Result::eSuccess) {
-        sd::log::engine::critical("Failed to create pipeline layout");
-        return;
+        NOT_IMPLEMENTED;
       }
       pipeline_layout = std::move(res.value);
     }
@@ -250,14 +236,14 @@ void on_load(sd::Application& app, State& state) {
         .stencilTestEnable     = false,
     };
 
-    std::array dynamic_states = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+    std::array dynamic_states{vk::DynamicState::eViewport, vk::DynamicState::eScissor};
     vk::PipelineDynamicStateCreateInfo dynamic_state = {
         .dynamicStateCount = dynamic_states.size(),
         .pDynamicStates    = dynamic_states.data(),
     };
 
 
-    auto                            color_format = game_view.get_color_format();
+    vk::Format                      color_format{game_view.get_color_format()};
     vk::PipelineRenderingCreateInfo rendering_info{
         .colorAttachmentCount    = 1,
         .pColorAttachmentFormats = &color_format,
@@ -287,18 +273,20 @@ void on_load(sd::Application& app, State& state) {
     // TODO: check this properly
 
 
+    // TODO: this should be reworked
     vk::UniquePipelineCache pipeline_cache{};
     {
       PROFILE("pipeline_cache");
 
       // Load cached pipeline data from previous run if available
-      std::vector<char> cache_data;
+      std::vector<char> cache_data{};
       std::ifstream     cache_file("cache/pipeline.spv", std::ios::binary | std::ios::ate);
       if (cache_file) {
-        auto size = static_cast<U64>(cache_file.tellg());
+        std::streamsize size(cache_file.tellg());
+
         cache_file.seekg(0);
-        cache_data.resize(static_cast<USize>(size));
-        cache_file.read(cache_data.data(), static_cast<std::streamsize>(size));
+        cache_data.resize(size);
+        cache_file.read(cache_data.data(), size);
         sd::log::game::info("Loaded pipeline cache ({} bytes)", size);
         // printf("Loaded pipeline cache (%lu bytes)\n", size);
       }
@@ -308,7 +296,7 @@ void on_load(sd::Application& app, State& state) {
           .pInitialData    = cache_data.data(),
       };
 
-      auto res = vulkan_context.get_vulkan_device()->createPipelineCacheUnique(pipeline_cache_info);
+      auto res{vulkan_device.createPipelineCacheUnique(pipeline_cache_info)};
       if (res.result == vk::Result::eSuccess) {
         pipeline_cache = std::move(res.value);
       } else {
@@ -318,23 +306,21 @@ void on_load(sd::Application& app, State& state) {
 
 
     PROFILE_START("createGraphicsPipelinesUnique creation");
-    auto res = vulkan_context.get_vulkan_device()->createGraphicsPipelinesUnique(*pipeline_cache,
-                                                                                 pipeline_info);
+    auto res{vulkan_device.createGraphicsPipelinesUnique(*pipeline_cache, pipeline_info)};
     PROFILE_END();
     if (res.result != vk::Result::eSuccess) {
-      sd::log::engine::critical("Rip, we failed, error is: {} ", static_cast<U32>(res.result));
-    } else {
-      pipeline = std::move(res.value.front());
+      NOT_IMPLEMENTED;
     }
+    pipeline = std::move(res.value.front());
 
     // Save pipeline cache for faster reloads
+    // TODO: needs rework aswell possibly
     if (pipeline_cache) {
-      auto&  dev      = vulkan_context.get_vulkan_device().get();
-      size_t data_sz  = 0;
-      auto   cache_hr = dev.getPipelineCacheData(*pipeline_cache, &data_sz, nullptr);
+      USize data_sz{};
+      auto  cache_hr{vulkan_device.getPipelineCacheData(*pipeline_cache, &data_sz, nullptr)};
       if (cache_hr == vk::Result::eSuccess && data_sz > 0) {
         std::vector<uint8_t> data(data_sz);
-        cache_hr = dev.getPipelineCacheData(*pipeline_cache, &data_sz, data.data());
+        cache_hr = vulkan_device.getPipelineCacheData(*pipeline_cache, &data_sz, data.data());
         if (cache_hr == vk::Result::eSuccess) {
           std::filesystem::create_directories("cache");
           std::ofstream cache_out("cache/pipeline.spv", std::ios::binary);
@@ -356,7 +342,7 @@ void on_load(sd::Application& app, State& state) {
 
   state.view_bit = 1u << game_view.get_view_id().value;
 
-  auto ent = state.shared_scene->em.create();
+  sd::Entity ent{state.shared_scene->em.create()};
   state.shared_scene->em.add_component<sd::components::DebugName>(ent, "Triangle");
   state.shared_scene->em.add_component<sd::components::Transform>(
       ent,
@@ -371,7 +357,7 @@ void on_load(sd::Application& app, State& state) {
                                                                        {0.0f, 1.0f, 0.0f, 1.0f}
   });
 
-  auto ent2 = state.shared_scene->em.create();
+  sd::Entity ent2{state.shared_scene->em.create()};
   state.shared_scene->em.add_component<sd::components::DebugName>(ent2, "Better triangle");
   state.shared_scene->em.add_component<sd::components::Transform>(
       ent2,
@@ -428,12 +414,12 @@ static void c_on_reload(SD_Application* app, void* state) {
 }
 
 extern "C" GameAPI get_game_api(void) {
-  GameAPI api{};
-  api.api_version = GAME_API_VERSION;
-  api.struct_size = sizeof(GameAPI);
-  api.on_load     = c_on_load;
-  api.on_update   = c_on_update;
-  api.on_unload   = c_on_unload;
-  api.on_reload   = c_on_reload;
-  return api;
+  return {
+      .api_version = GAME_API_VERSION,
+      .struct_size = sizeof(GameAPI),
+      .on_load     = c_on_load,
+      .on_update   = c_on_update,
+      .on_unload   = c_on_unload,
+      .on_reload   = c_on_reload,
+  };
 }

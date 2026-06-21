@@ -44,8 +44,7 @@ vk::Format sd::View::find_depth_format() {
     }
   }
 
-  log::engine::critical("Failed to find supported depth format");
-  return vk::Format::eUndefined;
+  NOT_IMPLEMENTED; // didnt find supported depth format
 }
 
 void sd::View::on_gui_render() {
@@ -54,7 +53,7 @@ void sd::View::on_gui_render() {
   if (!ImGui::GetCurrentContext())
     return;
   if (ImGui::Begin(m_name.c_str(), &m_open)) {
-    VkExtent2D current_extent = get_im_gui_extent();
+    vk::Extent2D current_extent = get_im_gui_extent();
     if (current_extent.width != m_extent.width || current_extent.height != m_extent.height) {
       resize(current_extent);
     }
@@ -360,7 +359,7 @@ void sd::View::destroy_viewport() {
   m_depth_view.reset();
 }
 
-void sd::View::resize(VkExtent2D extent) {
+void sd::View::resize(vk::Extent2D extent) {
   if (extent.width == 0 || extent.height == 0)
     return;
   if (m_extent.width == extent.width && m_extent.height == extent.height)

@@ -32,7 +32,7 @@ public:
     requires std::is_base_of_v<View, T>
   T& create(std::string name, Args&&... args) {
     if (m_view_name_to_id.contains(name))
-      log::engine::critical("View name already exists: {}", name);
+      NOT_IMPLEMENTED;
 
     ViewId id       = m_next_view_id++;
     auto   view     = std::make_unique<T>(std::move(name), std::forward<Args>(args)...);

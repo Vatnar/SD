@@ -13,34 +13,35 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-static void*                           g_game_handle = nullptr;
-static GameAPI                         g_game_api    = {};
-static game::State                     g_game_state  = {};
-static std::filesystem::file_time_type g_last_so_write_time;
-static int                             g_reload_count = 0;
+static void*                           g_game_handle{nullptr};
+static GameAPI                         g_game_api{};
+static game::State                     g_game_state{};
+static std::filesystem::file_time_type g_last_so_write_time{};
+static int                             g_reload_count{};
 
 // Accumulated old .so handles that are deliberately NOT closed during
 // hot-reload (dlclose is unsound — it can unmap code still referenced by
 // function pointers, lambdas, callbacks, etc.). On shutdown we close them
 // all at once when nothing can possibly be in flight.
-static std::vector<void*> g_stale_handles;
+static std::vector<void*> g_stale_handles{};
 
 // Cooldown timer to avoid spamming dlopen attempts when the file
 // changes faster than we can reload or the build is broken.
-static auto g_last_reload_check = std::chrono::steady_clock::time_point{};
+using time_point = std::chrono::steady_clock::time_point;
+static time_point g_last_reload_check{};
 
 static std::filesystem::path get_live_so_path(const std::filesystem::path& source_so,
                                               int                          reload_index) {
-  auto dir  = source_so.parent_path();
-  auto stem = source_so.filename().string();
+  std::filesystem::path dir{source_so.parent_path()};
+  std::string           stem{source_so.filename().string()};
   return dir / (stem + "_live_" + std::to_string(reload_index));
 }
 
 static void cleanup_stale_live_copies(const std::filesystem::path& source_so) {
-  auto            dir    = source_so.parent_path();
-  auto            stem   = source_so.filename().string();
-  std::string     prefix = stem + "_live_";
-  std::error_code ec;
+  std::filesystem::path dir{source_so.parent_path()};
+  std::string           stem{source_so.filename().string()};
+  std::string           prefix{stem + "_live_"};
+  std::error_code       ec{};
   for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
     if (ec)
       break;
@@ -48,7 +49,7 @@ static void cleanup_stale_live_copies(const std::filesystem::path& source_so) {
       continue;
     if (ec)
       continue;
-    auto name = entry.path().filename().string();
+    std::string name{entry.path().filename().string()};
     if (name.starts_with(prefix)) {
       std::filesystem::remove(entry.path(), ec);
       if (!ec) {
@@ -65,10 +66,10 @@ static bool load_game_code_safe(const std::filesystem::path& source_so,
                                 void**                       out_new_handle,
                                 GameAPI*                     out_new_api) {
   g_reload_count++;
-  auto live_so = get_live_so_path(source_so, g_reload_count);
-  auto temp_so = std::filesystem::path(live_so.string() + ".tmp");
+  std::filesystem::path live_so{get_live_so_path(source_so, g_reload_count)};
+  std::filesystem::path temp_so{std::filesystem::path(live_so.string() + ".tmp")};
 
-  std::error_code ec;
+  std::error_code ec{};
   if (!std::filesystem::copy_file(source_so,
                                   temp_so,
                                   std::filesystem::copy_options::overwrite_existing,
@@ -83,22 +84,22 @@ static bool load_game_code_safe(const std::filesystem::path& source_so,
     return false;
   }
 
-  void* new_handle = dlopen(live_so.c_str(), RTLD_NOW);
+  void* new_handle{dlopen(live_so.c_str(), RTLD_NOW)};
   if (!new_handle) {
-    const char* err = dlerror();
+    const char* err{dlerror()};
     sd::log::engine::error("dlopen failed: {}", err ? err : "unknown error");
     return false;
   }
 
-  auto* get_api = reinterpret_cast<GetGameAPIFn>(dlsym(new_handle, GAME_GET_API_NAME));
+  GameAPI (*get_api)(){reinterpret_cast<GetGameAPIFn>(dlsym(new_handle, GAME_GET_API_NAME))};
   if (!get_api) {
-    const char* err = dlerror();
+    const char* err{dlerror()};
     sd::log::engine::error("dlsym GetGameAPI failed: {}", err ? err : "unknown error");
     dlclose(new_handle);
     return false;
   }
 
-  GameAPI new_api = get_api();
+  GameAPI new_api{get_api()};
 
   if (new_api.api_version != GAME_API_VERSION) {
     sd::log::engine::error("Game code API version mismatch: expected {}, got {} — "
@@ -142,10 +143,10 @@ static bool load_game_code_safe(const std::filesystem::path& source_so,
 
 bool load_game_api(std::filesystem::path source_so) {
   g_reload_count++;
-  auto live_so = get_live_so_path(source_so, g_reload_count);
-  auto temp_so = std::filesystem::path(live_so.string() + ".tmp");
+  std::filesystem::path live_so{get_live_so_path(source_so, g_reload_count)};
+  std::filesystem::path temp_so{std::filesystem::path(live_so.string() + ".tmp")};
 
-  std::error_code ec;
+  std::error_code ec{};
   if (!std::filesystem::copy_file(source_so,
                                   temp_so,
                                   std::filesystem::copy_options::overwrite_existing,
@@ -163,7 +164,7 @@ bool load_game_api(std::filesystem::path source_so) {
     return false;
   }
 
-  auto* get_api = reinterpret_cast<GetGameAPIFn>(dlsym(g_game_handle, GAME_GET_API_NAME));
+  GameAPI (*get_api)(){reinterpret_cast<GetGameAPIFn>(dlsym(g_game_handle, GAME_GET_API_NAME))};
   if (!get_api) {
     sd::log::engine::error("Failed to get game API: {}", dlerror());
     return false;
@@ -195,8 +196,8 @@ bool load_game_api(std::filesystem::path source_so) {
 }
 int main(int argc, char* argv[]) {
   sd::log::init();
-  hr::ConfigLoader config(argc, argv);
-  const auto&      cfg = config.get_config();
+  hr::ConfigLoader           config(argc, argv);
+  const hr::HotReloadConfig& cfg{config.get_config()};
 
 #ifdef SD_DEBUG
   sd::log::engine::warn("Running in debug mode");
@@ -207,14 +208,14 @@ int main(int argc, char* argv[]) {
   sd::log::engine::info("  app-name: {}", cfg.app_name);
   sd::log::engine::info("  window: {}x{}", cfg.window_width, cfg.window_height);
 
-  std::filesystem::path source_so(cfg.game_so_path);
+  std::filesystem::path source_so{cfg.game_so_path};
   cleanup_stale_live_copies(source_so);
 
   if (!load_game_api(source_so)) {
     std::exit(1);
   }
 
-  std::error_code ec;
+  std::error_code ec{};
   g_last_so_write_time = std::filesystem::last_write_time(source_so, ec);
   if (ec) {
     sd::log::engine::error("Failed to get initial write time: {}", ec.message());
@@ -237,8 +238,8 @@ int main(int argc, char* argv[]) {
     if (app.consume_restart_request()) {
       sd::log::engine::info("Restart requested, performing full game restart...");
 
-      void*   new_handle = nullptr;
-      GameAPI new_api    = {};
+      void*   new_handle{nullptr};
+      GameAPI new_api{};
       if (!load_game_code_safe(source_so, &new_handle, &new_api)) {
         sd::log::engine::error("Failed to reload game code for restart");
         continue;
@@ -278,12 +279,12 @@ int main(int argc, char* argv[]) {
     }
 
     // ── Hot-reload (detect .so change, preserve scenes) ────────────────
-    std::error_code ec;
+    std::error_code ec{};
     if (!std::filesystem::exists(source_so, ec) || ec) {
       continue;
     }
 
-    auto current_time = std::filesystem::last_write_time(source_so, ec);
+    auto current_time{std::filesystem::last_write_time(source_so, ec)};
     if (ec) {
       sd::log::engine::warn("Failed to check write time: {}", ec.message());
       continue;
@@ -297,7 +298,7 @@ int main(int argc, char* argv[]) {
       }
 
       // Cooldown prevents busy-looping on a failed dlopen.
-      auto now = std::chrono::steady_clock::now();
+      auto now{std::chrono::steady_clock::now()};
       if (now - g_last_reload_check < std::chrono::milliseconds(500)) {
         continue;
       }
@@ -307,8 +308,8 @@ int main(int argc, char* argv[]) {
 
       sd::log::engine::info("Detected change, reloading game code...");
 
-      void*   new_handle = nullptr;
-      GameAPI new_api    = {};
+      void*   new_handle{};
+      GameAPI new_api{};
       if (!load_game_code_safe(source_so, &new_handle, &new_api)) {
         sd::log::engine::error("Failed to load new game code - keeping old code running");
         continue;
