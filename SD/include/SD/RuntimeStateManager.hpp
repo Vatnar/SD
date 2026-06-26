@@ -14,15 +14,14 @@
 
 namespace sd {
 
-class Application;
-class Scene;
+struct Application;
+struct Scene;
 
 /**
  * Provides hooks for hot-reload state transitions.
  * Game state is externally owned and auto-persists across reloads.
  */
-class RuntimeStateManager {
-public:
+struct RuntimeStateManager {
   RuntimeStateManager();
   ~RuntimeStateManager();
 
@@ -31,7 +30,7 @@ public:
   void set_application(Application* app);
   bool has_state() const;
 
-private:
+
   Application*                                       m_app = nullptr;
   std::unordered_map<std::string, std::vector<char>> m_serialized_scenes;
 };

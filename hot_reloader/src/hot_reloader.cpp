@@ -11,8 +11,6 @@
 #include "SD/core/logging.hpp"
 #include "SD/game_api.hpp"
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-
 static void*                           g_game_handle{nullptr};
 static GameAPI                         g_game_api{};
 static game::State                     g_game_state{};
@@ -194,6 +192,8 @@ bool load_game_api(std::filesystem::path source_so) {
   }
   return true;
 }
+
+
 int main(int argc, char* argv[]) {
   sd::log::init();
   hr::ConfigLoader           config(argc, argv);
@@ -271,12 +271,7 @@ int main(int argc, char* argv[]) {
     }
 
     // ── Shader reload (triggered from "Reload Shaders" button) ────────
-    // The flag is consumed here so it doesn't accumulate; actual work is
-    // deferred to the game's pipeline abstraction (hook consume_shader_reload_request()
-    // when your rewrite is ready).
-    if (app.consume_shader_reload_request()) {
-      sd::log::engine::info("Shader reload requested — pipeline abstraction will handle this");
-    }
+    app.dispatch_shader_reload();
 
     // ── Hot-reload (detect .so change, preserve scenes) ────────────────
     std::error_code ec{};

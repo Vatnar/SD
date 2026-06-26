@@ -19,10 +19,12 @@ namespace sd {
 EngineDebugLayer::EngineDebugLayer(ApplicationRuntime runtime,
                                    EngineServices     services,
                                    Scene*             scene) :
-  Panel("EngineDebug", scene), m_views(runtime.views), m_scenes(runtime.scenes),
-  m_layout(runtime.layout), m_events(runtime.events), m_frame_timer(runtime.timer),
+  m_views(runtime.views), m_scenes(runtime.scenes), m_layout(runtime.layout),
+  m_events(runtime.events), m_frame_timer(runtime.timer),
   m_hot_reload_enabled(runtime.hot_reload_enabled), m_global_layers(runtime.global_layers),
   m_renderer(services.renderer) {
+  debug_name  = "EngineDebug";
+  this->scene = scene;
 }
 
 void EngineDebugLayer::on_update(float dt) {
@@ -75,52 +77,34 @@ void EngineDebugLayer::on_fixed_update(double /*dt*/) {
   m_fixed_update_count++;
 }
 
-void EngineDebugLayer::on_event(Event& e) {
+void EngineDebugLayer::on_event(EventVariant& e) {
   if (m_log_events) {
     std::string detail;
-    switch (e.get_event_type()) {
-      case EventType::KEY_PRESSED: {
-        if (auto* ke = dynamic_cast<KeyPressedEvent*>(&e)) {
-          detail = fmt::format("Key: {} (mods: {}, repeat: {})", ke->key, ke->mods, ke->repeat);
-        }
-        break;
-      }
-      case EventType::KEY_RELEASED: {
-        if (auto* ke = dynamic_cast<KeyReleasedEvent*>(&e)) {
-          detail = fmt::format("Key: {} (mods: {})", ke->key, ke->mods);
-        }
-        break;
-      }
-      case EventType::MOUSE_PRESSED: {
-        if (auto* me = dynamic_cast<MousePressedEvent*>(&e)) {
-          detail =
-              fmt::format("Button: {} (mods: {}, repeat: {})", me->button, me->mods, me->repeat);
-        }
-        break;
-      }
-      case EventType::MOUSE_RELEASED: {
-        if (auto* me = dynamic_cast<MouseReleasedEvent*>(&e)) {
-          detail = fmt::format("Button: {} (mods: {})", me->button, me->mods);
-        }
-        break;
-      }
-      case EventType::MOUSE_MOVED: {
-        if (auto* me = dynamic_cast<MouseMovedEvent*>(&e)) {
-          detail = fmt::format("Pos: {:.1f}, {:.1f}", me->x_pos, me->y_pos);
-        }
-        break;
-      }
-      case EventType::MOUSE_SCROLLED: {
-        if (auto* me = dynamic_cast<MouseScrolledEvent*>(&e)) {
-          detail = fmt::format("Offset: {:.1f}, {:.1f}", me->x_offset, me->y_offset);
-        }
-        break;
-      }
-      default:
-        detail = "Generic Event";
-        break;
-    }
-    log::debug_layer::tagged("event", "{} [{}]", e.get_name(), detail);
+    std::visit(
+        overloaded{
+            [&](const KeyPressedEvent& ke) {
+              detail = fmt::format("Key: {} (mods: {}, repeat: {})", ke.key, ke.mods, ke.repeat);
+            },
+            [&](const KeyReleasedEvent& ke) {
+              detail = fmt::format("Key: {} (mods: {})", ke.key, ke.mods);
+            },
+            [&](const MousePressedEvent& me) {
+              detail =
+                  fmt::format("Button: {} (mods: {}, repeat: {})", me.button, me.mods, me.repeat);
+            },
+            [&](const MouseReleasedEvent& me) {
+              detail = fmt::format("Button: {} (mods: {})", me.button, me.mods);
+            },
+            [&](const MouseMovedEvent& me) {
+              detail = fmt::format("Pos: {:.1f}, {:.1f}", me.x_pos, me.y_pos);
+            },
+            [&](const MouseScrolledEvent& me) {
+              detail = fmt::format("Offset: {:.1f}, {:.1f}", me.x_offset, me.y_offset);
+            },
+            [&](const auto&) { detail = "Generic Event"; },
+        },
+        e.event);
+    log::debug_layer::tagged("event", "{} [{}]", e.event.index(), detail);
   }
 }
 
@@ -139,12 +123,12 @@ void EngineDebugLayer::on_im_gui_menu_bar() {
 
     ImGui::Separator();
     if (ImGui::MenuItem("Reload Shaders")) {
-      m_app->request_shader_reload();
+      app->request_shader_reload();
     }
 
     ImGui::Separator();
     if (ImGui::MenuItem("Restart Game")) {
-      m_app->request_restart();
+      app->request_restart();
     }
 
     ImGui::EndMenu();
@@ -268,11 +252,11 @@ void EngineDebugLayer::on_gui_render() {
       }
 
       ImGui::Separator();
-      if (ImGui::Checkbox("Pause Hot-Reload", &m_app->game_code_reload_paused)) {
-        m_app->game_code_reload_paused = !m_app->game_code_reload_paused;
+      if (ImGui::Checkbox("Pause Hot-Reload", &app->game_code_reload_paused)) {
+        app->game_code_reload_paused = !app->game_code_reload_paused;
       }
       if (ImGui::Button("Force Reload Shaders")) {
-        m_app->request_shader_reload();
+        app->request_shader_reload();
       }
     }
     ImGui::End();

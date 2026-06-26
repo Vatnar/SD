@@ -250,18 +250,18 @@ void sd::View::on_render(vk::CommandBuffer cmd) {
   ASSERT(m_extent.width > 0 && m_extent.height > 0 && "Extent must be valid");
 
   // Collect active layers sorted by stage
-  std::vector<Layer*> render_layers;
+  std::vector<LayerNode*> render_layers;
   for (auto& layer : m_layers) {
-    if (layer->is_active()) {
-      render_layers.push_back(layer.get());
-    }
+    if (layer.is_active)
+      render_layers.push_back(&layer);
   }
-  if (render_layers.empty()) {
+  if (render_layers.empty())
     return;
-  }
-  std::stable_sort(render_layers.begin(), render_layers.end(), [](const Layer* a, const Layer* b) {
-    return a->m_stage_id < b->m_stage_id;
-  });
+
+  std::stable_sort(
+      render_layers.begin(),
+      render_layers.end(),
+      [](const LayerNode* a, const LayerNode* b) { return a->stage_id < b->stage_id; });
 
   // Pre-barrier: color SHADER_READ_ONLY -> COLOR_ATTACHMENT_OPTIMAL
   // Depth is already in DEPTH_STENCIL_ATTACHMENT_OPTIMAL (left from last frame)
@@ -286,11 +286,8 @@ void sd::View::on_render(vk::CommandBuffer cmd) {
                       {},
                       color_to_att);
 
-  // Each layer is responsible for its own beginRendering/endRendering,
-  // viewport/scissor, clears, and load/store ops.
-  for (auto* layer : render_layers) {
-    layer->on_render(cmd);
-  }
+  for (auto* node : render_layers)
+    node->on_render(cmd);
 
   // Post-barrier: color -> SHADER_READ_ONLY_OPTIMAL for ImGui display
   vk::ImageMemoryBarrier color_to_read{

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <imgui.h>
 #include <ranges>
+#include <utility>
 
 #include <SD/Application.hpp>
 #include <SD/core/View.hpp>
@@ -12,16 +13,47 @@
 
 #include "SD/Vertex.hpp"
 #include "SD/profiler.hpp"
+#include "logging.hpp"
 
-GameRenderLayer::GameRenderLayer(const std::string&       name,
+namespace game {
+std::pair<vk::UniquePipeline, vk::UniquePipelineLayout>
+create_pipeline(vk::Device, const char*, const char*, vk::PolygonMode, sd::View*);
+} // namespace game
+
+GameRenderLayer::GameRenderLayer(const char*              name,
                                  sd::Scene*               scene,
                                  vk::UniquePipeline       pipeline,
-                                 vk::UniquePipelineLayout layout) :
-  RenderStage(name, scene), m_pipeline(std::move(pipeline)), m_layout(std::move(layout)) {
+                                 vk::UniquePipelineLayout layout,
+                                 const char*              vert_path,
+                                 const char*              frag_path,
+                                 vk::PolygonMode          polygon_mode) :
+  m_pipeline(std::move(pipeline)), m_layout(std::move(layout)), m_vert_path(vert_path),
+  m_frag_path(frag_path), m_polygon_mode(polygon_mode) {
+  debug_name  = name;
+  this->scene = scene;
+}
+
+void GameRenderLayer::reload_shaders() {
+  auto& device{*app->services().vulkan.get_vulkan_device()};
+  (void)device.waitIdle();
+
+  auto [new_pipeline,
+        new_layout]{game::create_pipeline(device, m_vert_path, m_frag_path, m_polygon_mode, view)};
+
+  if (new_pipeline && new_layout) {
+    m_pipeline = std::move(new_pipeline);
+    m_layout   = std::move(new_layout);
+  } else {
+    sd::log::game::error("Shader reload failed — keeping old pipeline");
+  }
+}
+
+void GameRenderLayer::on_shader_reload() {
+  reload_shaders();
 }
 
 void GameRenderLayer::create_vertex_buffer() {
-  constexpr std::array<SD::VertexPNUV, 3> triangle{
+  constexpr std::array<sd::VertexPNUV, 3> triangle{
       {
        {.position = {0.0f, -0.8f, 0.0f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.5f, 0.0f}},
        {.position = {-0.8f, 0.8f, 0.0f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 1.0f}},
@@ -30,8 +62,8 @@ void GameRenderLayer::create_vertex_buffer() {
   };
   constexpr vk::DeviceSize buffer_size{sizeof(triangle)};
 
-  const vk::Device&         device{*m_app->services().vulkan.get_vulkan_device()};
-  const vk::PhysicalDevice& phys_dev{m_app->services().vulkan.get_physical_device()};
+  const vk::Device&         device{*app->services().vulkan.get_vulkan_device()};
+  const vk::PhysicalDevice& phys_dev{app->services().vulkan.get_physical_device()};
 
   // TODO: staging upload to device local memory
   auto [vb, vm]{sd::create_buffer(
@@ -62,10 +94,10 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
   ASSERT(m_pipeline && "Invalid pipeline - was it destroyed or recreated?");
   ASSERT(m_layout && "Invalid layout");
 
-  vk::Extent2D extent{m_view->get_extent()};
+  vk::Extent2D extent{view->get_extent()};
 
   vk::RenderingAttachmentInfo color_attachment{
-      .imageView   = m_view->get_color_view(),
+      .imageView   = view->get_color_view(),
       .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
       .loadOp      = vk::AttachmentLoadOp::eClear,
       .storeOp     = vk::AttachmentStoreOp::eStore,
@@ -74,7 +106,7 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
   };
 
   vk::RenderingAttachmentInfo depth_attachment{
-      .imageView   = m_view->get_depth_view(),
+      .imageView   = view->get_depth_view(),
       .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
       .loadOp      = vk::AttachmentLoadOp::eClear,
       .storeOp     = vk::AttachmentStoreOp::eDontCare,
@@ -113,8 +145,8 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
   };
 
   ImVec2 mouse_pos{ImGui::GetMousePos()};
-  ImVec2 region_pos{m_view->get_content_region_pos()};
-  ImVec2 region_extent{m_view->get_content_region_extent()};
+  ImVec2 region_pos{view->get_content_region_pos()};
+  ImVec2 region_extent{view->get_content_region_extent()};
   F32    mouse_ndc_x{((mouse_pos.x - region_pos.x) / region_extent.x) * 2.0f - 1.0f};
   F32    mouse_ndc_y{((mouse_pos.y - region_pos.y) / region_extent.y) * 2.0f - 1.0f};
 
@@ -129,8 +161,8 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
       {0.8f, 0.8f}
   };
 
-  F32 aspect{static_cast<F32>(m_view->get_extent().width) /
-             static_cast<F32>(m_view->get_extent().height)};
+  F32 aspect{static_cast<F32>(view->get_extent().width) /
+             static_cast<F32>(view->get_extent().height)};
   F32 scale_x{(aspect > 1.0f) ? 1.0f / aspect : 1.0f};
   F32 scale_y{(aspect > 1.0f) ? 1.0f : aspect}; // Correcting for FixedWidth if aspect < 1
 
@@ -162,13 +194,13 @@ void GameRenderLayer::on_render(vk::CommandBuffer cmd) {
   // todo: should be on a mesh component, (or not on the component, but indexed to or something)
 
   for (auto [entity, transform, renderable] :
-       m_scene->em.view<sd::components::Transform, sd::components::Renderable>()) {
-    if ((renderable.view_mask & 1u << static_cast<uint32_t>(m_view_id)) == 0 ||
-        renderable.render_stage != m_stage_id)
+       scene->em.view<sd::components::Transform, sd::components::Renderable>()) {
+    if ((renderable.view_mask & 1u << static_cast<uint32_t>(view_id)) == 0 ||
+        renderable.render_stage != stage_id)
       continue;
 
     Push push{
-        .mvp = m_view->get_projection() * transform.world_matrix,
+        .mvp = view->get_projection() * transform.world_matrix,
     };
     memcpy(&push.color, renderable.color, sizeof(F32) * 4);
 

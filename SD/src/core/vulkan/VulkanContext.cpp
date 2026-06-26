@@ -7,6 +7,8 @@
 #include "SD/core/base.hpp"
 #include "SD/core/vulkan/vulkan_utils.hpp"
 
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
 namespace sd {
 class LayerList;
 

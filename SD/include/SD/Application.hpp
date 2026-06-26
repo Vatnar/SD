@@ -1,18 +1,12 @@
-// TODO(docs): Add file-level Doxygen header
-//   - @file Application.hpp
-//   - @brief Main application class - the central hub of the engine
-//   - Architecture overview: Application owns all subsystems
-//   - Lifecycle diagram (Init -> Run -> Shutdown)
-//   - Hot reload integration notes
 #pragma once
 #include <atomic>
 #include <expected>
 #include <functional>
-#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
 
+#include "SD/arena.hpp"
 #include "SD/core/ApplicationRuntime.hpp"
 #include "SD/core/EngineServices.hpp"
 #include "SD/core/FrameTimer.hpp"
@@ -26,20 +20,17 @@
 #include "SD/export.hpp"
 
 namespace sd {
-class Event;
-class Layer;
-class LayoutManager;
-class RuntimeStateManager;
-class VulkanWindow;
-class Window;
+struct EventVariant;
+struct Layer;
+struct LayoutManager;
+struct RuntimeStateManager;
+struct VulkanWindow;
+struct Window;
 } // namespace sd
 
 
 namespace sd {
 
-// TODO(docs): Document ApplicationSpecification
-//   - Each field's purpose and default value rationale
-//   - Example configuration
 struct ApplicationSpecification {
   std::string name            = "SDEngine App";
   int         width           = 1600;
@@ -48,46 +39,27 @@ struct ApplicationSpecification {
   std::string gameSoPath      = "libSandboxApp.so";
 };
 
-// TODO(docs): Document Application class thoroughly
-//   - Class overview and responsibilities
-//   - Ownership model (what it owns vs references)
-//   - Singleton pattern usage (Get())
-//   - Thread safety considerations
-//   - Example minimal application setup
-class SD_EXPORT Application {
-public:
-  explicit Application(const ApplicationSpecification& spec,
-                       RuntimeStateManager*            state_manager = nullptr);
-  virtual ~Application();
-
-  Application(const Application&)            = delete;
-  Application& operator=(const Application&) = delete;
-  Application(Application&&)                 = delete;
-  Application& operator=(Application&&)      = delete;
-
-
+struct SD_EXPORT Application {
   using ViewResult = ViewManager::ViewResult;
 
+  Application(const ApplicationSpecification& spec, RuntimeStateManager* state_manager = nullptr);
+  ~Application();
+
   void run(const std::atomic<bool>* external_stop);
-
   void frame();
-
   void close() { is_running = false; }
+  void on_app_event(EventVariant& e);
 
-  void on_app_event(Event& e);
-
-  // Layer management
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
   T& push_layer(Args&&... args) {
     auto& layer = global_layers.push_layer<T>(std::forward<Args>(args)...);
-    layer.m_app = this;
+    layer.app   = this;
     return layer;
   }
 
-  // Window management
   [[nodiscard]] WindowId create_window(const WindowProps& props) {
-    return window_manager->create(props);
+    return window_manager->create(props, engine_arena);
   }
   [[nodiscard]] Window& get_window(const WindowId id) const {
     return window_manager->get_window(id);
@@ -102,12 +74,11 @@ public:
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<View, T>
-  T& create_view(std::string name, Args&&... args) {
-    auto& view = view_manager->create<T>(std::move(name), std::forward<Args>(args)...);
+  T& create_view(Arena* arena, std::string name, Args&&... args) {
+    auto& view = view_manager->create<T>(arena, std::move(name), std::forward<Args>(args)...);
     view.m_app = this;
     return view;
   }
-
 
   [[nodiscard]] ViewResult get_view(const ViewId id) const { return view_manager->get(id); }
   [[nodiscard]] ViewResult get_view(const std::string& name) const {
@@ -131,8 +102,9 @@ public:
   std::expected<std::reference_wrapper<T>, ViewError> push_layer_to_view(const std::string& name,
                                                                          Args&&... args);
 
-  // Scene management
-  Scene*               create_scene(const std::string& name) { return scene_manager.create(name); }
+  Scene* create_scene(Arena* arena, const std::string& name) {
+    return scene_manager.create(arena, name);
+  }
   [[nodiscard]] Scene* get_scene(const std::string& name) const { return scene_manager.get(name); }
 
   void clear_game_layers();
@@ -146,6 +118,7 @@ public:
   [[nodiscard]] bool consume_shader_reload_request() {
     return m_shader_reload_requested.exchange(false, std::memory_order_acq_rel);
   }
+  void dispatch_shader_reload();
 
   [[nodiscard]] EngineServices services() const {
     return EngineServices{
@@ -168,22 +141,19 @@ public:
     };
   }
 
-public:
-  bool is_running              = true;
-  bool hot_reload_enabled      = true;
-  bool game_code_reload_paused = false;
+  [[nodiscard]] Arena* frame_arena() const { return m_frame_arena; }
 
+  // Data members
+  bool is_running;
+  bool hot_reload_enabled;
+  bool game_code_reload_paused;
 
   ApplicationSpecification app_spec;
 
-
-  // todo: abstract
-
-
-  std::unique_ptr<WindowManager> window_manager;
-  std::unique_ptr<ViewManager>   view_manager;
-  std::unique_ptr<LayoutManager> layout_manager;
-  SceneManager                   scene_manager;
+  WindowManager* window_manager;
+  ViewManager*   view_manager;
+  LayoutManager* layout_manager;
+  SceneManager   scene_manager;
 
   LayerList    global_layers;
   EventManager app_event_manager;
@@ -191,14 +161,16 @@ public:
   RuntimeStateManager* state_manager;
   FrameTimer           timer;
 
-private:
-  std::atomic<bool> m_restart_requested{false};
-  std::atomic<bool> m_shader_reload_requested{false};
+  Arena* engine_arena;
+  Arena* m_frame_arena;
 
-  std::unique_ptr<GlfwContext>    m_glfw_ctx;
-  std::unique_ptr<VulkanContext>  m_vulkan_ctx;
-  std::unique_ptr<VulkanRenderer> m_renderer;
-  std::unique_ptr<SDImGuiContext> m_imgui_ctx;
+  std::atomic<bool> m_restart_requested;
+  std::atomic<bool> m_shader_reload_requested;
+
+  GlfwContext*    m_glfw_ctx;
+  VulkanContext*  m_vulkan_ctx;
+  VulkanRenderer* m_renderer;
+  SDImGuiContext* m_imgui_ctx;
 };
 
 

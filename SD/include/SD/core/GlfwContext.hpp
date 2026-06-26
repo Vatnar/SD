@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 
 #include "SD/core/base.hpp"
+#include "SD/core/logging.hpp"
 
 namespace sd {
 using glfw_error_callback = std::function<void(int, const char*)>;
@@ -21,8 +22,7 @@ using glfw_error_callback = std::function<void(int, const char*)>;
 /**
  * @brief RAII wrapper for initializing and terminating Glfw. Also sets a glfwErrorCallback
  */
-class SD_EXPORT GlfwContext {
-public:
+struct SD_EXPORT GlfwContext {
   GlfwContext() {
     // Set GLFW error callback
     m_error_callback = [](int error_code, const char* description) {
@@ -62,7 +62,7 @@ public:
     return {glfw_exts, count};
   }
 
-private:
+
   static inline glfw_error_callback m_error_callback;
 
   static void glfw_error_callback_trampoline(int error_code, const char* description) {

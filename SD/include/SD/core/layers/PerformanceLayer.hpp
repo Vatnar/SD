@@ -1,9 +1,3 @@
-/**
- * @file PerformanceLayer.hpp
- * @brief x86-only performance monitoring layer using RDTSC
- *
- * @note This layer requires x86_64 architecture. Not portable to ARM.
- */
 #pragma once
 #include <chrono>
 
@@ -15,12 +9,13 @@
 
 #include "SD/core/Layer.hpp"
 #include "SD/core/logging.hpp"
-namespace sd {
-class PerformanceLayer : public Layer {
-public:
-  explicit PerformanceLayer() : Layer("Performance layer") { m_last_cycles = __rdtsc(); }
 
-  void on_update(const float dt) override {
+namespace sd {
+struct PerformanceLayer : Layer {
+  void on_update(float dt) {
+    if (!m_last_cycles)
+      m_last_cycles = __rdtsc();
+
     m_frame_count++;
     m_time_accumulator += dt;
 
@@ -36,7 +31,6 @@ public:
       double msPerFrame  = (computeTime * 1000.0) / m_frame_count;
       double avgCycles =
           static_cast<double>(m_cycle_accumulator - m_sleep_cycle_accumulator) / m_frame_count;
-
 
       log::engine::info("FPS: {:.2f}, Avg ms: {:.2f}, Avg cycles: {:.0f}",
                         fps,
@@ -62,7 +56,7 @@ public:
     m_sleep_time_accumulator += std::chrono::duration<float>(now - m_sleep_start_time).count();
   }
 
-private:
+
   U32   m_frame_count       = 0;
   float m_time_accumulator  = 0.0f;
   U64   m_cycle_accumulator = 0;

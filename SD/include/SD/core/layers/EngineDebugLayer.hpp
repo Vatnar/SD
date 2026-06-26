@@ -5,25 +5,25 @@
 #include "SD/core/ApplicationRuntime.hpp"
 #include "SD/core/EngineServices.hpp"
 #include "SD/core/Layer.hpp"
+#include "SD/core/events/EventVariant.hpp"
+#include "SD/core/logging.hpp"
 #include "SD/export.hpp"
 
 namespace sd {
 
-class Scene;
-class View;
-class Event;
+struct Scene;
+struct View;
 
-class SD_EXPORT EngineDebugLayer : public Panel {
-public:
+struct SD_EXPORT EngineDebugLayer : Panel {
   EngineDebugLayer(ApplicationRuntime runtime, EngineServices services, Scene* scene = nullptr);
 
-  void on_update(float dt) override;
-  void on_fixed_update(double dt) override;
-  void on_event(Event& e) override;
-  void on_im_gui_menu_bar() override;
-  void on_gui_render() override;
+  void on_update(float dt);
+  void on_fixed_update(double dt);
+  void on_event(EventVariant& e);
+  void on_im_gui_menu_bar();
+  void on_gui_render();
 
-private:
+
   void display_view_info(View* selected_view);
   void display_scene_selector();
   void display_ecs_inspector();
@@ -56,7 +56,6 @@ private:
   LayerList&      m_global_layers;
   VulkanRenderer& m_renderer;
 
-  // Dialog state
   bool                 m_show_save_layout_dialog     = false;
   bool                 m_show_delete_layout_dialog   = false;
   bool                 m_show_overwrite_confirmation = false;
@@ -64,15 +63,11 @@ private:
   std::string          m_pending_layout_name;
   std::array<char, 64> m_layout_name_buffer{};
 
-  // Window visibility - LayoutManager can control these
   bool m_show_view_inspector  = true;
   bool m_show_scene_inspector = true;
   bool m_show_event_log       = true;
   bool m_show_renderer_info   = true;
   bool m_show_context_overlay = false;
-
-public:
-  // LayoutManager interface
   void set_view_inspector_visible(bool visible) { m_show_view_inspector = visible; }
   void set_scene_inspector_visible(bool visible) { m_show_scene_inspector = visible; }
   void set_event_log_visible(bool visible) { m_show_event_log = visible; }
@@ -85,7 +80,6 @@ public:
   bool is_renderer_info_visible() const { return m_show_renderer_info; }
   bool is_context_overlay_visible() const { return m_show_context_overlay; }
 
-  // Apply a preset configuration (for LayoutManager)
   void apply_preset_configuration(bool inspectors_visible, bool log_visible, bool renderer_visible);
 
   bool m_log_events           = false;
@@ -93,7 +87,6 @@ public:
   bool m_log_view_resizes     = false;
   bool m_log_entity_lifecycle = false;
 
-  // Log viewer filters
   char m_log_search_buffer[128]{};
   bool m_log_show_trace      = true;
   bool m_log_show_debug      = true;
@@ -104,7 +97,6 @@ public:
   bool m_log_show_general    = true;
   bool m_log_show_timestamps = true;
 
-  // Category tree for log filtering
   struct CategoryNode {
     std::string               name;
     std::string               full_path;
@@ -130,7 +122,6 @@ public:
   Scene*                m_selected_scene = nullptr;
   std::optional<ViewId> m_selected_view_id;
 
-  // Entity lifecycle tracking (for m_log_entity_lifecycle)
   Scene* m_prev_scene_for_entity_count = nullptr;
   int    m_prev_entity_count           = -1;
 };

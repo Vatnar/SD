@@ -46,7 +46,7 @@ add_subdirectory(vendor)
 add_subdirectory(SD)
 add_subdirectory(hot_reloader)
 add_subdirectory(testing)
-
+add_subdirectory(proto)
 # TODO: we probably  shouldnt even have sandbox app here, sandboxapp should have SD as depdenceny not opposite
 add_subdirectory(sandbox_app)
 

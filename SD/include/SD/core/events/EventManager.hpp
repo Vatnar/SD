@@ -1,25 +1,23 @@
-// TODO(docs): Add file-level Doxygen header
-//   - @file EventManager.hpp
-//   - @brief Event queue and dispatcher
-//   - Event queuing vs immediate dispatch patterns
 #pragma once
 
 #include <algorithm>
-#include <memory>
-#include <vector>
+#include <variant>
 
-#include "Event.hpp"
+#include "EventVariant.hpp"
+#include "SD/core/arena_vec.hpp"
 #include "SD/export.hpp"
 
 namespace sd {
-// TODO(docs): Document EventManager class
-//   - Purpose: Queued event storage and type queries
-//   - Event lifetime (pushed, queried, cleared)
-//   - Integration with LayerList event handling
-//   - Example: Checking for specific events
-class SD_EXPORT EventManager {
-public:
-  EventManager() { m_events.reserve(64); }
+
+struct SD_EXPORT EventManager {
+  EventManager() {
+    m_arena = arena_alloc(
+        ArenaParams{.reserve_size = mb(1uz), .commit_size = kb(4uz), .name = "EventManagerArena"});
+  }
+  ~EventManager() {
+    if (m_arena)
+      arena_release(m_arena);
+  }
 
   EventManager(const EventManager&)            = delete;
   EventManager& operator=(const EventManager&) = delete;
@@ -28,63 +26,46 @@ public:
 
   [[nodiscard]] bool has_resize_event() const {
     return std::ranges::any_of(m_events, [](const auto& e) {
-      return e->get_event_type() == EventType::WINDOW_RESIZE ||
-             e->get_event_type() == EventType::SWAPCHAIN_OUT_OF_DATE;
+      return std::holds_alternative<WindowResizeEvent>(e.event) ||
+             std::holds_alternative<SwapchainOutOfDateEvent>(e.event);
     });
   }
 
   template<typename T>
-    requires std::derived_from<T, Event>
   [[nodiscard]] bool has_event() const {
-    return std::ranges::any_of(
-        m_events, [](const auto& e) { return e->get_event_type() == T::get_static_type(); });
-  }
-
-
-  void clear() { m_events.clear(); }
-
-
-  template<typename T, typename... Args>
-    requires std::derived_from<T, Event>
-  void push_event(Args&&... args) {
-    m_events.emplace_back(std::make_unique<T>(std::forward<Args>(args)...));
+    return std::ranges::any_of(m_events,
+                               [](const auto& e) { return std::holds_alternative<T>(e.event); });
   }
 
   template<typename T>
-    requires std::derived_from<T, Event>
   void clear_type() {
-    auto ret = std::ranges::remove_if(
-        m_events, [](const auto& e) { return e->get_event_type() == T::GetStaticType(); });
-
-    m_events.erase(ret.begin(), m_events.end());
-  }
-
-
-  auto               begin() { return m_events.begin(); }
-  auto               end() { return m_events.end(); }
-  [[nodiscard]] auto begin() const { return m_events.begin(); }
-  [[nodiscard]] auto end() const { return m_events.end(); }
-
-private:
-  std::vector<std::unique_ptr<Event>> m_events;
-};
-
-class EventDispatcher {
-public:
-  explicit EventDispatcher(Event& event) : m_event(event) {}
-
-  template<typename T, typename F>
-  bool dispatch(const F& func) {
-    if (m_event.get_event_type() == T::get_static_type()) {
-      if (func(static_cast<T&>(m_event))) {
-        m_event.m_handled = true;
+    U64 write = 0;
+    for (U64 i = 0; i < m_events.count; ++i) {
+      if (!std::holds_alternative<T>(m_events.data[i].event)) {
+        if (write != i)
+          m_events.data[write] = m_events.data[i];
+        ++write;
       }
-      return true;
     }
-    return false;
+    m_events.count = write;
   }
 
-private:
-  Event& m_event;
+  void clear() {
+    m_events.clear();
+    m_arena->clear();
+  }
+
+  template<typename T, typename... Args>
+  void push_event(Args&&... args) {
+    m_events.push(m_arena, EventVariant{.event = T(std::forward<Args>(args)...), .handled = false});
+  }
+
+  auto begin() { return m_events.begin(); }
+  auto end() { return m_events.end(); }
+
+
+  ArenaVec<EventVariant> m_events;
+  Arena*                 m_arena = nullptr;
 };
+
 } // namespace sd

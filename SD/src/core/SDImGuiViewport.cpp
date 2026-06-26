@@ -3,6 +3,7 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include "SD/Application.hpp"
+#include "SD/arena.hpp"
 #include "SD/core/SDImGuiContext.hpp"
 #include "SD/core/vulkan/vulkan_utils.hpp"
 
@@ -10,10 +11,12 @@ namespace sd {
 
 SDImGuiViewport::SDImGuiViewport(EngineServices&    services,
                                  const std::string& name,
+                                 Arena*             arena,
                                  U32                width,
                                  U32                height) :
   m_name(name), m_vulkan_ctx(services.vulkan), m_imgui_ctx(services.imgui) {
-  m_framebuffer = std::make_unique<VulkanFramebuffer>(m_vulkan_ctx, width, height);
+  m_framebuffer = arena_push<VulkanFramebuffer>(arena);
+  new (m_framebuffer) VulkanFramebuffer(m_vulkan_ctx, width, height);
 
   // Create Sampler for ImGui
   vk::SamplerCreateInfo sampler_info{
@@ -44,7 +47,9 @@ SDImGuiViewport::SDImGuiViewport(EngineServices&    services,
 }
 
 SDImGuiViewport::~SDImGuiViewport() {
-  // Clean up ImGui texture descriptor set
+  if (m_framebuffer) {
+    m_framebuffer->~VulkanFramebuffer();
+  }
   if (m_texture_id != nullptr) {
     m_imgui_ctx.remove_texture(m_texture_id);
     m_texture_id = nullptr;

@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <concepts>
 #include <cstring>
 #include <iterator>
 #include <string>
@@ -11,15 +12,16 @@
 
 namespace sd {
 
-class Serializer;
+struct Serializer;
 
-class Serializable {
-public:
-  virtual ~Serializable() = default;
+// ADL-based serialization detection
+template<typename T>
+concept HasSerialize = requires(Serializer& s, const T& obj) { serialize(s, obj); };
 
-  virtual void serialize(Serializer& s) const = 0;
-  virtual void deserialize(Serializer& s)     = 0;
-};
+template<typename T>
+concept HasDeserialize = requires(Serializer& s, T& obj) { deserialize(s, obj); };
+
+template<typename T> concept HasSerialization = HasSerialize<T> && HasDeserialize<T>;
 
 /**
  * Writes and reads data to a byte vector
@@ -33,14 +35,13 @@ public:
  * s.SetOffset(0);
  * \endcode
  */
-class Serializer {
-public:
+struct Serializer {
   explicit Serializer(std::vector<std::byte>& buffer) : m_buffer(buffer) {}
 
   // Write arithmetic types
   template<typename T>
     requires std::is_arithmetic_v<T>
-  void write(T value) {
+  void write(const T& value) {
     const auto bytes = reinterpret_cast<const std::byte*>(&value);
     m_buffer.insert(m_buffer.end(), bytes, bytes + sizeof(T));
   }
@@ -84,8 +85,11 @@ public:
     m_buffer.insert(m_buffer.end(), bytes, bytes + size);
   }
 
-  // Write Serializable object
-  void write(const Serializable& obj) { obj.serialize(*this); }
+  // Write ADL-serializable object
+  template<HasSerialize T>
+  void write(const T& obj) {
+    serialize(*this, obj);
+  }
 
   // Write VLA::Matrix4x4f
   void write(const VLA::Matrix4x4f& m) { write(m.A); }
@@ -141,8 +145,11 @@ public:
     }
   }
 
-  // Read Serializable object
-  void read(Serializable& obj) { obj.deserialize(*this); }
+  // Read ADL-deserializable object
+  template<HasDeserialize T>
+  void read(T& obj) {
+    deserialize(*this, obj);
+  }
 
   // Read VLA::Matrix4x4f
   VLA::Matrix4x4f read() {
@@ -160,7 +167,7 @@ public:
 
   [[nodiscard]] std::span<std::byte> get_span() const { return {m_buffer.data(), m_buffer.size()}; }
 
-private:
+
   std::vector<std::byte>& m_buffer;
   USize                   m_read_offset = 0;
 };

@@ -5,22 +5,23 @@
 
 namespace sd {
 
-Scene* SceneManager::create(const std::string& name) {
-  for (auto& scene : m_scenes) {
+Scene* SceneManager::create(Arena* arena, const std::string& name) {
+  for (auto* scene : m_scenes) {
     if (scene->get_name() == name) {
       log::engine::warn("Scene '{}' already exists, returning existing scene", name);
-      return scene.get();
+      return scene;
     }
   }
-  auto scene = std::make_unique<Scene>(name);
-  m_scenes.push_back(std::move(scene));
-  return m_scenes.back().get();
+  auto* scene = arena_push<Scene>(arena);
+  new (scene) Scene(name, arena);
+  m_scenes.push_back(scene);
+  return m_scenes.back();
 }
 
 Scene* SceneManager::get(const std::string& name) const {
-  for (auto& scene : m_scenes) {
+  for (auto* scene : m_scenes) {
     if (scene->get_name() == name) {
-      return scene.get();
+      return scene;
     }
   }
   return nullptr;

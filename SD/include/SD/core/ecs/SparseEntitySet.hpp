@@ -1,105 +1,146 @@
-// TODO(docs): Add file-level Doxygen header
-//   - @file SparseEntitySet.hpp
-//   - @brief Sparse set data structure for component storage
-//   - Memory layout: sparse array -> dense array -> component data
-//   - Performance characteristics (O(1) add/remove/get)
 #pragma once
 #include "Entity.hpp"
+#include "SD/arena.hpp"
+#include "SD/core/arena_vec.hpp"
 #include "SD/core/math_utils.hpp"
 #include "SD/utils/serialization.hpp"
 #include "component_registration.hpp"
 
 namespace sd {
-// TODO(docs): Document SparseEntitySetBase interface
-//   - Purpose: Type-erased base for component pools
-//   - Used by EntityManager for heterogeneous storage
-class SparseEntitySetBase : public Serializable {
-public:
-  ~SparseEntitySetBase() override    = default;
-  virtual bool remove(Entity entity) = 0;
 
-  // virtual std::optional<ComponentDebugInfo> get_debug_info(Entity e) = 0;
-};
-
-// TODO(docs): Document SparseEntitySet class thoroughly
-//   - Purpose: Sparse set storing components with O(1) operations
-//   - Memory layout explanation (sparse pages, dense arrays)
-//   - Page size rationale (1024 entities per page)
-//   - Add: O(1) amortized (with page allocation)
-//   - Remove: O(1) with swap-and-pop
-//   - Get: O(1)
-//   - Serialization/Deserialization for state persistence
-//   - Example: How EntityManager uses this for component pools
-/**
- * Sparse -> Dense set for enitities.
- * @tparam T Data associated, for instance component structs
- */
-
-// TODO(vatnar): SparseEntity Set does make_unique on per page and push_back on each
-// component add. which trigger a heap allocation. Rather add an arena for this, one arena
-// per archetype or similar
 template<typename T>
-class SparseEntitySet : public SparseEntitySetBase {
+struct SparseEntitySet {
   static constexpr USize PAGE_SIZE = 1024;
   static constexpr USize SHIFT     = math::log2_int(PAGE_SIZE);
   static constexpr USize MASK      = PAGE_SIZE - 1;
 
-  // INVARIANTS:
-  // 1. dense_entities.size() == dense_data.size() (parallel arrays)
-  // 2. sparse[page][offset] is either valid dense index OR sentinel (max usize)
-  // 3. For each i in [0, dense_entities.size()): sparse[dense_entities[i]] points back to i
+  Arena* arena = nullptr;
 
-#ifdef SD_DEBUG
-  void ValidateInvariants() const {
-    assert(dense_entities.size() == dense_data.size());
-    for (size_t i = 0; i < dense_entities.size(); ++i) {
-      Entity e      = dense_entities[i];
-      USize  page   = e.index >> SHIFT;
-      USize  offset = e.index & MASK;
-      assert(page < sparse.size() && sparse[page]);
-      assert(sparse[page][offset] == i);
+  USize** sparse_pages = nullptr;
+  U64     sparse_count = 0;
+  U64     sparse_cap   = 0;
+
+  ArenaVec<T>      dense_data;
+  ArenaVec<Entity> dense_entities;
+
+  void ensure_page(USize page) {
+    if (page >= sparse_cap) {
+      U64 new_cap = sparse_cap ? sparse_cap * 2 : 4;
+      while (new_cap <= page)
+        new_cap *= 2;
+      USize** new_pages = arena->push_array<USize*>(new_cap);
+      for (U64 i = 0; i < sparse_count; ++i)
+        new_pages[i] = sparse_pages[i];
+      for (U64 i = sparse_count; i < new_cap; ++i)
+        new_pages[i] = nullptr;
+      sparse_pages = new_pages;
+      sparse_cap   = new_cap;
+    }
+    if (page >= sparse_count)
+      sparse_count = page + 1;
+    if (!sparse_pages[page]) {
+      sparse_pages[page] = arena->push_array<USize>(PAGE_SIZE);
+      for (USize i = 0; i < PAGE_SIZE; ++i)
+        sparse_pages[page][i] = std::numeric_limits<USize>::max();
     }
   }
-#endif
 
-  std::vector<std::unique_ptr<USize[]>> sparse;
-  std::vector<T>                        dense_data;
-  std::vector<Entity>                   dense_entities;
-
-public:
   template<typename... Args>
-  void add(Entity entity, Args&&... args);
+  void add(Entity entity, Args&&... args) {
+    USize page   = entity.index >> SHIFT;
+    USize offset = entity.index & MASK;
 
-  /**
-   * Remove an entity from the set
-   * @param entity Entity to remove
-   * @return true if successfully removed, false if it doesn't exist
-   */
-  bool remove(Entity entity) override;
+    ensure_page(page);
 
-  /**
-   * Retrieve data for this entity
-   * @param entity
-   * @return Data associated for this entity, or nullptr if it doesn't exist
-   */
-  T*                     get(Entity entity);
-  [[nodiscard]] const T* get(Entity entity) const;
+    USize dense_idx = sparse_pages[page][offset];
+    if (dense_idx != std::numeric_limits<USize>::max()) {
+      dense_data[dense_idx]     = T{std::forward<Args>(args)...};
+      dense_entities[dense_idx] = entity;
+    } else {
+      sparse_pages[page][offset] = static_cast<USize>(dense_entities.count);
+      dense_data.push(arena, T{std::forward<Args>(args)...});
+      dense_entities.push(arena, entity);
+    }
+  }
 
-  // std::optional<ComponentDebugInfo>        get_debug_info(Entity e) override;
-  T*                                       operator[](const Entity idx) { return get(idx); }
-  [[nodiscard]] const std::vector<Entity>& get_dense_entities() const { return dense_entities; }
+  bool remove(Entity entity) {
+    USize page   = entity.index >> SHIFT;
+    USize offset = entity.index & MASK;
 
-  [[nodiscard]] USize size() const { return dense_entities.size(); }
+    if (page >= sparse_count || !sparse_pages[page])
+      return false;
+
+    USize dense_idx = sparse_pages[page][offset];
+    if (dense_idx == std::numeric_limits<USize>::max())
+      return false;
+    if (dense_entities[dense_idx] != entity)
+      return false;
+
+    U64    last_idx    = dense_entities.count - 1;
+    Entity last_entity = dense_entities[last_idx];
+
+    dense_data[dense_idx]     = dense_data[last_idx];
+    dense_entities[dense_idx] = last_entity;
+
+    USize last_page                      = last_entity.index >> SHIFT;
+    USize last_offset                    = last_entity.index & MASK;
+    sparse_pages[last_page][last_offset] = static_cast<USize>(dense_idx);
+
+    sparse_pages[page][offset] = std::numeric_limits<USize>::max();
+
+    dense_data.count--;
+    dense_entities.count--;
+    return true;
+  }
+
+  T* get(Entity entity) {
+    USize page   = entity.index >> SHIFT;
+    USize offset = entity.index & MASK;
+
+    if (page >= sparse_count || !sparse_pages[page])
+      return nullptr;
+
+    USize dense_idx = sparse_pages[page][offset];
+    if (dense_idx == std::numeric_limits<USize>::max())
+      return nullptr;
+    if (dense_entities[dense_idx] != entity)
+      return nullptr;
+
+    return &dense_data[dense_idx];
+  }
+
+  const T* get(Entity entity) const {
+    USize page   = entity.index >> SHIFT;
+    USize offset = entity.index & MASK;
+
+    if (page >= sparse_count || !sparse_pages[page])
+      return nullptr;
+
+    USize dense_idx = sparse_pages[page][offset];
+    if (dense_idx == std::numeric_limits<USize>::max())
+      return nullptr;
+    if (dense_entities[dense_idx] != entity)
+      return nullptr;
+
+    return &dense_data[dense_idx];
+  }
+
+  T* operator[](Entity idx) { return get(idx); }
+
+  const ArenaVec<Entity>& get_dense_entities() const { return dense_entities; }
+
+  USize size() const { return static_cast<USize>(dense_entities.count); }
 
   void clear() {
-    sparse.clear();
+    sparse_pages = nullptr;
+    sparse_count = 0;
+    sparse_cap   = 0;
     dense_data.clear();
     dense_entities.clear();
   }
 
   void serialize_to(std::vector<char>& out) const {
-    // Header: size_t entity_count, size_t sizeof(T).
-    size_t entity_count = dense_entities.size();
+    size_t entity_count = static_cast<size_t>(dense_entities.count);
     size_t comp_size    = sizeof(T);
 
     out.resize(sizeof(size_t) * 2 + entity_count * (sizeof(Entity) + comp_size));
@@ -109,10 +150,9 @@ public:
     memcpy(ptr, &comp_size, sizeof(size_t));
     ptr += sizeof(size_t);
 
-    // Dense entities + data.
-    memcpy(ptr, dense_entities.data(), entity_count * sizeof(Entity));
+    memcpy(ptr, dense_entities.data, entity_count * sizeof(Entity));
     ptr += entity_count * sizeof(Entity);
-    memcpy(ptr, dense_data.data(), entity_count * comp_size);
+    memcpy(ptr, dense_data.data, entity_count * comp_size);
   }
 
   void deserialize_from(const std::vector<char>& data) {
@@ -123,79 +163,62 @@ public:
     memcpy(&comp_size, ptr, sizeof(size_t));
     ptr += sizeof(size_t);
 
-    dense_entities.resize(entity_count);
-    dense_data.resize(entity_count);
-
-    memcpy(dense_entities.data(), ptr, entity_count * sizeof(Entity));
-    ptr += entity_count * sizeof(Entity);
-    memcpy(dense_data.data(), ptr, entity_count * comp_size);
-
-    sparse.clear();
     for (size_t i = 0; i < entity_count; ++i) {
-      Entity      e      = dense_entities[i];
-      const USize page   = e.index >> SHIFT;
-      const USize offset = e.index & MASK;
-
-      if (page >= sparse.size())
-        sparse.resize(page + 1);
-      if (!sparse[page]) {
-        sparse[page] = std::make_unique<USize[]>(PAGE_SIZE); // TODO: here
-        std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<USize>::max());
-      }
-      sparse[page][offset] = i;
+      Entity e;
+      memcpy(&e, ptr + i * sizeof(Entity), sizeof(Entity));
+      ptr += sizeof(Entity);
     }
-#ifdef SD_DEBUG
-    ValidateInvariants();
-#endif
+    ptr = data.data() + sizeof(size_t) * 2;
+    for (size_t i = 0; i < entity_count; ++i) {
+      Entity e;
+      memcpy(&e, ptr, sizeof(Entity));
+      ptr += sizeof(Entity);
+      dense_entities.push(arena, e);
+      T comp;
+      memcpy(&comp, ptr, comp_size);
+      ptr += comp_size;
+      add(e, std::move(comp));
+    }
   }
 
-  void serialize(Serializer& s) const override {
-    s.write(static_cast<U32>(dense_entities.size()));
-    for (const auto& e : dense_entities) {
-      s.write(e.index);
-      s.write(e.generation);
+  void serialize(Serializer& s) const {
+    s.write(static_cast<U32>(dense_entities.count));
+    for (U64 i = 0; i < dense_entities.count; ++i) {
+      s.write(dense_entities[i].index);
+      s.write(dense_entities[i].generation);
     }
-    // Only serialize component data if it's serializable
     if constexpr (SerializableComponent<T>) {
-      for (const auto& data : dense_data) {
-        ComponentSerializer<T>::serialize(data, s);
+      for (U64 i = 0; i < dense_data.count; ++i) {
+        ComponentSerializer<T>::serialize(dense_data[i], s);
       }
     }
   }
 
-  void deserialize(Serializer& s) override {
+  void deserialize(Serializer& s) {
     U32 count = s.read<U32>();
-    dense_entities.resize(count);
     for (U32 i = 0; i < count; ++i) {
-      dense_entities[i].index      = s.read<U32>();
-      dense_entities[i].generation = s.read<U32>();
+      Entity e;
+      e.index      = s.read<U32>();
+      e.generation = s.read<U32>();
+      dense_entities.push(arena, e);
     }
-    dense_data.resize(dense_entities.size());
     if constexpr (SerializableComponent<T>) {
-      for (auto& data : dense_data) {
-        ComponentSerializer<T>::deserialize(data, s);
+      for (U32 i = 0; i < count; ++i) {
+        T comp;
+        ComponentSerializer<T>::deserialize(comp, s);
+        dense_data.push(arena, comp);
       }
     }
-    // Rebuild sparse index
-    sparse.clear();
-    for (size_t i = 0; i < dense_entities.size(); ++i) {
-      Entity      e      = dense_entities[i];
-      const USize page   = e.index >> SHIFT;
-      const USize offset = e.index & MASK;
-
-      if (page >= sparse.size())
-        sparse.resize(page + 1);
-      if (!sparse[page]) {
-        // TODO: here
-        sparse[page] = std::make_unique<USize[]>(PAGE_SIZE);
-        std::fill_n(sparse[page].get(), PAGE_SIZE, std::numeric_limits<USize>::max());
-      }
-      sparse[page][offset] = i;
+    for (U64 i = 0; i < dense_entities.count; ++i) {
+      Entity e      = dense_entities[i];
+      USize  page   = e.index >> SHIFT;
+      USize  offset = e.index & MASK;
+      ensure_page(page);
+      sparse_pages[page][offset] = static_cast<USize>(i);
     }
   }
 
   friend class RuntimeStateManager;
 };
 
-#include "impl/SparseEntitySet.inl"
 } // namespace sd

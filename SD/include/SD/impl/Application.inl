@@ -8,7 +8,7 @@ T& Application::push_window_layer(WindowId id, Args&&... args) {
                           static_cast<uint32_t>(id));
   }
   auto& layer = windows[id].view_layers.push_layer<T>(std::forward<Args>(args)...);
-  layer.m_app = this;
+  layer.app   = this;
   return layer;
 }
 template<typename T, typename... Args>

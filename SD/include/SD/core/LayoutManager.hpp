@@ -11,8 +11,7 @@ namespace sd {
 struct ApplicationRuntime;
 
 /// Manages window layouts using ImGui DockBuilder for presets and INI for user layouts
-class SD_EXPORT LayoutManager {
-public:
+struct SD_EXPORT LayoutManager {
   enum class Preset {
     DEFAULT,
     MINIMAL
@@ -48,7 +47,7 @@ public:
   /// Get the currently active layout/preset name
   const std::string& get_current_layout() const { return m_current_layout; }
 
-private:
+
   void        ensure_layouts_directory_exists();
   std::string get_layout_path(const std::string& name) const;
   void        save_current_layout_name();

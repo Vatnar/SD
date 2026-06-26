@@ -24,8 +24,7 @@ struct SDImGuiCallbacks {
 //   - Dock space creation (BeginDockSpace/EndDockSpace)
 //   - Texture utilities (CreateTextureFromView, RemoveTexture)
 //   - Example: Setting up ImGui in a custom layer
-class SDImGuiContext {
-public:
+struct SDImGuiContext {
   explicit SDImGuiContext(const SDImGuiCallbacks& callbacks) : m_callbacks(callbacks) {}
   ~SDImGuiContext();
   SDImGuiContext(const SDImGuiContext& other)                = delete;
@@ -55,10 +54,9 @@ public:
   void remove_texture(VkDescriptorSet descriptor_set);
 
 
-private:
   void create_descriptor_pool(VulkanContext& ctx);
 
-private:
+
   ImGuiContext* m_context = nullptr;
 
   SDImGuiCallbacks m_callbacks;

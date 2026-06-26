@@ -5,8 +5,7 @@
 
 namespace sd {
 
-class VulkanFramebuffer {
-public:
+struct VulkanFramebuffer {
   VulkanFramebuffer(VulkanContext& ctx, uint32_t width, uint32_t height);
   ~VulkanFramebuffer();
 
@@ -17,11 +16,11 @@ public:
   vk::ImageView   get_color_image_view() const { return *m_color_image_view; }
   vk::Extent2D    get_extent() const { return m_extent; }
 
-private:
+
   void create_resources();
   void destroy_resources();
 
-private:
+
   VulkanContext& m_ctx;
   vk::Extent2D   m_extent;
 

@@ -4,9 +4,6 @@
 
 namespace sd {
 
-ViewManager::ViewManager()  = default;
-ViewManager::~ViewManager() = default;
-
 ViewManager::ViewResult ViewManager::get(ViewId id) {
   auto it = m_views_by_id.find(id);
   if (it == m_views_by_id.end())
@@ -64,7 +61,7 @@ std::vector<Scene*> ViewManager::get_scenes() {
   for (auto& view : m_views_by_id | std::views::values) {
     ASSERT(view && "View must be valid");
     for (auto& layer : view->get_layers()) {
-      Scene* s = layer->get_scene();
+      Scene* s = layer.scene;
       if (s && std::ranges::find(scenes, s) == scenes.end())
         scenes.push_back(s);
     }

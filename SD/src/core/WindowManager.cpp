@@ -1,5 +1,7 @@
 #include "SD/core/WindowManager.hpp"
 
+#include <utility>
+
 #include "SD/core/SDImGuiContext.hpp"
 #include "SD/core/ViewManager.hpp"
 #include "SD/core/events/window/window_events.hpp"
@@ -8,21 +10,24 @@
 namespace sd {
 
 WindowManager::WindowManager(const EngineServices&         services,
-                             const WindowManagerCallbacks& callbacks) :
-  m_vulkan_ctx(services.vulkan), m_imgui_ctx(services.imgui), m_renderer(services.renderer),
-  m_callbacks(callbacks) {
+                             const WindowManagerCallbacks& callbacks,
+                             Arena*                        arena) :
+  window_arena(arena), m_vulkan_ctx(services.vulkan), m_imgui_ctx(services.imgui),
+  m_renderer(services.renderer), m_callbacks(callbacks) {
 }
 
 WindowManager::~WindowManager() = default;
 
-WindowId WindowManager::create(const WindowProps& props) {
+WindowId WindowManager::create(const WindowProps& props, Arena* arena) {
   ASSERT(!props.title.empty() && "Window title must not be empty");
   ASSERT(props.width > 0 && props.height > 0 && "Window dimensions must be positive");
 
   WindowId id = m_next_window_id++;
 
-  auto window =
-      WindowBuilder().set_title(props.title.c_str()).set_size(props.width, props.height).build();
+  Window* window = WindowBuilder()
+                       .set_title(props.title.c_str())
+                       .set_size(props.width, props.height)
+                       .build(arena);
 
   ASSERT(window && "Window must be created");
 
@@ -31,13 +36,14 @@ WindowId WindowManager::create(const WindowProps& props) {
     m_vulkan_ctx.init(*window);
   }
 
-  auto vw = std::make_unique<VulkanWindow>(*window, m_vulkan_ctx);
+  auto* vw = arena_push<VulkanWindow>(arena);
+  new (vw) VulkanWindow(*window, m_vulkan_ctx);
 
   WindowData data;
-  data.logic  = std::move(window);
-  data.render = std::move(vw);
+  data.logic  = window;
+  data.render = vw;
 
-  m_windows[id] = std::move(data);
+  m_windows.emplace(id, std::move(data));
   return id;
 }
 
@@ -46,6 +52,8 @@ void WindowManager::destroy(WindowId id) {
   ASSERT(it != m_windows.end() && "Cannot destroy window,  window ID does not exist");
 
   (void)m_vulkan_ctx.get_vulkan_device()->waitIdle();
+  it->second.render->~VulkanWindow();
+  it->second.logic->~Window();
   m_windows.erase(id);
 }
 
@@ -95,34 +103,25 @@ void WindowManager::update_window(WindowId id, WindowData& data, float dt) {
     return;
 
   for (auto& e : window.get_event_manager()) {
-    EventDispatcher dispatcher(*e);
+    std::visit(overloaded{[&](WindowResizeEvent& event) { vw.resize(event.width, event.height); },
+                          [&](WindowCloseEvent&) {
+                            if (id == WindowId{}) {
+                              m_callbacks.close_app();
+                            } else {
+                              m_pending_close.push_back(id);
+                            }
+                            e.handled = true;
+                          },
+                          [](auto&) {}},
+               e.event);
 
-    dispatcher.dispatch<WindowResizeEvent>([&](const WindowResizeEvent& event) {
-      vw.resize(event.width, event.height);
-      return false;
-    });
-
-    dispatcher.dispatch<WindowCloseEvent>([&](const WindowCloseEvent&) {
-      if (id == WindowId{}) {
-        m_callbacks.close_app();
-      } else {
-        m_pending_close.push_back(id);
-      }
-      return true;
-    });
-
-    layers.on_event(*e);
-    // Note: Application-level global layer and view event dispatching
-    // should probably happen in Application::Run or some other unified way.
-    // For now, we'll let Application handle its own event distribution.
-    m_callbacks.on_app_event(*e);
+    layers.on_event(e);
+    m_callbacks.on_app_event(e);
   }
   window.get_event_manager().clear();
 
-  for (auto& layer : layers)
-    layer->on_update(dt);
-  for (auto& layer : layers)
-    layer->on_gui_render();
+  layers.update(dt);
+  layers.gui_render();
 }
 
 void WindowManager::draw_window(WindowId id, WindowData& data, ViewManager& viewManager) {
@@ -139,12 +138,10 @@ void WindowManager::draw_window(WindowId id, WindowData& data, ViewManager& view
     vw.reset_framebuffer_resized();
   }
 
-  // Wait for previous frame before acquiring (avoids semaphore-pending error)
   auto& device     = m_vulkan_ctx.get_vulkan_device();
   auto& frame_sync = vw.get_frame_sync();
   (void)device->waitForFences(1, &*frame_sync.in_flight, true, UINT64_MAX);
 
-  // Acquire Image
   auto acquire_res = vw.get_vulkan_images(frame_sync.image_acquired);
 
   if (!acquire_res) {
@@ -155,15 +152,11 @@ void WindowManager::draw_window(WindowId id, WindowData& data, ViewManager& view
   }
   vk::CommandBuffer cmd = m_renderer.begin_command_buffer(vw);
 
-  // 1. Offscreen viewports (Handled by ViewManager)
   viewManager.render_views(cmd);
 
-  // 2. Begin Main Render Pass
   m_renderer.begin_render_pass(vw);
 
-  // 3. Render Layers
-  for (auto& layer : layers)
-    layer->on_render(cmd);
+  layers.on_render(cmd);
 
   if (id == WindowId{}) {
     m_imgui_ctx.render_draw_data(cmd);

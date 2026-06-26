@@ -18,8 +18,7 @@ namespace sd {
 //   - GPU wait time tracking
 //   - Example game loop using FrameTimer
 /// Tracks frame timing, fixed timestep accumulation, and CPU work time.
-class SD_EXPORT FrameTimer {
-public:
+struct SD_EXPORT FrameTimer {
   void begin() {
     double now   = glfwGetTime();
     m_frame_time = now - m_last_time;
@@ -54,7 +53,7 @@ public:
   [[nodiscard]] double get_fixed_time_step() const { return m_fixed_time_step; }
   void                 set_fixed_time_step(double step) { m_fixed_time_step = step; }
 
-private:
+
   double m_last_time       = 0.0;
   double m_accumulator     = 0.0;
   double m_fixed_time_step = 1.0 / 60.0;

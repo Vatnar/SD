@@ -227,6 +227,7 @@ sd::WindowBuilder& sd::WindowBuilder::set_char_callback(const CharCallbackFn& ca
   m_desc.char_callback = callback;
   return *this;
 }
-std::unique_ptr<sd::Window> sd::WindowBuilder::build() const {
-  return std::make_unique<Window>(m_desc);
+sd::Window* sd::WindowBuilder::build(Arena* arena) const {
+  auto* win = arena_push<Window>(arena);
+  return new (win) Window(m_desc);
 }

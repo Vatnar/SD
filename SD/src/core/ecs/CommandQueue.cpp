@@ -5,84 +5,99 @@
 
 namespace sd {
 
-U32 CommandRegistry::register_(const char* name, U32 component_id) {
-  std::string key = std::string(name) + "_" + std::to_string(component_id);
-  auto        it  = map.find(key);
-  if (it != map.end()) {
-    return it->second;
+namespace {
+struct CommandTypeRegistrar {
+  CommandTypeRegistrar() {
+    CommandQueue::register_type_erased_entry(
+        type_id_of<CreateEntityCmd>(),
+        TypeErasedCommandEntry{
+            .alloc_fn = [](Arena* a) -> void* { return a->push_array<CreateEntityCmd>(1); },
+            .execute_fn =
+                [](void* d, EntityManager<ComponentGroup<>>& em, CommandQueue& queue) {
+                  static_cast<CreateEntityCmd*>(d)->execute(em, queue);
+                },
+            .serialize_fn = [](void*       d,
+                               Serializer& s) { static_cast<CreateEntityCmd*>(d)->serialize(s); },
+            .deserialize_fn =
+                [](void* d, Serializer& s) { static_cast<CreateEntityCmd*>(d)->deserialize(s); },
+        });
+    CommandQueue::register_type_erased_entry(
+        type_id_of<DestroyEntityCmd>(),
+        TypeErasedCommandEntry{
+            .alloc_fn = [](Arena* a) -> void* { return a->push_array<DestroyEntityCmd>(1); },
+            .execute_fn =
+                [](void* d, EntityManager<ComponentGroup<>>& em, CommandQueue& queue) {
+                  static_cast<DestroyEntityCmd*>(d)->execute(em, queue);
+                },
+            .serialize_fn = [](void*       d,
+                               Serializer& s) { static_cast<DestroyEntityCmd*>(d)->serialize(s); },
+            .deserialize_fn =
+                [](void* d, Serializer& s) { static_cast<DestroyEntityCmd*>(d)->deserialize(s); },
+        });
   }
-  U32 id = static_cast<U32>(names.size());
-  names.push_back(name);
-  map[key] = id;
-  return id;
-}
+};
+static CommandTypeRegistrar s_registrar;
 
-U32 CommandRegistry::get_id(const char* name, U32 component_id) {
-  std::string key = std::string(name) + "_" + std::to_string(component_id);
-  auto        it  = map.find(key);
-  if (it != map.end()) {
-    return it->second;
-  }
-  return g_type_max<U32>;
-}
-
-const char* CommandRegistry::get_name(U32 id) {
-  if (id < names.size()) {
-    return names[id];
-  }
-  return "Unknown";
-}
-
-void CommandFactory::register_(U32 type_id, CreatorFn creator) {
-  if (type_id >= creators.size()) {
-    creators.resize(type_id + 1);
-  }
-  creators[type_id] = std::move(creator);
-}
-
-std::unique_ptr<Command> CommandFactory::create(U32 type_id) {
-  if (type_id < creators.size() && creators[type_id]) {
-    return creators[type_id]();
-  }
-  return nullptr;
-}
+} // namespace
 
 void CommandQueue::apply(EntityManager<ComponentGroup<>>& em) {
-  for (const auto& cmd : m_commands) {
-    cmd->execute(em, *this);
+  for (U64 i = 0; i < m_commands.count; ++i) {
+    auto& cmd = m_commands.data[i];
+    cmd.execute_fn(cmd.data, em, *this);
   }
-  m_commands.clear();
+  clear();
 }
+
 void CommandQueue::set_entity_for_handle(EntityHandle entity_handle, Entity entity) {
   ASSERT(entity_handle.is_valid() && "Cannot set entity for invalid (sentinel) handle");
-  if (entity_handle.id >= m_handle_to_entity.size()) {
-    m_handle_to_entity.resize(entity_handle.id + 1);
+  if (entity_handle.id >= m_handle_to_entity.count) {
+    // Grow the handle table — push placeholder entities
+    for (U64 i = m_handle_to_entity.count; i <= entity_handle.id; ++i)
+      m_handle_to_entity.push(m_arena, Entity{});
+    m_handle_to_entity.data[entity_handle.id] = entity;
+  } else {
+    m_handle_to_entity.data[entity_handle.id] = entity;
   }
-  m_handle_to_entity[entity_handle.id] = entity;
 }
+
 bool CommandQueue::is_handle_resolved(EntityHandle handle) const {
-  return handle.is_valid() && handle.id < m_handle_to_entity.size();
+  return handle.is_valid() && handle.id < m_handle_to_entity.count;
 }
+
 void CommandQueue::clear() {
   m_commands.clear();
   m_handle_to_entity.clear();
+  m_arena->clear();
 }
+
 USize CommandQueue::get_count() const {
-  return m_commands.size();
+  return m_commands.count;
 }
+
 Entity CommandQueue::get_entity(EntityHandle handle) const {
-  ASSERT(handle.id < m_handle_to_entity.size() && "Entity has not been resolved");
-  return m_handle_to_entity[handle.id];
+  ASSERT(handle.id < m_handle_to_entity.count && "Entity has not been resolved");
+  return m_handle_to_entity.data[handle.id];
+}
+
+void CommandQueue::register_type_erased_entry(U64 type_id, TypeErasedCommandEntry entry) {
+  s_type_entries[type_id] = entry;
+}
+
+TypeErasedCommandEntry CommandQueue::lookup_type_erased_entry(U64 type_id) {
+  auto it = s_type_entries.find(type_id);
+  if (it != s_type_entries.end())
+    return it->second;
+  return {};
 }
 
 void CommandQueue::serialize(Serializer& serializer) const {
-  serializer.write(static_cast<U32>(m_commands.size()));
-  for (const auto& cmd : m_commands) {
-    serializer.write(cmd->get_type_id());
-    // Serialize command to temp buffer to know its size
+  serializer.write(static_cast<U32>(m_commands.count));
+  for (U64 i = 0; i < m_commands.count; ++i) {
+    auto& cmd = m_commands.data[i];
+    serializer.write(static_cast<U32>(cmd.type_id));
     std::vector<std::byte> payload;
     Serializer             payload_serializer(payload);
-    cmd->serialize(payload_serializer);
+    cmd.serialize_fn(cmd.data, payload_serializer);
     serializer.write(static_cast<U32>(payload.size()));
     serializer.write(payload.data(), payload.size());
   }
@@ -90,16 +105,25 @@ void CommandQueue::serialize(Serializer& serializer) const {
 
 void CommandQueue::deserialize(Serializer& serializer) {
   U32 count = serializer.read<U32>();
-  m_commands.clear();
-  m_commands.reserve(count);
+  clear();
 
   for (U32 i = 0; i < count; ++i) {
     U32   type_id       = serializer.read<U32>();
     U32   payload_size  = serializer.read<U32>();
     USize payload_start = serializer.get_offset();
-    if (auto cmd = CommandFactory::create(type_id)) {
-      cmd->deserialize(serializer);
-      m_commands.push_back(std::move(cmd));
+
+    auto entry = lookup_type_erased_entry(type_id);
+    if (entry.deserialize_fn) {
+      void* data = entry.alloc_fn(m_arena);
+      entry.deserialize_fn(data, serializer);
+      m_commands.push(m_arena,
+                      CommandNode{
+                          .type_id        = type_id,
+                          .data           = data,
+                          .execute_fn     = entry.execute_fn,
+                          .serialize_fn   = entry.serialize_fn,
+                          .deserialize_fn = entry.deserialize_fn,
+                      });
     } else {
       log::engine::error("Unknown command type ID {} during deserialization, skipping {} bytes",
                          type_id,

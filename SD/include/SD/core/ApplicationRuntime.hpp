@@ -2,12 +2,12 @@
 
 namespace sd {
 
-class ViewManager;
-class SceneManager;
-class LayoutManager;
-class EventManager;
-class FrameTimer;
-class LayerList;
+struct ViewManager;
+struct SceneManager;
+struct LayoutManager;
+struct EventManager;
+struct FrameTimer;
+struct LayerList;
 
 struct ApplicationRuntime {
   ViewManager&   views;

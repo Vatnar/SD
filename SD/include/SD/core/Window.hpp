@@ -6,11 +6,11 @@
 #pragma once
 #define GLFW_INCLUDE_VULKAN
 #include <functional>
-#include <memory>
 
 #include <GLFW/glfw3.h>
 
 #include "LayerList.hpp"
+#include "SD/arena.hpp"
 #include "SD/export.hpp"
 #include "events/EventManager.hpp"
 
@@ -26,7 +26,7 @@ using RefreshCallbackFn     = std::function<void()>;
 using CharCallbackFn        = std::function<void(unsigned int)>;
 
 
-class Window;
+struct Window;
 
 // TODO(docs): Document WindowDesc struct
 //   - Each field's purpose
@@ -46,8 +46,7 @@ struct WindowDesc {
 };
 
 
-class SD_EXPORT Window {
-public:
+struct SD_EXPORT Window {
   Window(int width, int height, const std::string& title);
   explicit Window(const WindowDesc& desc);
 
@@ -85,7 +84,7 @@ public:
 
   LayerList layer_stack;
 
-private:
+
   GLFWwindow* m_handle;
 
 
@@ -110,9 +109,7 @@ private:
   static void dispatch_char_dispatch_char(GLFWwindow* window, unsigned int keycode);
 };
 
-class WindowBuilder {
-public:
-  WindowBuilder() : m_desc({}) {}
+struct WindowBuilder {
   WindowBuilder& set_title(const char* title);
   WindowBuilder& set_size(int width, int height);
   WindowBuilder& set_width(int width);
@@ -126,9 +123,8 @@ public:
   WindowBuilder& set_refresh_callback_set_refresh_callback(const RefreshCallbackFn& callback);
   WindowBuilder& set_char_callback(const CharCallbackFn& callback);
 
-  [[nodiscard]] std::unique_ptr<Window> build() const;
+  [[nodiscard]] Window* build(Arena* arena) const;
 
-private:
   WindowDesc m_desc;
 };
 } // namespace sd

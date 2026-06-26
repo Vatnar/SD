@@ -8,6 +8,7 @@
 #include "SD/utils/serialization.hpp"
 
 namespace sd {
+using namespace components;
 
 class FileSerializationTest : public ::testing::Test {
 protected:

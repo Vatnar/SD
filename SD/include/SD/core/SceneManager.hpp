@@ -1,41 +1,37 @@
 #pragma once
 
-#include <memory>
 #include <string>
 #include <vector>
 
+#include "SD/arena.hpp"
 #include "SD/export.hpp"
 
 
 namespace sd {
 
-class Scene;
+struct Scene;
 
-class SD_EXPORT SceneManager {
-public:
-  SceneManager() = default;
-
-  Scene* create(const std::string& name);
+struct SD_EXPORT SceneManager {
+  Scene* create(Arena* arena, const std::string& name);
   Scene* get(const std::string& name) const;
 
   template<typename F>
   void for_each(F&& fn) {
-    for (auto& scene : m_scenes) {
+    for (auto* scene : m_scenes) {
       fn(*scene);
     }
   }
 
   template<typename F>
   void for_each(F&& fn) const {
-    for (const auto& scene : m_scenes) {
+    for (const auto* scene : m_scenes) {
       fn(*scene);
     }
   }
 
   void clear();
 
-private:
-  std::vector<std::unique_ptr<Scene>> m_scenes;
+  std::vector<Scene*> m_scenes;
 };
 
 } // namespace sd

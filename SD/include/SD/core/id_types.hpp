@@ -7,7 +7,8 @@ namespace sd {
 struct ViewId {
   uint32_t value = 0;
 
-  explicit constexpr ViewId(uint32_t v = 0) noexcept : value(v) {}
+  ViewId() = default;
+  explicit constexpr ViewId(uint32_t v) noexcept : value(v) {}
 
   constexpr ViewId& operator++() noexcept {
     ++value;
@@ -28,7 +29,8 @@ struct ViewId {
 struct WindowId {
   uint32_t value = 0;
 
-  explicit constexpr WindowId(uint32_t v = 0) noexcept : value(v) {}
+  WindowId() = default;
+  explicit constexpr WindowId(uint32_t v) noexcept : value(v) {}
 
   constexpr WindowId& operator++() noexcept {
     ++value;

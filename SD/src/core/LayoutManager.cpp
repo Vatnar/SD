@@ -67,13 +67,7 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
   DockBuilderGuard guard(dockspace_id);
 
   // Find EngineDebugLayer to control inspector windows
-  EngineDebugLayer* debug_layer = nullptr;
-  for (auto& layer : runtime.global_layers) {
-    if (auto* edl = dynamic_cast<EngineDebugLayer*>(layer.get())) {
-      debug_layer = edl;
-      break;
-    }
-  }
+  EngineDebugLayer* debug_layer = runtime.global_layers.Get<EngineDebugLayer>();
 
   if (preset == Preset::MINIMAL) {
     // Close all views except Game
@@ -113,7 +107,10 @@ void LayoutManager::apply_preset(Preset preset, ApplicationRuntime runtime) {
 
     // Right side: split vertically for inspector panels
     ImGuiID dock_id_right_top, dock_id_right_bottom;
-    ImGui::DockBuilderSplitNode(dock_id_right, ImGuiDir_Up, 0.50f, &dock_id_right_top,
+    ImGui::DockBuilderSplitNode(dock_id_right,
+                                ImGuiDir_Up,
+                                0.50f,
+                                &dock_id_right_top,
                                 &dock_id_right_bottom);
 
     // Dock windows

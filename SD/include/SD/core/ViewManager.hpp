@@ -6,11 +6,11 @@
 
 #include <expected>
 #include <functional>
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "SD/arena.hpp"
 #include "SD/core/Scene.hpp"
 #include "SD/core/View.hpp"
 #include "SD/core/base.hpp"
@@ -18,28 +18,22 @@
 
 namespace sd {
 
-// TODO(docs): Document ViewManager class
-//   - Purpose: Factory and registry for View objects
-//   - View naming and ID system
-//   - Error handling patterns (std::expected)
-//   - Example: Creating and managing multiple views
-class SD_EXPORT ViewManager {
-public:
-  ViewManager();
-  ~ViewManager();
+struct SD_EXPORT ViewManager {
+  ~ViewManager() = default;
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<View, T>
-  T& create(std::string name, Args&&... args) {
+  T& create(Arena* arena, std::string name, Args&&... args) {
     if (m_view_name_to_id.contains(name))
       NOT_IMPLEMENTED;
 
-    ViewId id       = m_next_view_id++;
-    auto   view     = std::make_unique<T>(std::move(name), std::forward<Args>(args)...);
+    ViewId id   = m_next_view_id++;
+    T*     view = arena_push<T>(arena);
+    new (view) T(std::move(name), std::forward<Args>(args)...);
     view->m_view_id = id;
 
     auto& ref = *view;
-    m_views_by_id.emplace(id, std::move(view));
+    m_views_by_id.emplace(id, view);
     m_view_name_to_id.emplace(ref.get_name(), id);
     return ref;
   }
@@ -62,10 +56,8 @@ public:
     return it->second->push_layer<T>(std::forward<Args>(args)...);
   }
 
-  const std::unordered_map<ViewId, std::unique_ptr<View>>& get_views() const {
-    return m_views_by_id;
-  }
-  auto& get_views() { return m_views_by_id; }
+  const std::unordered_map<ViewId, View*>& get_views() const { return m_views_by_id; }
+  auto&                                    get_views() { return m_views_by_id; }
 
   template<typename F>
   void for_each(F&& fn) {
@@ -88,10 +80,10 @@ public:
   void cleanup_closed_views();
   void clear();
 
-private:
-  std::unordered_map<ViewId, std::unique_ptr<View>> m_views_by_id;
-  std::unordered_map<std::string, ViewId>           m_view_name_to_id;
-  ViewId                                            m_next_view_id;
+
+  std::unordered_map<ViewId, View*>       m_views_by_id;
+  std::unordered_map<std::string, ViewId> m_view_name_to_id;
+  ViewId                                  m_next_view_id;
 };
 
 } // namespace sd

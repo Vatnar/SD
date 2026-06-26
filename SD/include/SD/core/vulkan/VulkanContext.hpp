@@ -19,8 +19,7 @@ namespace sd {
 //   - Queue setup and family indices
 //   - Memory management with VMA
 //   - Note about refactoring into smaller classes
-class SD_EXPORT VulkanContext {
-public:
+struct SD_EXPORT VulkanContext {
   explicit VulkanContext(const GlfwContext& glfw_ctx);
   void init(const Window& window);
   ~VulkanContext();
@@ -40,7 +39,6 @@ public:
   bool is_initialized() { return m_instance.get() && m_vulkan_device && m_phys_dev; }
 
 
-private:
   vk::UniqueInstance create_vulkan_application_instance();
   void               setup_queues(vk::SurfaceKHR surface);
   void               setup_device_extensions();

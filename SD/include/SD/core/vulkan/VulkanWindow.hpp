@@ -32,8 +32,7 @@ struct SwapchainSync {
 //   - Command buffer management
 //   - Minimization handling
 //   - Integration with LayerList for swapchain recreation
-class SD_EXPORT VulkanWindow {
-public:
+struct SD_EXPORT VulkanWindow {
   uint32_t current_frame       = 0;
   uint32_t current_image_index = 0;
   explicit VulkanWindow(Window& window, VulkanContext& vulkan_ctx);
@@ -69,7 +68,7 @@ public:
   vk::CommandBuffer get_current_command_buffer() const { return *m_command_buffers[current_frame]; }
   VulkanContext&    get_vulkan_context() { return m_vulkan_ctx; }
 
-private:
+
   void create_swapchain();
   void create_command_pool();
   void create_swapchain_dependent_resources();

@@ -7,8 +7,7 @@
 #include "vulkan_config.hpp"
 
 namespace sd {
-class VulkanRenderer {
-public:
+struct VulkanRenderer {
   VulkanRenderer(VulkanContext& ctx, FrameTimer& timer);
   void init();
 
@@ -19,7 +18,7 @@ public:
 
   void set_clear_color(const std::array<float, 4>& color) { m_clear_color = color; }
 
-private:
+
   VulkanContext& ctx;
   VkDevice       m_device;
   FrameTimer&    m_timer;

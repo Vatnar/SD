@@ -15,12 +15,12 @@ protected:
 
 TEST_F(CommandQueueTest, Add_IncreasesCount) {
   EXPECT_EQ(queue.get_count(), 0u);
-  queue.add<CreateEntityCmd>(EntityHandle(0));
+  queue.add<CreateEntityCmd>(EntityHandle(1));
   EXPECT_EQ(queue.get_count(), 1u);
 }
 
 TEST_F(CommandQueueTest, Apply_ExecutesCommands) {
-  EntityHandle h(0);
+  EntityHandle h(1);
   queue.add<CreateEntityCmd>(h);
   queue.apply(em);
 
@@ -28,7 +28,7 @@ TEST_F(CommandQueueTest, Apply_ExecutesCommands) {
 }
 
 TEST_F(CommandQueueTest, CreateEntityCmd_CreatesEntity) {
-  EntityHandle h(0);
+  EntityHandle h(1);
   queue.add<CreateEntityCmd>(h);
   queue.apply(em);
 
@@ -37,7 +37,7 @@ TEST_F(CommandQueueTest, CreateEntityCmd_CreatesEntity) {
 }
 
 TEST_F(CommandQueueTest, AddComponentCmd_AddsComponent) {
-  EntityHandle h(0);
+  EntityHandle h(1);
   queue.add<CreateEntityCmd>(h);
   queue.add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity()});
   queue.apply(em);
@@ -47,7 +47,7 @@ TEST_F(CommandQueueTest, AddComponentCmd_AddsComponent) {
 }
 
 TEST_F(CommandQueueTest, RemoveComponentCmd_RemovesComponent) {
-  EntityHandle h(0);
+  EntityHandle h(1);
   queue.add<CreateEntityCmd>(h);
   queue.add<AddComponentCmd<Transform>>(h, Transform{VLA::Matrix4x4f::Identity()});
   queue.apply(em);
@@ -62,8 +62,8 @@ TEST_F(CommandQueueTest, RemoveComponentCmd_RemovesComponent) {
 }
 
 TEST_F(CommandQueueTest, Clear_RemovesAllCommands) {
-  queue.add<CreateEntityCmd>(EntityHandle(0));
   queue.add<CreateEntityCmd>(EntityHandle(1));
+  queue.add<CreateEntityCmd>(EntityHandle(2));
   EXPECT_EQ(queue.get_count(), 2u);
 
   queue.clear();
@@ -112,8 +112,8 @@ TEST_F(CommandSerializationTest, AddComponentCmd_SerializeDeserialize) {
 
 TEST_F(CommandSerializationTest, CommandQueue_SerializeDeserialize) {
   CommandQueue queue;
-  queue.add<CreateEntityCmd>(EntityHandle(0));
   queue.add<CreateEntityCmd>(EntityHandle(1));
+  queue.add<CreateEntityCmd>(EntityHandle(2));
 
   std::vector<std::byte> buffer;
   Serializer             serializer(buffer);

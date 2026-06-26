@@ -4,10 +4,10 @@
 //   - Relationship to ViewManager and Application
 #pragma once
 
-#include <memory>
 #include <unordered_map>
 #include <vector>
 
+#include "SD/arena.hpp"
 #include "SD/core/EngineServices.hpp"
 #include "SD/core/LayerList.hpp"
 #include "SD/core/Window.hpp"
@@ -18,7 +18,7 @@
 
 namespace sd {
 
-class ViewManager;
+struct ViewManager;
 
 // TODO(docs): Document WindowProps struct
 //   - Each field's purpose
@@ -31,8 +31,8 @@ struct WindowProps {
 };
 
 struct WindowManagerCallbacks {
-  std::function<void()>       close_app;
-  std::function<void(Event&)> on_app_event;
+  std::function<void()>              close_app;
+  std::function<void(EventVariant&)> on_app_event;
 };
 // TODO(docs): Document WindowManager class
 //   - Purpose: Manages multiple windows (GLFW + Vulkan)
@@ -40,12 +40,13 @@ struct WindowManagerCallbacks {
 //   - WindowData structure (logic window, render window, layers)
 //   - Update/Draw loop integration
 //   - Example: Creating and managing multiple windows
-class WindowManager {
-public:
-  WindowManager(const EngineServices& services, const WindowManagerCallbacks& callbacks);
+struct WindowManager {
+  WindowManager(const EngineServices&         services,
+                const WindowManagerCallbacks& callbacks,
+                Arena*                        arena);
   ~WindowManager();
 
-  WindowId create(const WindowProps& props);
+  WindowId create(const WindowProps& props, Arena* arena);
   void     destroy(WindowId id);
   void     process_pending_closes();
 
@@ -53,15 +54,9 @@ public:
   VulkanWindow& get_render_window(WindowId id);
 
   struct WindowData {
-    std::unique_ptr<Window>       logic;
-    std::unique_ptr<VulkanWindow> render;
-    LayerList                     view_layers;
-
-    WindowData()                             = default;
-    WindowData(WindowData&&)                 = default;
-    WindowData& operator=(WindowData&&)      = default;
-    WindowData(const WindowData&)            = delete;
-    WindowData& operator=(const WindowData&) = delete;
+    Window*       logic;
+    VulkanWindow* render;
+    LayerList     view_layers;
   };
 
   auto&       get_windows() { return m_windows; }
@@ -70,7 +65,9 @@ public:
   void update_windows(float dt);
   void draw_windows(ViewManager& viewManager);
 
-private:
+  Arena* window_arena;
+
+
   void update_window(WindowId id, WindowData& data, float dt);
   void draw_window(WindowId id, WindowData& data, ViewManager& viewManager);
 

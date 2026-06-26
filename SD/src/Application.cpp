@@ -71,21 +71,41 @@ ImVec4 apply_theme() {
 
 Application::Application(const ApplicationSpecification& spec, RuntimeStateManager* state_manager) :
   is_running(true), hot_reload_enabled(spec.enableHotReload), app_spec(spec),
-  window_manager(nullptr), view_manager(std::make_unique<ViewManager>()),
-  layout_manager(std::make_unique<LayoutManager>()), scene_manager(), global_layers(),
-  app_event_manager(), state_manager(state_manager), timer(),
-  m_glfw_ctx(std::make_unique<GlfwContext>()),
-  m_vulkan_ctx(std::make_unique<VulkanContext>(*m_glfw_ctx)),
-  m_renderer(std::make_unique<VulkanRenderer>(*m_vulkan_ctx, timer)),
-  m_imgui_ctx(
-      std::make_unique<SDImGuiContext>(SDImGuiCallbacks{.close_app = [this] { close(); }})) {
-  window_manager = std::make_unique<WindowManager>(
+  window_manager(nullptr), layout_manager(nullptr), scene_manager(), app_event_manager(),
+  state_manager(state_manager), timer(), m_glfw_ctx(nullptr), m_vulkan_ctx(nullptr),
+  m_renderer(nullptr), m_imgui_ctx(nullptr) {
+  engine_arena = arena_alloc(ArenaParams{
+      .name = "EngineArena",
+  });
+  Arena* a     = engine_arena;
+
+  m_glfw_ctx = arena_push<GlfwContext>(a);
+  new (m_glfw_ctx) GlfwContext();
+
+  m_vulkan_ctx = arena_push<VulkanContext>(a);
+  new (m_vulkan_ctx) VulkanContext(*m_glfw_ctx);
+
+  m_renderer = arena_push<VulkanRenderer>(a);
+  new (m_renderer) VulkanRenderer(*m_vulkan_ctx, timer);
+
+  m_imgui_ctx = arena_push<SDImGuiContext>(a);
+  new (m_imgui_ctx) SDImGuiContext(SDImGuiCallbacks{.close_app = [this] { close(); }});
+
+  view_manager = arena_push<ViewManager>(a);
+  new (view_manager) ViewManager();
+
+  layout_manager = arena_push<LayoutManager>(a);
+  new (layout_manager) LayoutManager();
+
+  window_manager = arena_push<WindowManager>(a);
+  new (window_manager) WindowManager(
       services(),
       WindowManagerCallbacks{.close_app    = [this] { close(); },
-                             .on_app_event = [this](Event& e) { on_app_event(e); }});
+                             .on_app_event = [this](EventVariant& e) { on_app_event(e); }},
+      a);
 
   WindowProps props(spec.name, spec.width, spec.height);
-  WindowId    main_id = window_manager->create(props);
+  WindowId    main_id = window_manager->create(props, a);
   auto&       window  = window_manager->get_window(main_id);
   auto&       vw      = window_manager->get_render_window(main_id);
 
@@ -122,13 +142,30 @@ Application::~Application() {
   }
   scene_manager.clear();
 
-  window_manager.reset();
+  if (window_manager) {
+    window_manager->~WindowManager();
+  }
+  if (layout_manager) {
+    layout_manager->~LayoutManager();
+  }
+  if (view_manager) {
+    view_manager->~ViewManager();
+  }
+  if (m_imgui_ctx) {
+    m_imgui_ctx->shutdown();
+    m_imgui_ctx->~SDImGuiContext();
+  }
+  if (m_renderer) {
+    m_renderer->~VulkanRenderer();
+  }
+  if (m_vulkan_ctx) {
+    m_vulkan_ctx->~VulkanContext();
+  }
+  if (m_glfw_ctx) {
+    m_glfw_ctx->~GlfwContext();
+  }
 
-  m_imgui_ctx.reset();
-
-  m_renderer.reset();
-
-  m_vulkan_ctx.reset();
+  arena_release(engine_arena);
 }
 
 void Application::run(const std::atomic<bool>* external_stop) {
@@ -147,13 +184,13 @@ void Application::frame() {
   float dt = timer.get_frame_time();
 
   for (auto& e : app_event_manager) {
-    on_app_event(*e);
+    on_app_event(e);
   }
   app_event_manager.clear();
 
   while (timer.consume_fixed_step()) {
     for (auto& layer : global_layers)
-      layer->on_fixed_update(timer.get_fixed_time_step());
+      layer.on_fixed_update(timer.get_fixed_time_step());
   }
 
   m_imgui_ctx->begin_frame();
@@ -176,8 +213,8 @@ void Application::frame() {
   }
 
   for (auto& layer : global_layers) {
-    layer->on_update(dt);
-    layer->on_gui_render();
+    layer.on_update(dt);
+    layer.on_gui_render();
   }
 
   window_manager->update_windows(dt);
@@ -195,14 +232,28 @@ void Application::frame() {
   view_manager->cleanup_closed_views();
 }
 
-void Application::on_app_event(Event& e) {
-  EventDispatcher dispatcher(e);
-  dispatcher.dispatch<AppTerminateEvent>([this](AppTerminateEvent&) {
-    is_running = false;
-    return true;
-  });
+void Application::on_app_event(EventVariant& e) {
+  std::visit(overloaded{[this](AppTerminateEvent&) { is_running = false; }, [](auto&) {}}, e.event);
 
   global_layers.on_event(e);
+}
+
+void Application::dispatch_shader_reload() {
+  if (!consume_shader_reload_request())
+    return;
+
+  (void)m_vulkan_ctx->get_vulkan_device()->waitIdle();
+
+  for (auto& layer : global_layers)
+    layer.on_shader_reload();
+
+  for (auto& view : view_manager->get_views() | std::views::values)
+    for (auto& layer : view->get_layers())
+      layer.on_shader_reload();
+
+  for (auto& data : window_manager->get_windows() | std::views::values)
+    for (auto& layer : data.view_layers)
+      layer.on_shader_reload();
 }
 
 void Application::clear_game_layers() {

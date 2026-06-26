@@ -2,10 +2,10 @@
 
 namespace sd {
 
-class GlfwContext;
-class VulkanContext;
-class VulkanRenderer;
-class SDImGuiContext;
+struct GlfwContext;
+struct VulkanContext;
+struct VulkanRenderer;
+struct SDImGuiContext;
 
 struct EngineServices {
   GlfwContext&    glfw;

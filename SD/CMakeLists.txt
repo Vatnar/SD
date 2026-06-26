@@ -3,6 +3,7 @@ include(GenerateExportHeader)
 set(SD_ENGINE_SOURCES
         src/Application.cpp
         src/RuntimeStateManager.cpp
+        src/arena.cpp
         src/core/View.cpp
         src/core/Window.cpp
         src/core/logging.cpp
@@ -71,6 +72,10 @@ target_compile_definitions(SD
         VULKAN_HPP_USE_STD_EXPECTED=1
         VULKAN_HPP_NO_EXCEPTIONS=1
         QUILL_NO_EXCEPTIONS
+
+        PRIVATE
+        VULKAN_HPP_STORAGE_SHARED
+        VULKAN_HPP_STORAGE_SHARED_EXPORT
 )
 
 if (SD_DEBUG_ENABLED)

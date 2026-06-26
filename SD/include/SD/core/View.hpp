@@ -6,7 +6,6 @@
 #pragma once
 
 #include <imgui.h>
-#include <memory>
 #include <string>
 #include <vector>
 #include <vk_mem_alloc.h>
@@ -20,7 +19,7 @@
 
 namespace sd {
 
-class Application;
+struct Application;
 
 // TODO(docs): Document ViewError enum
 //   - Each error code's meaning
@@ -53,40 +52,39 @@ enum class RenderMode {
 //   - Aspect ratio management
 //   - Render pass and framebuffer management
 //   - Example: Creating a custom view with layers
-class SD_EXPORT View {
-public:
+struct SD_EXPORT View {
   View(const std::string& name, const EngineServices& services) :
-    m_name(name), m_vulkan_ctx(services.vulkan), m_imgui_ctx(services.imgui) {
+    m_name(name), m_view_id(0), m_vulkan_ctx(services.vulkan), m_imgui_ctx(services.imgui) {
     m_camera_view_projection = VLA::Matrix4x4f::Ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
   }
-  virtual ~View();
+  ~View();
 
-  void         on_update(float dt) { m_layers.update(dt); }
-  virtual void on_gui_render();
+  void on_update(float dt) { m_layers.update(dt); }
+  void on_gui_render();
 
-  virtual void on_event(Event& e) { m_layers.on_event(e); }
-  virtual void on_render(vk::CommandBuffer cmd);
-  virtual void on_fixed_update(double dt) { m_layers.on_fixed_update(dt); }
+  void on_event(EventVariant& e) { m_layers.on_event(e); }
+  void on_render(vk::CommandBuffer cmd);
+  void on_fixed_update(double dt) { m_layers.on_fixed_update(dt); }
 
   // --- Layer management ---
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
   T& push_layer(Args&&... args) {
-    auto& layer     = m_layers.push_layer<T>(std::forward<Args>(args)...);
-    layer.m_view_id = m_view_id;
-    layer.m_view    = this;
-    layer.m_app     = m_app;
+    auto& layer   = m_layers.push_layer<T>(std::forward<Args>(args)...);
+    layer.view_id = m_view_id;
+    layer.view    = this;
+    layer.app     = m_app;
     return layer;
   }
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<Layer, T>
   T& push_layer(int stageOrder, Args&&... args) {
-    auto& layer      = m_layers.push_layer<T>(std::forward<Args>(args)...);
-    layer.m_stage_id = stageOrder;
-    layer.m_view_id  = m_view_id;
-    layer.m_view     = this;
-    layer.m_app      = m_app;
+    auto& layer    = m_layers.push_layer<T>(std::forward<Args>(args)...);
+    layer.stage_id = stageOrder;
+    layer.view_id  = m_view_id;
+    layer.view     = this;
+    layer.app      = m_app;
     return layer;
   }
 
@@ -137,7 +135,7 @@ public:
   void create_viewport(VkExtent2D initialExtent = {1280, 720});
   void destroy_viewport();
 
-private:
+
   vk::Format find_depth_format();
   void       create_vulkan_resources();
 

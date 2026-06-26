@@ -44,297 +44,303 @@ vk::UniqueShaderModule create_shader_module(vk::Device device, std::string_view 
 
 namespace game {
 
+std::pair<vk::UniquePipeline, vk::UniquePipelineLayout> create_empty_pipeline() {
+  // TODO: maybe indicate this with drawing missing texture etc
+  sd::log::engine::renderer::error("Creating empty pipeline. Check callstack");
+  return {{}, {}};
+}
+
+std::pair<vk::UniquePipeline, vk::UniquePipelineLayout>
+create_pipeline(vk::Device      vulkan_device,
+                const char*     vert_path,
+                const char*     frag_path,
+                vk::PolygonMode polygon_mode,
+                sd::View*       view) {
+  // NOTE: Should pipeline creation be templated so we can have different push structs? Like can
+  //  pipelines have different push constants etc, or should we find something standardized. Most
+  //  likely some pipelines will be created dynamically but maybe its smart to have like 3 or 4
+  //  different kinds based on whats needed. Or should we just have different functions for those
+  //  different pipelines, since we will have compute shaders etc as well. Maybe just make this
+  //  beneath into some pipeline creation function, and rather create new ones where needed. and
+  //  abstract shared things into other functions later.
+  // TODO: compress pipeline creation
+
+  // NOTE: What should be changable between pipelines:
+  //  Shader Stages
+  //  Vertex input
+  //  Input Assembly
+  //  Rasterizer
+  // MultiSampling
+  // Depth/stencil
+  // Blend attachments
+  // dynamic state
+  // color depth formats
+  // [pipeline layouts
+
+
+  // What changes between different pipelines
+  // Shaders and shader stages.
+  // Push Constants
+
+
+  vk::UniqueShaderModule vert_module{create_shader_module(vulkan_device, vert_path)};
+  if (!vert_module) {
+    return create_empty_pipeline();
+  }
+  vk::UniqueShaderModule frag_module{create_shader_module(vulkan_device, frag_path)};
+  if (!frag_module) {
+    return create_empty_pipeline();
+  }
+
+  vk::PipelineShaderStageCreateInfo vert_stage{
+      .stage  = vk::ShaderStageFlagBits::eVertex,
+      .module = *vert_module,
+      .pName  = "main",
+  };
+
+  vk::PipelineShaderStageCreateInfo frag_stage{
+      .stage  = vk::ShaderStageFlagBits::eFragment,
+      .module = *frag_module,
+      .pName  = "main",
+  };
+
+  std::array shader_stages{vert_stage, frag_stage};
+
+  struct Push {
+    VLA::Matrix4x4f mvp{};
+    F32             color[4]{};
+  };
+  static_assert(sizeof(Push) <= 128, "Push must fit in vulkan spec minimum");
+
+  vk::PushConstantRange push_constant_range{
+      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      .size       = static_cast<U32>(sizeof(Push)),
+  };
+
+  vk::DescriptorSetLayoutBinding binding1 = {
+
+  };
+
+  std::array descriptor_set_layout_bindings{binding1};
+
+  vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info{
+      .bindingCount = descriptor_set_layout_bindings.size(),
+      .pBindings    = descriptor_set_layout_bindings.data()};
+
+
+  std::array descriptor_set_layouts{[&] {
+    auto res{vulkan_device.createDescriptorSetLayoutUnique(descriptor_set_layout_info)};
+    if (res.result != vk::Result::eSuccess) {
+      NOT_IMPLEMENTED;
+    }
+    return std::move(res.value);
+  }()};
+
+
+  static_assert(std::is_standard_layout_v<sd::VertexPNUV>);
+  static_assert(sizeof(VLA::Vector3f) == 12);
+  static_assert(sizeof(VLA::Vector2f) == 8);
+  static_assert(offsetof(sd::VertexPNUV, position) == 0);
+  static_assert(offsetof(sd::VertexPNUV, normal) == 12);
+  static_assert(offsetof(sd::VertexPNUV, uv) == 24);
+  static_assert(sizeof(sd::VertexPNUV) == 32);
+
+
+  auto binding_descriptions{sd::VertexPNUV::binding_descriptions()};
+  auto attribute_descriptions{sd::VertexPNUV::attribute_descriptions()};
+
+  std::array raw_layouts = {*descriptor_set_layouts[0]};
+
+  // NOTE: This might be sharted accross pipelines, should be cached or reused when descritpor
+  // set layout list and push constant ranges are identical
+  vk::PipelineLayoutCreateInfo pipeline_layout_info{.setLayoutCount = descriptor_set_layouts.size(),
+                                                    .pSetLayouts    = raw_layouts.data(),
+                                                    .pushConstantRangeCount = 1,
+                                                    .pPushConstantRanges    = &push_constant_range};
+
+  auto res{vulkan_device.createPipelineLayoutUnique(pipeline_layout_info)};
+  if (res.result != vk::Result::eSuccess) {
+    NOT_IMPLEMENTED;
+  }
+  vk::UniquePipelineLayout pipeline_layout = std::move(res.value);
+
+
+  vk::PipelineVertexInputStateCreateInfo vertex_input_info{
+      .vertexBindingDescriptionCount   = binding_descriptions.size(),
+      .pVertexBindingDescriptions      = binding_descriptions.data(),
+      .vertexAttributeDescriptionCount = attribute_descriptions.size(),
+      .pVertexAttributeDescriptions    = attribute_descriptions.data(),
+
+  };
+
+  vk::PipelineInputAssemblyStateCreateInfo input_assembly{
+      .topology = vk::PrimitiveTopology::eTriangleList,
+  };
+
+  vk::PipelineViewportStateCreateInfo viewport_state{
+      .viewportCount = 1,
+      .scissorCount  = 1,
+  };
+
+  vk::PipelineRasterizationStateCreateInfo rasterizer{
+      .polygonMode = polygon_mode,
+      .cullMode    = vk::CullModeFlagBits::eBack,
+      .frontFace   = vk::FrontFace::eCounterClockwise,
+      .lineWidth   = 1.0f,
+  };
+
+  vk::PipelineMultisampleStateCreateInfo multisampling{
+      .rasterizationSamples = vk::SampleCountFlagBits::e1,
+  };
+
+  using enum vk::ColorComponentFlagBits;
+  vk::PipelineColorBlendAttachmentState color_blend_attachment{
+      .blendEnable    = false,
+      .colorWriteMask = eR | eG | eB | eA,
+  };
+
+  vk::PipelineColorBlendStateCreateInfo color_blending{.attachmentCount = 1,
+                                                       .pAttachments    = &color_blend_attachment};
+
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil{
+      .depthTestEnable       = true,
+      .depthWriteEnable      = true,
+      .depthCompareOp        = vk::CompareOp::eLess,
+      .depthBoundsTestEnable = false,
+      .stencilTestEnable     = false,
+  };
+
+  std::array dynamic_states{vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+  vk::PipelineDynamicStateCreateInfo dynamic_state = {
+      .dynamicStateCount = dynamic_states.size(),
+      .pDynamicStates    = dynamic_states.data(),
+  };
+
+
+  vk::Format                      color_format{view->get_color_format()};
+  vk::PipelineRenderingCreateInfo rendering_info{.colorAttachmentCount    = 1,
+                                                 .pColorAttachmentFormats = &color_format,
+                                                 .depthAttachmentFormat = view->get_depth_format(),
+                                                 .stencilAttachmentFormat = {}};
+
+  vk::GraphicsPipelineCreateInfo pipeline_info{
+      .pNext               = &rendering_info,
+      .stageCount          = 2,
+      .pStages             = shader_stages.data(),
+      .pVertexInputState   = &vertex_input_info,
+      .pInputAssemblyState = &input_assembly,
+      .pTessellationState  = nullptr,
+      .pViewportState      = &viewport_state,
+      .pRasterizationState = &rasterizer,
+      .pMultisampleState   = &multisampling,
+      .pDepthStencilState  = &depth_stencil,
+      .pColorBlendState    = &color_blending,
+      .pDynamicState       = &dynamic_state,
+      .layout              = *pipeline_layout,
+      .renderPass          = nullptr, // dynamic rendering requires renderPass to be nullptr
+      .subpass             = {},      // dynamic rendering requires subpass to be 0
+      .basePipelineHandle  = {},
+      .basePipelineIndex   = {},
+  };
+
+  // TODO: check this properly
+
+
+  // TODO: this should be reworked
+  vk::UniquePipelineCache pipeline_cache{};
+  {
+    PROFILE("pipeline_cache");
+
+    // Load cached pipeline data from previous run if available
+    std::vector<char> cache_data{};
+    std::ifstream     cache_file("cache/pipeline.spv", std::ios::binary | std::ios::ate);
+    if (cache_file) {
+      std::streamsize size(cache_file.tellg());
+
+      cache_file.seekg(0);
+      cache_data.resize(size);
+      cache_file.read(cache_data.data(), size);
+      sd::log::game::info("Loaded pipeline cache ({} bytes)", size);
+      // printf("Loaded pipeline cache (%lu bytes)\n", size);
+    }
+
+    vk::PipelineCacheCreateInfo pipeline_cache_info{
+        .initialDataSize = cache_data.size(),
+        .pInitialData    = cache_data.data(),
+    };
+
+    auto res{vulkan_device.createPipelineCacheUnique(pipeline_cache_info)};
+    if (res.result == vk::Result::eSuccess) {
+      pipeline_cache = std::move(res.value);
+    } else {
+      sd::log::engine::warn("Failed to create pipeline cache");
+    }
+  }
+
+
+  PROFILE_START("createGraphicsPipelinesUnique creation");
+  auto pipeline_res{vulkan_device.createGraphicsPipelinesUnique(*pipeline_cache, pipeline_info)};
+  PROFILE_END();
+  if (pipeline_res.result != vk::Result::eSuccess) {
+    NOT_IMPLEMENTED;
+  }
+  vk::UniquePipeline pipeline = std::move(pipeline_res.value.front());
+
+  // Save pipeline cache for faster reloads
+  // TODO: needs rework aswell possibly
+  if (pipeline_cache) {
+    USize data_sz{};
+    auto  cache_hr{vulkan_device.getPipelineCacheData(*pipeline_cache, &data_sz, nullptr)};
+    if (cache_hr == vk::Result::eSuccess && data_sz > 0) {
+      std::vector<uint8_t> data(data_sz);
+      cache_hr = vulkan_device.getPipelineCacheData(*pipeline_cache, &data_sz, data.data());
+      if (cache_hr == vk::Result::eSuccess) {
+        std::filesystem::create_directories("cache");
+        std::ofstream cache_out("cache/pipeline.spv", std::ios::binary);
+        cache_out.write(reinterpret_cast<const char*>(data.data()),
+                        static_cast<std::streamsize>(data_sz));
+        sd::log::game::info("Saved pipeline cache ({} bytes)", data_sz);
+        // printf("Saved pipeline cache (%lu bytes)\n", data_sz);
+      }
+    }
+  }
+
+
+  sd::log::game::info("Pipeline created");
+
+  return std::pair{std::move(pipeline), std::move(pipeline_layout)};
+}
+
 void on_load(sd::Application& app, State& state) {
   register_game_categories();
   state.version++;
   sd::log::game::info("GAME VERSION {} LOADED", state.version);
 
-  state.shared_scene  = app.create_scene("MainScene");
-  state.another_scene = app.create_scene("AnotherScene");
+  state.shared_scene  = app.create_scene(app.engine_arena, "MainScene");
+  state.another_scene = app.create_scene(app.engine_arena, "AnotherScene");
 
   //~ pipeline creation stuff
   sd::WindowId main_win{0};
-  sd::Panel&   ctrl{
-      app.push_window_layer<sd::Panel>(main_win, "Sandbox Controls", state.another_scene)};
+  sd::Panel&   ctrl = app.push_window_layer<sd::Panel>(main_win);
+  ctrl.debug_name   = "Sandbox Controls";
+  ctrl.scene        = state.shared_scene;
 
-  ctrl.set_scene(state.shared_scene);
-
-  sd::View&          game_view{app.create_view<sd::View>("Game", app.services())};
+  sd::View&          game_view{app.create_view<sd::View>(app.engine_arena, "Game", app.services())};
   sd::VulkanContext& vulkan_context{app.services().vulkan};
   game_view.create_viewport();
 
   // NOTE: Pipeline is baked from shadermodules, swapchains and everything, so the rest of the stuff
   // below we can keep between pipelines really. and just the pipelieninfo changing slightly
 
-  vk::PolygonMode          polygon_mode{VK_POLYGON_MODE_FILL}; // rasterizer
-  vk::UniquePipeline       pipeline{};
-  vk::UniquePipelineLayout pipeline_layout{};
-  {
-    const vk::Device vulkan_device{*vulkan_context.get_vulkan_device()};
-    // NOTE: Should pipeline creation be templated so we can have different push structs? Like can
-    //  pipelines have different push constants etc, or should we find something standardized. Most
-    //  likely some pipelines will be created dynamically but maybe its smart to have like 3 or 4
-    //  different kinds based on whats needed. Or should we just have different functions for those
-    //  different pipelines, since we will have compute shaders etc as well. Maybe just make this
-    //  beneath into some pipeline creation function, and rather create new ones where needed. and
-    //  abstract shared things into other functions later.
-    // TODO: compress pipeline creation
+  vk::PolygonMode polygon_mode{VK_POLYGON_MODE_FILL}; // rasterizer
+  const char*     vert_path{"assets/engine/shaders/world.vert"};
+  const char*     frag_path{"assets/engine/shaders/world.frag"};
 
-    // NOTE: What should be changable between pipelines:
-    //  Shader Stages
-    //  Vertex input
-    //  Input Assembly
-    //  Rasterizer
-    // MultiSampling
-    // Depth/stencil
-    // Blend attachments
-    // dynamic state
-    // color depth formats
-    // [pipeline layouts
-
-
-    // What changes between different pipelines
-    // Shaders and shader stages.
-    // Push Constants
-
-    const char* vert_path{"assets/engine/shaders/world.vert"};
-    const char* frag_path{"assets/engine/shaders/world.frag"};
-
-
-    vk::UniqueShaderModule vert_module{create_shader_module(vulkan_device, vert_path)};
-    if (!vert_module) {
-      return;
-    }
-    vk::UniqueShaderModule frag_module{create_shader_module(vulkan_device, frag_path)};
-    if (!frag_module) {
-      return;
-    }
-
-    vk::PipelineShaderStageCreateInfo vert_stage{
-        .stage  = vk::ShaderStageFlagBits::eVertex,
-        .module = *vert_module,
-        .pName  = "main",
-    };
-
-    vk::PipelineShaderStageCreateInfo frag_stage{
-        .stage  = vk::ShaderStageFlagBits::eFragment,
-        .module = *frag_module,
-        .pName  = "main",
-    };
-
-    std::array shader_stages{vert_stage, frag_stage};
-
-    struct Push {
-      VLA::Matrix4x4f mvp{};
-      F32             color[4]{};
-    };
-    static_assert(sizeof(Push) <= 128, "Push must fit in vulkan spec minimum");
-
-    vk::PushConstantRange push_constant_range{
-        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-        .size       = static_cast<U32>(sizeof(Push)),
-    };
-
-    vk::DescriptorSetLayoutBinding binding1 = {
-
-    };
-
-    std::array descriptor_set_layout_bindings{binding1};
-
-    vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info{
-        .bindingCount = descriptor_set_layout_bindings.size(),
-        .pBindings    = descriptor_set_layout_bindings.data()};
-
-
-    std::array descriptor_set_layouts{[&] {
-      auto res{vulkan_device.createDescriptorSetLayoutUnique(descriptor_set_layout_info)};
-      if (res.result != vk::Result::eSuccess) {
-        NOT_IMPLEMENTED;
-      }
-      return std::move(res.value);
-    }()};
-
-
-    static_assert(std::is_standard_layout_v<SD::VertexPNUV>);
-    static_assert(sizeof(VLA::Vector3f) == 12);
-    static_assert(sizeof(VLA::Vector2f) == 8);
-    static_assert(offsetof(SD::VertexPNUV, position) == 0);
-    static_assert(offsetof(SD::VertexPNUV, normal) == 12);
-    static_assert(offsetof(SD::VertexPNUV, uv) == 24);
-    static_assert(sizeof(SD::VertexPNUV) == 32);
-
-
-    auto binding_descriptions{SD::VertexPNUV::binding_descriptions()};
-    auto attribute_descriptions{SD::VertexPNUV::attribute_descriptions()};
-    {
-      PROFILE("Pipeline creation");
-
-      std::vector<vk::DescriptorSetLayout> raw_layouts;
-      raw_layouts.reserve(descriptor_set_layouts.size());
-      for (auto& layout : descriptor_set_layouts) {
-        raw_layouts.push_back(*layout);
-      }
-
-      // NOTE: This might be sharted accross pipelines, should be cached or reused when descritpor
-      // set layout list and push constant ranges are identical
-      vk::PipelineLayoutCreateInfo pipeline_layout_info{
-          .setLayoutCount         = descriptor_set_layouts.size(),
-          .pSetLayouts            = raw_layouts.data(),
-          .pushConstantRangeCount = 1,
-          .pPushConstantRanges    = &push_constant_range};
-
-      auto res{vulkan_device.createPipelineLayoutUnique(pipeline_layout_info)};
-      if (res.result != vk::Result::eSuccess) {
-        NOT_IMPLEMENTED;
-      }
-      pipeline_layout = std::move(res.value);
-    }
-
-
-    vk::PipelineVertexInputStateCreateInfo vertex_input_info{
-        .vertexBindingDescriptionCount   = binding_descriptions.size(),
-        .pVertexBindingDescriptions      = binding_descriptions.data(),
-        .vertexAttributeDescriptionCount = attribute_descriptions.size(),
-        .pVertexAttributeDescriptions    = attribute_descriptions.data(),
-
-    };
-
-    vk::PipelineInputAssemblyStateCreateInfo input_assembly{
-        .topology = vk::PrimitiveTopology::eTriangleList,
-    };
-
-    vk::PipelineViewportStateCreateInfo viewport_state{
-        .viewportCount = 1,
-        .scissorCount  = 1,
-    };
-
-    vk::PipelineRasterizationStateCreateInfo rasterizer{
-        .polygonMode = polygon_mode,
-        .cullMode    = vk::CullModeFlagBits::eBack,
-        .frontFace   = vk::FrontFace::eCounterClockwise,
-        .lineWidth   = 1.0f,
-    };
-
-    vk::PipelineMultisampleStateCreateInfo multisampling{
-        .rasterizationSamples = vk::SampleCountFlagBits::e1,
-    };
-
-    using enum vk::ColorComponentFlagBits;
-    vk::PipelineColorBlendAttachmentState color_blend_attachment{
-        .blendEnable    = false,
-        .colorWriteMask = eR | eG | eB | eA,
-    };
-
-    vk::PipelineColorBlendStateCreateInfo color_blending{.attachmentCount = 1,
-                                                         .pAttachments = &color_blend_attachment};
-
-    vk::PipelineDepthStencilStateCreateInfo depth_stencil{
-        .depthTestEnable       = true,
-        .depthWriteEnable      = true,
-        .depthCompareOp        = vk::CompareOp::eLess,
-        .depthBoundsTestEnable = false,
-        .stencilTestEnable     = false,
-    };
-
-    std::array dynamic_states{vk::DynamicState::eViewport, vk::DynamicState::eScissor};
-    vk::PipelineDynamicStateCreateInfo dynamic_state = {
-        .dynamicStateCount = dynamic_states.size(),
-        .pDynamicStates    = dynamic_states.data(),
-    };
-
-
-    vk::Format                      color_format{game_view.get_color_format()};
-    vk::PipelineRenderingCreateInfo rendering_info{
-        .colorAttachmentCount    = 1,
-        .pColorAttachmentFormats = &color_format,
-        .depthAttachmentFormat   = game_view.get_depth_format(),
-        .stencilAttachmentFormat = {}};
-
-    vk::GraphicsPipelineCreateInfo pipeline_info{
-        .pNext               = &rendering_info,
-        .stageCount          = 2,
-        .pStages             = shader_stages.data(),
-        .pVertexInputState   = &vertex_input_info,
-        .pInputAssemblyState = &input_assembly,
-        .pTessellationState  = nullptr,
-        .pViewportState      = &viewport_state,
-        .pRasterizationState = &rasterizer,
-        .pMultisampleState   = &multisampling,
-        .pDepthStencilState  = &depth_stencil,
-        .pColorBlendState    = &color_blending,
-        .pDynamicState       = &dynamic_state,
-        .layout              = *pipeline_layout,
-        .renderPass          = nullptr, // dynamic rendering requires renderPass to be nullptr
-        .subpass             = {},      // dynamic rendering requires subpass to be 0
-        .basePipelineHandle  = {},
-        .basePipelineIndex   = {},
-    };
-
-    // TODO: check this properly
-
-
-    // TODO: this should be reworked
-    vk::UniquePipelineCache pipeline_cache{};
-    {
-      PROFILE("pipeline_cache");
-
-      // Load cached pipeline data from previous run if available
-      std::vector<char> cache_data{};
-      std::ifstream     cache_file("cache/pipeline.spv", std::ios::binary | std::ios::ate);
-      if (cache_file) {
-        std::streamsize size(cache_file.tellg());
-
-        cache_file.seekg(0);
-        cache_data.resize(size);
-        cache_file.read(cache_data.data(), size);
-        sd::log::game::info("Loaded pipeline cache ({} bytes)", size);
-        // printf("Loaded pipeline cache (%lu bytes)\n", size);
-      }
-
-      vk::PipelineCacheCreateInfo pipeline_cache_info{
-          .initialDataSize = cache_data.size(),
-          .pInitialData    = cache_data.data(),
-      };
-
-      auto res{vulkan_device.createPipelineCacheUnique(pipeline_cache_info)};
-      if (res.result == vk::Result::eSuccess) {
-        pipeline_cache = std::move(res.value);
-      } else {
-        sd::log::engine::warn("Failed to create pipeline cache");
-      }
-    }
-
-
-    PROFILE_START("createGraphicsPipelinesUnique creation");
-    auto res{vulkan_device.createGraphicsPipelinesUnique(*pipeline_cache, pipeline_info)};
-    PROFILE_END();
-    if (res.result != vk::Result::eSuccess) {
-      NOT_IMPLEMENTED;
-    }
-    pipeline = std::move(res.value.front());
-
-    // Save pipeline cache for faster reloads
-    // TODO: needs rework aswell possibly
-    if (pipeline_cache) {
-      USize data_sz{};
-      auto  cache_hr{vulkan_device.getPipelineCacheData(*pipeline_cache, &data_sz, nullptr)};
-      if (cache_hr == vk::Result::eSuccess && data_sz > 0) {
-        std::vector<uint8_t> data(data_sz);
-        cache_hr = vulkan_device.getPipelineCacheData(*pipeline_cache, &data_sz, data.data());
-        if (cache_hr == vk::Result::eSuccess) {
-          std::filesystem::create_directories("cache");
-          std::ofstream cache_out("cache/pipeline.spv", std::ios::binary);
-          cache_out.write(reinterpret_cast<const char*>(data.data()),
-                          static_cast<std::streamsize>(data_sz));
-          sd::log::game::info("Saved pipeline cache ({} bytes)", data_sz);
-          // printf("Saved pipeline cache (%lu bytes)\n", data_sz);
-        }
-      }
-    }
-
-
-    sd::log::game::info("Pipeline created");
-  }
+  auto [pipeline, pipeline_layout] = create_pipeline(*vulkan_context.get_vulkan_device(),
+                                                     vert_path,
+                                                     frag_path,
+                                                     polygon_mode,
+                                                     &game_view);
 
   app.push_layer<sd::EngineDebugLayer>(app.runtime(), app.services(), state.shared_scene);
 
@@ -369,7 +375,10 @@ void on_load(sd::Application& app, State& state) {
   game_view.push_layer<GameRenderLayer>("Game Render Layer",
                                         state.shared_scene,
                                         std::move(pipeline),
-                                        std::move(pipeline_layout));
+                                        std::move(pipeline_layout),
+                                        vert_path,
+                                        frag_path,
+                                        polygon_mode);
 
   sd::log::game::info("Game loaded, version {}", state.version);
 }
@@ -379,7 +388,8 @@ void on_reload(sd::Application& app, State& state) {
   register_game_categories();
   state.version++;
   sd::log::game::info("Game {} reloaded", state.version);
-  // FIXME: on_reload needs to re-push layers
+  // FIXME: on_reload needs to re-push layers (and recreate pipeline, since that will be destroyed
+  // with the layer)
 }
 
 void on_update(sd::Application& app, State& state, float dt) {

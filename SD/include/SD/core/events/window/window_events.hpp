@@ -1,26 +1,14 @@
 #pragma once
-#include "SD/core/events/Event.hpp"
+
 namespace sd {
-class WindowResizeEvent : public Event {
-public:
-  int width{}, height{};
-  WindowResizeEvent(int w, int h) : width(w), height(h) {}
 
-  EVENT_CLASS_TYPE(WINDOW_RESIZE)
-  EVENT_CLASS_CATEGORY(EventCategory::EVENT_CATEGORY_WINDOW)
+struct WindowResizeEvent {
+  int width{};
+  int height{};
 };
 
-class SwapchainOutOfDateEvent : public Event {
-public:
-  SwapchainOutOfDateEvent() = default;
-  EVENT_CLASS_TYPE(SWAPCHAIN_OUT_OF_DATE)
-  EVENT_CLASS_CATEGORY(EventCategory::EVENT_CATEGORY_WINDOW)
-};
+struct SwapchainOutOfDateEvent {};
 
-class WindowCloseEvent : public Event {
-public:
-  WindowCloseEvent() = default;
-  EVENT_CLASS_TYPE(WINDOW_CLOSE)
-  EVENT_CLASS_CATEGORY(EventCategory::EVENT_CATEGORY_WINDOW)
-};
+struct WindowCloseEvent {};
+
 } // namespace sd
