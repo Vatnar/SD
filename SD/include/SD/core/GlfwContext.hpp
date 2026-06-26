@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 
 #include "SD/core/base.hpp"
+#include "SD/core/logging.hpp"
 
 namespace sd {
 using glfw_error_callback = std::function<void(int, const char*)>;

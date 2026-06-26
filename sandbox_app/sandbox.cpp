@@ -155,17 +155,17 @@ void on_load(sd::Application& app, State& state) {
     }()};
 
 
-    static_assert(std::is_standard_layout_v<SD::VertexPNUV>);
+    static_assert(std::is_standard_layout_v<sd::VertexPNUV>);
     static_assert(sizeof(VLA::Vector3f) == 12);
     static_assert(sizeof(VLA::Vector2f) == 8);
-    static_assert(offsetof(SD::VertexPNUV, position) == 0);
-    static_assert(offsetof(SD::VertexPNUV, normal) == 12);
-    static_assert(offsetof(SD::VertexPNUV, uv) == 24);
-    static_assert(sizeof(SD::VertexPNUV) == 32);
+    static_assert(offsetof(sd::VertexPNUV, position) == 0);
+    static_assert(offsetof(sd::VertexPNUV, normal) == 12);
+    static_assert(offsetof(sd::VertexPNUV, uv) == 24);
+    static_assert(sizeof(sd::VertexPNUV) == 32);
 
 
-    auto binding_descriptions{SD::VertexPNUV::binding_descriptions()};
-    auto attribute_descriptions{SD::VertexPNUV::attribute_descriptions()};
+    auto binding_descriptions{sd::VertexPNUV::binding_descriptions()};
+    auto attribute_descriptions{sd::VertexPNUV::attribute_descriptions()};
     {
       PROFILE("Pipeline creation");
 

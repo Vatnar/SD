@@ -3,7 +3,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include "core/types.hpp"
-namespace SD {
+namespace sd {
 
 struct VertexPNUV {
   VLA::Vector3f position;
@@ -37,4 +37,4 @@ struct VertexPNUV {
     };
   };
 };
-} // namespace SD
+} // namespace sd

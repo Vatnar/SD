@@ -11,8 +11,6 @@
 #include "SD/core/logging.hpp"
 #include "SD/game_api.hpp"
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-
 static void*                           g_game_handle{nullptr};
 static GameAPI                         g_game_api{};
 static game::State                     g_game_state{};
@@ -194,6 +192,8 @@ bool load_game_api(std::filesystem::path source_so) {
   }
   return true;
 }
+
+
 int main(int argc, char* argv[]) {
   sd::log::init();
   hr::ConfigLoader           config(argc, argv);

@@ -21,7 +21,7 @@ GameRenderLayer::GameRenderLayer(const std::string&       name,
 }
 
 void GameRenderLayer::create_vertex_buffer() {
-  constexpr std::array<SD::VertexPNUV, 3> triangle{
+  constexpr std::array<sd::VertexPNUV, 3> triangle{
       {
        {.position = {0.0f, -0.8f, 0.0f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.5f, 0.0f}},
        {.position = {-0.8f, 0.8f, 0.0f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 1.0f}},

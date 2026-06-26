@@ -1,4 +1,4 @@
-struct VSInput{
+struct VertexPNUV{
     [[vk::location(0)]] float3 pos : POSITION;
     [[vk::location(1)]] float3 normal : NORMAL;
     [[vk::location(2)]] float2 uv : TEXCOORD0;
@@ -16,9 +16,10 @@ struct PushConstants {
     float4 colorMul;
 };
 
+
 [[vk::push_constant]] PushConstants pc;
 
-VSOutput main(VSInput input) {
+VSOutput main(VertexPNUV input) {
     VSOutput output;
     output.position = mul(pc.mvp, float4(input.pos, 1.0f));
     output.color = pc.colorMul;
