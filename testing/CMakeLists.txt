@@ -25,7 +25,13 @@ target_compile_definitions(SDGTest PRIVATE
 )
 
 # Tests need exceptions (GoogleTest requirement); override -fno-exceptions inherited from SD
-target_compile_options(SDGTest PRIVATE -fexceptions -freflection -mclflushopt)
+target_compile_options(SDGTest PRIVATE -fexceptions -freflection -mclflushopt
+        -include ${PROJECT_SOURCE_DIR}/SD/src/internal.hpp
+)
+
+set_target_properties(SDGTest PROPERTIES
+        UNITY_BUILD_UNIQUE_ID "FILE_INTERNAL"
+)
 
 if (SD_ENABLE_ASAN)
     if (NOT MSVC)

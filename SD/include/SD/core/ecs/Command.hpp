@@ -11,7 +11,7 @@
 
 namespace sd {
 
-class CommandQueue;
+struct CommandQueue;
 
 struct EntityHandle {
   U32 id;

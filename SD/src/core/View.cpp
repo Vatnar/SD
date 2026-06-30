@@ -45,6 +45,7 @@ vk::Format sd::View::find_depth_format() {
   }
 
   NOT_IMPLEMENTED; // didnt find supported depth format
+  return vk::Format::eUndefined;
 }
 
 void sd::View::on_gui_render() {

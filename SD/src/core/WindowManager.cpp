@@ -16,7 +16,12 @@ WindowManager::WindowManager(const EngineServices&         services,
   m_renderer(services.renderer), m_callbacks(callbacks) {
 }
 
-WindowManager::~WindowManager() = default;
+WindowManager::~WindowManager() {
+  for (auto& [id, data] : m_windows) {
+    data.render->~VulkanWindow();
+    data.logic->~Window();
+  }
+}
 
 WindowId WindowManager::create(const WindowProps& props, Arena* arena) {
   ASSERT(!props.title.empty() && "Window title must not be empty");

@@ -19,7 +19,7 @@
 namespace sd {
 
 struct SD_EXPORT ViewManager {
-  ~ViewManager() = default;
+  ~ViewManager();
 
   template<typename T, typename... Args>
     requires std::is_base_of_v<View, T>

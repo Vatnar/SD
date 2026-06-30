@@ -28,7 +28,7 @@ using Microsoft::WRL::ComPtr;
 #endif
 
 
-namespace {
+FILE_INTERNAL_BEGIN
 constexpr const char* k_shader_model = "6_0";
 
 
@@ -104,14 +104,14 @@ std::wstring to_wstring(const std::string& str) {
   return {str.begin(), str.end()};
 }
 
-ComPtr<IDxcUtils> init_dxc_utils() {
+[[maybe_unused]] ComPtr<IDxcUtils> init_dxc_utils() {
   ComPtr<IDxcUtils> utils;
   if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils))))
     sd::log::engine::critical("Failed to create DXC utils instance");
   return utils;
 }
 
-ComPtr<IDxcCompiler3> init_dxc_compiler() {
+[[maybe_unused]] ComPtr<IDxcCompiler3> init_dxc_compiler() {
   ComPtr<IDxcCompiler3> compiler;
   if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler))))
     sd::log::engine::critical("Failed to create DXC Compiler instance");
@@ -147,17 +147,17 @@ std::string deduce_profile(std::string_view filename) {
 
   return std::string{"lib_"} + k_shader_model;
 }
-} // namespace
+FILE_INTERNAL_END
 
 namespace sd {
 std::optional<std::vector<U32>> compile_shader(std::string_view filename,
                                                std::string_view profile) {
-  static ComPtr<IDxcUtils>     s_utils    = init_dxc_utils();
-  static ComPtr<IDxcCompiler3> s_compiler = init_dxc_compiler();
+  static ComPtr<IDxcUtils>     s_utils    = FILE_INTERNAL::init_dxc_utils();
+  static ComPtr<IDxcCompiler3> s_compiler = FILE_INTERNAL::init_dxc_compiler();
 
   ComPtr<IDxcBlobEncoding> source_blob;
   std::string              s_filename = std::string(filename);
-  std::wstring             w_filename = to_wstring(s_filename);
+  std::wstring             w_filename = FILE_INTERNAL::to_wstring(s_filename);
 
   HRESULT hres = s_utils->LoadFile(w_filename.c_str(), nullptr, &source_blob);
   if (FAILED(hres)) {
@@ -165,8 +165,9 @@ std::optional<std::vector<U32>> compile_shader(std::string_view filename,
     return {};
   }
 
-  std::string  target_profile   = profile.empty() ? deduce_profile(filename) : std::string{profile};
-  std::wstring w_target_profile = to_wstring(target_profile);
+  std::string target_profile =
+      profile.empty() ? FILE_INTERNAL::deduce_profile(filename) : std::string{profile};
+  std::wstring w_target_profile = FILE_INTERNAL::to_wstring(target_profile);
 
   std::vector arguments = {
       L"-E",

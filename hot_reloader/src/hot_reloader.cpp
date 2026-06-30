@@ -11,31 +11,32 @@
 #include "SD/core/logging.hpp"
 #include "SD/game_api.hpp"
 
-static void*                           g_game_handle{nullptr};
-static GameAPI                         g_game_api{};
-static game::State                     g_game_state{};
-static std::filesystem::file_time_type g_last_so_write_time{};
-static int                             g_reload_count{};
+FILE_INTERNAL_BEGIN
+
+void*                           g_game_handle{nullptr};
+GameAPI                         g_game_api{};
+game::State                     g_game_state{};
+std::filesystem::file_time_type g_last_so_write_time{};
+int                             g_reload_count{};
 
 // Accumulated old .so handles that are deliberately NOT closed during
 // hot-reload (dlclose is unsound — it can unmap code still referenced by
 // function pointers, lambdas, callbacks, etc.). On shutdown we close them
 // all at once when nothing can possibly be in flight.
-static std::vector<void*> g_stale_handles{};
+std::vector<void*> g_stale_handles{};
 
 // Cooldown timer to avoid spamming dlopen attempts when the file
 // changes faster than we can reload or the build is broken.
 using time_point = std::chrono::steady_clock::time_point;
-static time_point g_last_reload_check{};
+time_point g_last_reload_check{};
 
-static std::filesystem::path get_live_so_path(const std::filesystem::path& source_so,
-                                              int                          reload_index) {
+std::filesystem::path get_live_so_path(const std::filesystem::path& source_so, int reload_index) {
   std::filesystem::path dir{source_so.parent_path()};
   std::string           stem{source_so.filename().string()};
   return dir / (stem + "_live_" + std::to_string(reload_index));
 }
 
-static void cleanup_stale_live_copies(const std::filesystem::path& source_so) {
+void cleanup_stale_live_copies(const std::filesystem::path& source_so) {
   std::filesystem::path dir{source_so.parent_path()};
   std::string           stem{source_so.filename().string()};
   std::string           prefix{stem + "_live_"};
@@ -60,9 +61,9 @@ static void cleanup_stale_live_copies(const std::filesystem::path& source_so) {
 // No file-stability polling: the build system writes atomically (rename),
 // and dlopen with RTLD_NOW already fails on a corrupt .so. A failed reload
 // just retries on the next file change.
-static bool load_game_code_safe(const std::filesystem::path& source_so,
-                                void**                       out_new_handle,
-                                GameAPI*                     out_new_api) {
+bool load_game_code_safe(const std::filesystem::path& source_so,
+                         void**                       out_new_handle,
+                         GameAPI*                     out_new_api) {
   g_reload_count++;
   std::filesystem::path live_so{get_live_so_path(source_so, g_reload_count)};
   std::filesystem::path temp_so{std::filesystem::path(live_so.string() + ".tmp")};
@@ -193,6 +194,7 @@ bool load_game_api(std::filesystem::path source_so) {
   return true;
 }
 
+FILE_INTERNAL_END
 
 int main(int argc, char* argv[]) {
   sd::log::init();
@@ -209,14 +211,14 @@ int main(int argc, char* argv[]) {
   sd::log::engine::info("  window: {}x{}", cfg.window_width, cfg.window_height);
 
   std::filesystem::path source_so{cfg.game_so_path};
-  cleanup_stale_live_copies(source_so);
+  FILE_INTERNAL::cleanup_stale_live_copies(source_so);
 
-  if (!load_game_api(source_so)) {
+  if (!FILE_INTERNAL::load_game_api(source_so)) {
     std::exit(1);
   }
 
   std::error_code ec{};
-  g_last_so_write_time = std::filesystem::last_write_time(source_so, ec);
+  FILE_INTERNAL::g_last_so_write_time = std::filesystem::last_write_time(source_so, ec);
   if (ec) {
     sd::log::engine::error("Failed to get initial write time: {}", ec.message());
     return 1;
@@ -231,7 +233,8 @@ int main(int argc, char* argv[]) {
   };
   sd::Application app(app_spec);
 
-  g_game_api.on_load(reinterpret_cast<SD_Application*>(&app), &g_game_state);
+  FILE_INTERNAL::g_game_api.on_load(reinterpret_cast<SD_Application*>(&app),
+                                    &FILE_INTERNAL::g_game_state);
 
   while (app.is_running) {
     // ── Full restart request (from EngineDebugLayer "Restart Game") ────
@@ -240,32 +243,34 @@ int main(int argc, char* argv[]) {
 
       void*   new_handle{nullptr};
       GameAPI new_api{};
-      if (!load_game_code_safe(source_so, &new_handle, &new_api)) {
+      if (!FILE_INTERNAL::load_game_code_safe(source_so, &new_handle, &new_api)) {
         sd::log::engine::error("Failed to reload game code for restart");
         continue;
       }
 
       (void)app.services().vulkan.get_vulkan_device()->waitIdle();
 
-      if (g_game_api.on_unload) {
-        g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app), &g_game_state);
+      if (FILE_INTERNAL::g_game_api.on_unload) {
+        FILE_INTERNAL::g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app),
+                                            &FILE_INTERNAL::g_game_state);
       }
 
       app.clear_game_layers();
       app.scene_manager.clear();
-      g_game_state = {};
+      FILE_INTERNAL::g_game_state = {};
 
       sd::ComponentFactory::clear();
       sd::ComponentFactory::register_default_pools();
 
-      if (g_game_handle) {
-        g_stale_handles.push_back(g_game_handle);
+      if (FILE_INTERNAL::g_game_handle) {
+        FILE_INTERNAL::g_stale_handles.push_back(FILE_INTERNAL::g_game_handle);
       }
 
-      g_game_handle = new_handle;
-      g_game_api    = new_api;
+      FILE_INTERNAL::g_game_handle = new_handle;
+      FILE_INTERNAL::g_game_api    = new_api;
 
-      g_game_api.on_load(reinterpret_cast<SD_Application*>(&app), &g_game_state);
+      FILE_INTERNAL::g_game_api.on_load(reinterpret_cast<SD_Application*>(&app),
+                                        &FILE_INTERNAL::g_game_state);
 
       sd::log::engine::info("Game restart completed successfully");
     }
@@ -285,7 +290,7 @@ int main(int argc, char* argv[]) {
       continue;
     }
 
-    if (current_time > g_last_so_write_time) {
+    if (current_time > FILE_INTERNAL::g_last_so_write_time) {
       // When paused, don't update g_last_so_write_time — on resume
       // we'll still detect the change.
       if (app.game_code_reload_paused) {
@@ -294,18 +299,18 @@ int main(int argc, char* argv[]) {
 
       // Cooldown prevents busy-looping on a failed dlopen.
       auto now{std::chrono::steady_clock::now()};
-      if (now - g_last_reload_check < std::chrono::milliseconds(500)) {
+      if (now - FILE_INTERNAL::g_last_reload_check < std::chrono::milliseconds(500)) {
         continue;
       }
-      g_last_reload_check = now;
+      FILE_INTERNAL::g_last_reload_check = now;
 
-      g_last_so_write_time = current_time;
+      FILE_INTERNAL::g_last_so_write_time = current_time;
 
       sd::log::engine::info("Detected change, reloading game code...");
 
       void*   new_handle{};
       GameAPI new_api{};
-      if (!load_game_code_safe(source_so, &new_handle, &new_api)) {
+      if (!FILE_INTERNAL::load_game_code_safe(source_so, &new_handle, &new_api)) {
         sd::log::engine::error("Failed to load new game code - keeping old code running");
         continue;
       }
@@ -316,8 +321,9 @@ int main(int argc, char* argv[]) {
       // the old handle stays mapped so all existing code pointers are valid.
       (void)app.services().vulkan.get_vulkan_device()->waitIdle();
 
-      if (g_game_api.on_unload) {
-        g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app), &g_game_state);
+      if (FILE_INTERNAL::g_game_api.on_unload) {
+        FILE_INTERNAL::g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app),
+                                            &FILE_INTERNAL::g_game_state);
       }
 
       app.clear_game_layers();
@@ -325,14 +331,15 @@ int main(int argc, char* argv[]) {
       // dlclose is intentionally NOT called here — outstanding function
       // pointers, lambdas, callbacks, and Vulkan debug hooks from the old
       // .so remain valid as long as the mapping is resident.
-      if (g_game_handle) {
-        g_stale_handles.push_back(g_game_handle);
+      if (FILE_INTERNAL::g_game_handle) {
+        FILE_INTERNAL::g_stale_handles.push_back(FILE_INTERNAL::g_game_handle);
       }
 
-      g_game_handle = new_handle;
-      g_game_api    = new_api;
+      FILE_INTERNAL::g_game_handle = new_handle;
+      FILE_INTERNAL::g_game_api    = new_api;
 
-      g_game_api.on_reload(reinterpret_cast<SD_Application*>(&app), &g_game_state);
+      FILE_INTERNAL::g_game_api.on_reload(reinterpret_cast<SD_Application*>(&app),
+                                          &FILE_INTERNAL::g_game_state);
 
       sd::log::engine::info("Game code reload completed successfully");
     }
@@ -340,14 +347,15 @@ int main(int argc, char* argv[]) {
     app.frame();
   }
 
-  if (g_game_api.on_unload) {
-    g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app), &g_game_state);
+  if (FILE_INTERNAL::g_game_api.on_unload) {
+    FILE_INTERNAL::g_game_api.on_unload(reinterpret_cast<SD_Application*>(&app),
+                                        &FILE_INTERNAL::g_game_state);
   }
 
-  if (g_game_handle) {
-    g_stale_handles.push_back(g_game_handle);
+  if (FILE_INTERNAL::g_game_handle) {
+    FILE_INTERNAL::g_stale_handles.push_back(FILE_INTERNAL::g_game_handle);
   }
-  for (auto* h : g_stale_handles) {
+  for (auto* h : FILE_INTERNAL::g_stale_handles) {
     dlclose(h);
   }
 

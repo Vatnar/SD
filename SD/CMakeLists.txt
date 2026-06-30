@@ -28,6 +28,7 @@ add_library(SD SHARED ${SD_ENGINE_SOURCES})
 set_target_properties(SD PROPERTIES
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
+        UNITY_BUILD_UNIQUE_ID "FILE_INTERNAL"
 )
 
 generate_export_header(SD
@@ -123,6 +124,7 @@ else ()
             $<$<CONFIG:Debug>:-g -O0>
             $<$<CONFIG:Release>:-O3>
             $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+            -include ${CMAKE_CURRENT_SOURCE_DIR}/src/internal.hpp
             -fno-exceptions
             -Wall
             -Wextra

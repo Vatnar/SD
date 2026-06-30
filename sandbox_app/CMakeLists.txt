@@ -28,6 +28,7 @@ else ()
             -Wextra
             -Wpedantic
             -mclflushopt
+            -include ${PROJECT_SOURCE_DIR}/SD/src/internal.hpp
             $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
     )
 endif ()
@@ -48,6 +49,10 @@ if (UNIX AND NOT APPLE)
 
     target_link_libraries(SandboxApp PRIVATE
             SD
+    )
+
+    set_target_properties(SandboxApp PROPERTIES
+            UNITY_BUILD_UNIQUE_ID "FILE_INTERNAL"
     )
 
 
@@ -71,6 +76,7 @@ if (UNIX AND NOT APPLE)
                 -Wextra
                 -Wpedantic
                 -mclflushopt
+                -include ${PROJECT_SOURCE_DIR}/SD/src/internal.hpp
                 $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
         )
     endif ()
@@ -95,6 +101,7 @@ endif ()
 add_executable(SandboxAppStandalone
         main.cpp
         sandbox.cpp
+        $<TARGET_OBJECTS:SandboxGameObjects>
 )
 
 target_link_libraries(SandboxAppStandalone PRIVATE
@@ -108,11 +115,17 @@ target_compile_definitions(SandboxAppStandalone PRIVATE
 set_target_properties(SandboxAppStandalone PROPERTIES
         BUILD_RPATH "$ORIGIN:$ORIGIN/../lib"
         BUILD_RPATH_USE_ORIGIN TRUE
+        UNITY_BUILD_UNIQUE_ID "FILE_INTERNAL"
 )
 
 set_target_properties(SandboxApp PROPERTIES
         BUILD_RPATH "$ORIGIN"
         BUILD_RPATH_USE_ORIGIN TRUE
+        UNITY_BUILD_UNIQUE_ID "FILE_INTERNAL"
+)
+
+set_target_properties(SandboxGameObjects PROPERTIES
+        UNITY_BUILD_UNIQUE_ID "FILE_INTERNAL"
 )
 
 if (MSVC)
@@ -135,6 +148,7 @@ if (MSVC)
                 -Wextra
                 -Wpedantic
                 -mclflushopt
+                -include ${PROJECT_SOURCE_DIR}/SD/src/internal.hpp
                 $<$<BOOL:${SD_WARNINGS_AS_ERRORS}>:-Werror>
         )
     endif ()

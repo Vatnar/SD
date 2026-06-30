@@ -19,6 +19,7 @@ if (UNIX AND NOT APPLE)
     set_target_properties(HotReloadApp PROPERTIES
             BUILD_RPATH "$ORIGIN:$ORIGIN/../lib"
             BUILD_RPATH_USE_ORIGIN TRUE
+            UNITY_BUILD_UNIQUE_ID "FILE_INTERNAL"
     )
 
     target_compile_definitions(HotReloadApp PRIVATE
@@ -26,6 +27,7 @@ if (UNIX AND NOT APPLE)
             TOML_EXCEPTIONS=0
     )
     target_compile_options(HotReloadApp PRIVATE
+            -include ${PROJECT_SOURCE_DIR}/SD/src/internal.hpp
             -freflection
             -mclflushopt
     )

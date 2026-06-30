@@ -125,8 +125,11 @@ struct SD_EXPORT LayerList {
   }
 
   void clear() {
-    for (I64 i = static_cast<I64>(m_layers.count) - 1; i >= 0; --i)
+    for (I64 i = static_cast<I64>(m_layers.count) - 1; i >= 0; --i) {
       m_layers[i].on_detach();
+      if (m_layers[i].destroy_fn)
+        m_layers[i].destroy_fn(m_layers[i].data);
+    }
     m_layers.clear();
     if (m_arena)
       m_arena->clear();
@@ -196,6 +199,10 @@ struct SD_EXPORT LayerList {
 
   template<typename T>
   static void setup_fn_ptrs(LayerNode& node) {
+    if constexpr (!std::is_trivially_destructible_v<T>)
+      node.destroy_fn = [](void* d) {
+        static_cast<T*>(d)->~T();
+      };
     if constexpr (requires(T& t, EventVariant& e) { t.on_event(e); })
       node.on_event_fn = [](void* d, EventVariant& e) {
         static_cast<T*>(d)->on_event(e);

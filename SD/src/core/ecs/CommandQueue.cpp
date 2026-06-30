@@ -5,7 +5,7 @@
 
 namespace sd {
 
-namespace {
+FILE_INTERNAL_BEGIN
 struct CommandTypeRegistrar {
   CommandTypeRegistrar() {
     CommandQueue::register_type_erased_entry(
@@ -36,9 +36,9 @@ struct CommandTypeRegistrar {
         });
   }
 };
-static CommandTypeRegistrar s_registrar;
+CommandTypeRegistrar s_registrar;
 
-} // namespace
+FILE_INTERNAL_END
 
 void CommandQueue::apply(EntityManager<ComponentGroup<>>& em) {
   for (U64 i = 0; i < m_commands.count; ++i) {

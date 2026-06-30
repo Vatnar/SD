@@ -24,6 +24,7 @@ struct LayerNode {
   ViewId       view_id    = ViewId{0};
   View*        view       = nullptr;
 
+  void (*destroy_fn)(void*)                      = nullptr;
   void (*on_attach_fn)(void*)                    = nullptr;
   void (*on_detach_fn)(void*)                    = nullptr;
   void (*on_activate_fn)(void*)                  = nullptr;

@@ -50,6 +50,7 @@ inline U32 find_memory_type(const vk::PhysicalDevice& physical_device,
       return i;
   }
   NOT_IMPLEMENTED; // fallback??
+  return 0;
 }
 
 } // namespace sd

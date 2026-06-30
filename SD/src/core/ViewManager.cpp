@@ -4,6 +4,12 @@
 
 namespace sd {
 
+ViewManager::~ViewManager() {
+  for (auto& [id, view] : m_views_by_id) {
+    view->~View();
+  }
+}
+
 ViewManager::ViewResult ViewManager::get(ViewId id) {
   auto it = m_views_by_id.find(id);
   if (it == m_views_by_id.end())
@@ -34,6 +40,7 @@ ViewError ViewManager::remove(ViewId id) {
     return VIEW_DOES_NOT_EXIST;
 
   m_view_name_to_id.erase(it->second->get_name());
+  it->second->~View();
   m_views_by_id.erase(it);
   return SUCCESS;
 }
@@ -51,6 +58,7 @@ ViewError ViewManager::remove(const std::string& name) {
     return VIEW_DOES_NOT_EXIST; // Shouldn't happen, but be safe
 
   m_view_name_to_id.erase(it_name);
+  it_view->second->~View();
   m_views_by_id.erase(it_view);
   return SUCCESS;
 }
@@ -94,6 +102,7 @@ void ViewManager::cleanup_closed_views() {
     ASSERT(it->second && "View must be valid");
     if (!it->second->is_open()) {
       m_view_name_to_id.erase(it->second->get_name());
+      it->second->~View();
       it = m_views_by_id.erase(it);
     } else {
       ++it;
@@ -102,6 +111,9 @@ void ViewManager::cleanup_closed_views() {
 }
 
 void ViewManager::clear() {
+  for (auto& [id, view] : m_views_by_id) {
+    view->~View();
+  }
   m_views_by_id.clear();
   m_view_name_to_id.clear();
   m_next_view_id = ViewId{};

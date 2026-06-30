@@ -19,14 +19,17 @@
 
 namespace sd::log {
 
-static constexpr const char* HISTORY_FILE    = "debug_history.log";
-static constexpr size_t      MAX_MEM_ENTRIES = 500;
+FILE_INTERNAL_BEGIN
 
-static std::deque<LogEntry> g_log_history;
-static size_t               g_file_entry_count = 0;
-static std::mutex           g_log_mutex;
+constexpr const char* HISTORY_FILE    = "debug_history.log";
+constexpr size_t      MAX_MEM_ENTRIES = 500;
 
-static void write_entry_to_file(const LogEntry& entry) {
+
+std::deque<LogEntry> g_log_history;
+size_t               g_file_entry_count = 0;
+std::mutex           g_log_mutex;
+
+void write_entry_to_file(const LogEntry& entry) {
   FILE* f = fopen(HISTORY_FILE, "a");
   if (!f)
     return;
@@ -39,7 +42,7 @@ static void write_entry_to_file(const LogEntry& entry) {
   fclose(f);
 }
 
-static std::vector<LogEntry> read_entries_from_file(size_t offset, size_t count) {
+std::vector<LogEntry> read_entries_from_file(size_t offset, size_t count) {
   std::vector<LogEntry> result;
   FILE*                 f = fopen(HISTORY_FILE, "r");
   if (!f)
@@ -82,60 +85,68 @@ static std::vector<LogEntry> read_entries_from_file(size_t offset, size_t count)
   return result;
 }
 
+FILE_INTERNAL_END
+
 std::deque<LogEntry> get_log_history() {
-  std::lock_guard lock(g_log_mutex);
-  return g_log_history;
+  std::lock_guard lock(FILE_INTERNAL::g_log_mutex);
+  return FILE_INTERNAL::g_log_history;
 }
 
 void add_log_entry(LogEntry entry) {
-  std::lock_guard lock(g_log_mutex);
-  if (g_log_history.size() >= MAX_MEM_ENTRIES) {
-    write_entry_to_file(g_log_history.front());
-    g_log_history.pop_front();
-    g_file_entry_count++;
+  std::lock_guard lock(FILE_INTERNAL::g_log_mutex);
+  if (FILE_INTERNAL::g_log_history.size() >= FILE_INTERNAL::MAX_MEM_ENTRIES) {
+    FILE_INTERNAL::write_entry_to_file(FILE_INTERNAL::g_log_history.front());
+    FILE_INTERNAL::g_log_history.pop_front();
+    FILE_INTERNAL::g_file_entry_count++;
   }
-  g_log_history.push_back(std::move(entry));
+  FILE_INTERNAL::g_log_history.push_back(std::move(entry));
 }
 
 void clear_history() {
-  std::lock_guard lock(g_log_mutex);
-  g_log_history.clear();
-  g_file_entry_count = 0;
-  FILE* f            = fopen(HISTORY_FILE, "w");
+  std::lock_guard lock(FILE_INTERNAL::g_log_mutex);
+  FILE_INTERNAL::g_log_history.clear();
+  FILE_INTERNAL::g_file_entry_count = 0;
+  FILE* f                           = fopen(FILE_INTERNAL::HISTORY_FILE, "w");
   if (f)
     fclose(f);
 }
 
 size_t get_total_entry_count() {
-  std::lock_guard lock(g_log_mutex);
-  return g_file_entry_count + g_log_history.size();
+  std::lock_guard lock(FILE_INTERNAL::g_log_mutex);
+  return FILE_INTERNAL::g_file_entry_count + FILE_INTERNAL::g_log_history.size();
 }
 
 std::vector<LogEntry> get_entries(size_t offset, size_t count) {
-  std::lock_guard       lock(g_log_mutex);
+  std::lock_guard       lock(FILE_INTERNAL::g_log_mutex);
   std::vector<LogEntry> result;
 
-  if (offset < g_file_entry_count) {
-    size_t from_file = std::min(count, g_file_entry_count - offset);
-    auto   fe        = read_entries_from_file(offset, from_file);
+  if (offset < FILE_INTERNAL::g_file_entry_count) {
+    size_t from_file = std::min(count, FILE_INTERNAL::g_file_entry_count - offset);
+    auto   fe        = FILE_INTERNAL::read_entries_from_file(offset, from_file);
     result           = std::move(fe);
   }
 
-  size_t mem_offset = offset > g_file_entry_count ? offset - g_file_entry_count : 0;
-  if (mem_offset < g_log_history.size() && result.size() < count) {
-    size_t from_mem = std::min(count - result.size(), g_log_history.size() - mem_offset);
-    auto   begin    = g_log_history.begin() + static_cast<std::ptrdiff_t>(mem_offset);
+  size_t mem_offset =
+      offset > FILE_INTERNAL::g_file_entry_count ? offset - FILE_INTERNAL::g_file_entry_count : 0;
+  if (mem_offset < FILE_INTERNAL::g_log_history.size() && result.size() < count) {
+    size_t from_mem =
+        std::min(count - result.size(), FILE_INTERNAL::g_log_history.size() - mem_offset);
+    auto begin = FILE_INTERNAL::g_log_history.begin() + static_cast<std::ptrdiff_t>(mem_offset);
     result.insert(result.end(), begin, begin + static_cast<std::ptrdiff_t>(from_mem));
   }
 
   return result;
 }
 
-static std::vector<CategoryInfo> g_category_registry;
-static std::mutex                g_registry_mutex;
+FILE_INTERNAL_BEGIN
+
+std::vector<CategoryInfo> g_category_registry;
+std::mutex                g_registry_mutex;
+
+FILE_INTERNAL_END
 
 std::vector<CategoryInfo>& get_category_registry() {
-  return g_category_registry;
+  return FILE_INTERNAL::g_category_registry;
 }
 
 quill::LogLevel to_quill_level(const LogLevel level) {
@@ -183,22 +194,24 @@ LogLevel from_quill_level(const quill::LogLevel level) {
   }
 }
 
-static std::chrono::steady_clock::time_point s_start_time;
+FILE_INTERNAL_BEGIN
 
-static float get_uptime_sec() {
+std::chrono::steady_clock::time_point s_start_time;
+
+float get_uptime_sec() {
   auto now     = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration<float>(now - s_start_time).count();
   return elapsed;
 }
 
-static std::string ansi_fg_color(ImVec4 c) {
+std::string ansi_fg_color(ImVec4 c) {
   return fmt::format("\033[38;2;{};{};{}m",
                      static_cast<int>(c.x * 255),
                      static_cast<int>(c.y * 255),
                      static_cast<int>(c.z * 255));
 }
 
-static std::string level_ansi_color(quill::LogLevel level) {
+std::string level_ansi_color(quill::LogLevel level) {
   ImVec4 c;
   switch (level) {
     case quill::LogLevel::TraceL3:
@@ -229,7 +242,7 @@ static std::string level_ansi_color(quill::LogLevel level) {
   return ansi_fg_color(c);
 }
 
-static const char* level_str(quill::LogLevel level) {
+const char* level_str(quill::LogLevel level) {
   switch (level) {
     case quill::LogLevel::TraceL3:
     case quill::LogLevel::TraceL2:
@@ -250,6 +263,8 @@ static const char* level_str(quill::LogLevel level) {
       return "?";
   }
 }
+
+FILE_INTERNAL_END
 
 class CategoryConsoleSink final : public quill::Sink {
 public:
@@ -276,11 +291,11 @@ public:
                  std::string_view log_statement) override {
     std::string cat_color;
     {
-      std::lock_guard lock(g_registry_mutex);
+      std::lock_guard lock(FILE_INTERNAL::g_registry_mutex);
       auto&           reg = get_category_registry();
       for (auto& cat : reg) {
         if (is_category_under(std::string(logger_name.data(), logger_name.size()), cat.name)) {
-          cat_color = ansi_fg_color(cat.color);
+          cat_color = FILE_INTERNAL::ansi_fg_color(cat.color);
           break;
         }
       }
@@ -315,8 +330,8 @@ public:
       }
     } else {
       out += " [";
-      out += level_ansi_color(log_level);
-      out += level_str(log_level);
+      out += FILE_INTERNAL::level_ansi_color(log_level);
+      out += FILE_INTERNAL::level_str(log_level);
       out += "\033[0m] ";
       out.append(log_message.data(), log_message.size());
     }
@@ -352,19 +367,21 @@ public:
     add_log_entry({.category   = std::string(logger_name.data(), logger_name.size()),
                    .level      = from_quill_level(log_level),
                    .message    = std::string(log_message.data(), log_message.size()),
-                   .uptime_sec = get_uptime_sec()});
+                   .uptime_sec = FILE_INTERNAL::get_uptime_sec()});
   }
 
   void flush_sink() noexcept override {}
 };
 
-static std::shared_ptr<quill::Sink> g_console_sink;
-static std::shared_ptr<quill::Sink> g_imgui_sink;
-static std::shared_ptr<quill::Sink> g_engine_file_sink;
-static std::shared_ptr<quill::Sink> g_game_file_sink;
-static std::shared_ptr<quill::Sink> g_profiler_file_sink;
+FILE_INTERNAL_BEGIN
 
-static void create_category_logger(const char* name, LogLevel minLevel) {
+std::shared_ptr<quill::Sink> g_console_sink;
+std::shared_ptr<quill::Sink> g_imgui_sink;
+std::shared_ptr<quill::Sink> g_engine_file_sink;
+std::shared_ptr<quill::Sink> g_game_file_sink;
+std::shared_ptr<quill::Sink> g_profiler_file_sink;
+
+void create_category_logger(const char* name, LogLevel minLevel) {
   if (!g_console_sink)
     return;
 
@@ -387,21 +404,24 @@ static void create_category_logger(const char* name, LogLevel minLevel) {
   logger->set_immediate_flush(0);
 }
 
+FILE_INTERNAL_END
+
 void register_category(const char* name, ImVec4 color) {
   bool found = false;
   {
-    std::lock_guard lock(g_registry_mutex);
-    auto            it = std::find_if(g_category_registry.begin(),
-                                      g_category_registry.end(),
+    std::lock_guard lock(FILE_INTERNAL::g_registry_mutex);
+    auto            it = std::find_if(FILE_INTERNAL::g_category_registry.begin(),
+                                      FILE_INTERNAL::g_category_registry.end(),
                                       [name](const CategoryInfo& ci) { return ci.name == name; });
-    if (it == g_category_registry.end()) {
-      g_category_registry.push_back(CategoryInfo{.name = name, .visible = true, .color = color});
+    if (it == FILE_INTERNAL::g_category_registry.end()) {
+      FILE_INTERNAL::g_category_registry.push_back(
+          CategoryInfo{.name = name, .visible = true, .color = color});
     } else {
       found = true;
     }
   }
   if (!found) {
-    create_category_logger(name, LogLevel::TRACE);
+    FILE_INTERNAL::create_category_logger(name, LogLevel::TRACE);
   }
 }
 
@@ -414,23 +434,24 @@ bool is_category_under(const std::string& child, const std::string& parent) {
 }
 
 void init() {
-  s_start_time = std::chrono::steady_clock::now();
-  g_category_registry.clear();
-  g_console_sink.reset();
-  g_imgui_sink.reset();
-  g_engine_file_sink.reset();
-  g_game_file_sink.reset();
-  g_profiler_file_sink.reset();
+  FILE_INTERNAL::s_start_time = std::chrono::steady_clock::now();
+  FILE_INTERNAL::g_category_registry.clear();
+  FILE_INTERNAL::g_console_sink.reset();
+  FILE_INTERNAL::g_imgui_sink.reset();
+  FILE_INTERNAL::g_engine_file_sink.reset();
+  FILE_INTERNAL::g_game_file_sink.reset();
+  FILE_INTERNAL::g_profiler_file_sink.reset();
 
-  std::rename(HISTORY_FILE, "debug_history.log.old");
+  std::rename(FILE_INTERNAL::HISTORY_FILE, "debug_history.log.old");
 
   quill::BackendOptions backend_opts;
   backend_opts.error_notifier = [](const std::string&) {
   };
   quill::Backend::start(backend_opts);
 
-  g_console_sink = quill::Frontend::create_or_get_sink<CategoryConsoleSink>("console");
-  g_imgui_sink   = quill::Frontend::create_or_get_sink<ImguiSink>("imgui");
+  FILE_INTERNAL::g_console_sink =
+      quill::Frontend::create_or_get_sink<CategoryConsoleSink>("console");
+  FILE_INTERNAL::g_imgui_sink = quill::Frontend::create_or_get_sink<ImguiSink>("imgui");
 
   auto make_file_sink = [](const char* filename) {
     quill::FileSinkConfig cfg;
@@ -446,9 +467,9 @@ void init() {
                                                                 std::move(cfg));
   };
 
-  g_engine_file_sink   = make_file_sink("engine.log");
-  g_game_file_sink     = make_file_sink("game.log");
-  g_profiler_file_sink = make_file_sink("profiler.log");
+  FILE_INTERNAL::g_engine_file_sink   = make_file_sink("engine.log");
+  FILE_INTERNAL::g_game_file_sink     = make_file_sink("game.log");
+  FILE_INTERNAL::g_profiler_file_sink = make_file_sink("profiler.log");
 
   register_category("engine", ImVec4(0.0f, 0.8f, 1.0f, 1.0f));
   register_category("engine/renderer", ImVec4(0.8f, 0.4f, 1.0f, 1.0f));
